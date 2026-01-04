@@ -76,21 +76,39 @@
 interface Image {
   id: string;                    // Partition Key (UUID)
   datasetId: string;             // Sort Key (GSI)
-  s3Key: string;                 // S3 object key
-  s3Url: string;                 // Presigned URL (temporary)
+
+  // Image versions (multiple sizes for different use cases)
+  s3KeyOriginal: string;         // S3 key for original high-res image
+  s3KeyCompressed: string;       // S3 key for model-optimized image (≤4MB)
+  s3KeyThumbnail: string;        // S3 key for thumbnail (≤100KB)
+  s3Url: string;                 // Presigned URL (temporary, points to compressed by default)
+  s3UrlOriginal?: string;        // Presigned URL for original (on-demand)
+
   fileName: string;              // Original filename
-  fileSize: number;              // Bytes
+  originalSize: number;          // Original file size in bytes
+  compressedSize: number;        // Compressed file size in bytes
+  thumbnailSize: number;         // Thumbnail file size in bytes
+  compressionRatio: number;      // compressedSize / originalSize
+
   mimeType: string;              // image/jpeg, image/png, etc.
   documentType: DocumentType;    // Receipt, Invoice, etc.
   uploadedBy: string;            // User ID
   uploadedAt: string;            // ISO timestamp
   status: ImageStatus;           // Uploaded, Processing, Annotated, Validated
   processingError?: string;      // Error message if processing failed
+
   metadata: {
-    width: number;
-    height: number;
+    original: {
+      width: number;
+      height: number;
+    };
+    compressed: {
+      width: number;
+      height: number;
+    };
     exif?: Record<string, any>;
   };
+
   createdAt: string;
   updatedAt: string;
 }
@@ -361,6 +379,7 @@ App
 │   │   │   └── RecentActivity
 │   │   ├── ImageUpload
 │   │   │   ├── FileDropzone
+│   │   │   ├── CameraCapture (mobile-specific)
 │   │   │   ├── ImagePreview
 │   │   │   └── UploadProgress
 │   │   ├── ImageGallery
@@ -369,8 +388,9 @@ App
 │   │   │   └── ImageCard
 │   │   ├── AnnotationWorkspace
 │   │   │   ├── ImageViewer
-│   │   │   │   ├── CanvasAnnotator
-│   │   │   │   └── ZoomControls
+│   │   │   │   ├── CanvasAnnotator / TouchAnnotator (responsive)
+│   │   │   │   ├── ZoomControls
+│   │   │   │   └── ProgressiveImageLoader
 │   │   │   ├── QuestionList
 │   │   │   │   └── QuestionItem
 │   │   │   ├── AnnotationEditor
@@ -434,6 +454,64 @@ interface QuestionListProps {
 // - Sort by various criteria
 ```
 
+##### CameraCapture (Mobile-Specific)
+```typescript
+interface CameraCaptureProps {
+  onCapture: (file: File) => void;
+  onCancel: () => void;
+  documentType?: DocumentType;
+}
+
+// Features:
+// - Access device camera via HTML5 capture API
+// - Show live camera preview
+// - Capture photo on button press
+// - Support front/back camera switching
+// - Show captured image preview before confirmation
+// - Handle camera permissions gracefully
+```
+
+##### TouchAnnotator (Mobile-Specific)
+```typescript
+interface TouchAnnotatorProps {
+  imageUrl: string;
+  boundingBoxes: BoundingBox[];
+  selectedBoxId?: string;
+  onBoundingBoxChange: (boxes: BoundingBox[]) => void;
+  onBoundingBoxSelect: (boxId: string) => void;
+}
+
+// Features:
+// - Touch-friendly bounding box manipulation
+// - Pinch-to-zoom gesture support
+// - Two-finger pan gesture
+// - Large touch targets (minimum 44x44px)
+// - Corner handles for resizing (minimum 12px touch area)
+// - Tap to select box
+// - Long-press to show context menu
+// - Haptic feedback on interactions (if available)
+```
+
+##### ProgressiveImageLoader
+```typescript
+interface ProgressiveImageLoaderProps {
+  thumbnailUrl: string;
+  compressedUrl: string;
+  originalUrl: string;
+  onLoadComplete: () => void;
+  showOriginalOption?: boolean;
+}
+
+// Features:
+// - Load thumbnail first for instant display
+// - Load compressed image progressively
+// - Option to load original on demand
+// - Show loading progress indicator
+// - Optimize for mobile network conditions
+// - Cache loaded images in browser
+// - Handle network errors gracefully
+```
+
 ### 3.2 Backend Components
 
 #### Lambda Functions
@@ -441,14 +519,92 @@ interface QuestionListProps {
 ##### ImageProcessor
 ```typescript
 // Trigger: S3 upload event
-// Purpose: Process uploaded images
+// Purpose: Process uploaded images and generate multiple versions
 async function handler(event: S3Event) {
-  // 1. Get image from S3
+  // 1. Get original image from S3
+  const originalImage = await s3.getObject({ Key: s3KeyOriginal });
+
   // 2. Extract metadata (dimensions, EXIF)
-  // 3. Generate thumbnails
-  // 4. Update DynamoDB with metadata
-  // 5. Trigger annotation generation
-  // 6. Update status to PROCESSING
+  const metadata = await sharp(originalImage).metadata();
+
+  // 3. Generate compressed version (≤4MB for model processing)
+  const compressed = await compressImage(originalImage, {
+    maxSize: 4 * 1024 * 1024,  // 4MB
+    maxDimension: 2048,
+    quality: 90
+  });
+
+  // 4. Generate thumbnail (≤100KB for gallery view)
+  const thumbnail = await sharp(originalImage)
+    .resize(200, 200, { fit: 'inside' })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+
+  // 5. Upload compressed and thumbnail to S3
+  await Promise.all([
+    s3.putObject({ Key: s3KeyCompressed, Body: compressed }),
+    s3.putObject({ Key: s3KeyThumbnail, Body: thumbnail })
+  ]);
+
+  // 6. Update DynamoDB with all metadata
+  await updateImageRecord({
+    s3KeyOriginal,
+    s3KeyCompressed,
+    s3KeyThumbnail,
+    originalSize: originalImage.length,
+    compressedSize: compressed.length,
+    thumbnailSize: thumbnail.length,
+    compressionRatio: compressed.length / originalImage.length,
+    metadata: {
+      original: { width: metadata.width, height: metadata.height },
+      compressed: await sharp(compressed).metadata(),
+      exif: metadata.exif
+    }
+  });
+
+  // 7. Trigger annotation generation using compressed image
+  await triggerAnnotationGeneration(s3KeyCompressed);
+
+  // 8. Update status to PROCESSING
+  await updateImageStatus(imageId, 'PROCESSING');
+}
+
+// Helper function for smart compression
+async function compressImage(
+  buffer: Buffer,
+  options: { maxSize: number; maxDimension: number; quality: number }
+): Promise<Buffer> {
+  const metadata = await sharp(buffer).metadata();
+
+  // Calculate dimensions maintaining aspect ratio
+  let { width, height } = metadata;
+  if (width > options.maxDimension || height > options.maxDimension) {
+    const ratio = Math.min(
+      options.maxDimension / width,
+      options.maxDimension / height
+    );
+    width = Math.round(width * ratio);
+    height = Math.round(height * ratio);
+  }
+
+  // Iteratively compress until under maxSize
+  let quality = options.quality;
+  let compressed: Buffer;
+
+  do {
+    compressed = await sharp(buffer)
+      .resize(width, height, { fit: 'inside' })
+      .jpeg({ quality, progressive: true })
+      .toBuffer();
+
+    if (compressed.length > options.maxSize && quality > 50) {
+      quality -= 5;
+    } else {
+      break;
+    }
+  } while (quality >= 50);
+
+  return compressed;
 }
 ```
 

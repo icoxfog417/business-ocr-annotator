@@ -41,9 +41,14 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 #### 3.1.1 Image Upload
 - **REQ-IU-001**: Users shall be able to upload images in common formats (JPEG, PNG, PDF)
 - **REQ-IU-002**: System shall support batch upload of multiple images
-- **REQ-IU-003**: Maximum single image size shall be 10MB
+- **REQ-IU-003**: Maximum single image size shall be 20MB (original), with automatic compression to ≤4MB for model processing
 - **REQ-IU-004**: System shall validate image format and size before upload
 - **REQ-IU-005**: Users shall be able to preview images before upload
+- **REQ-IU-006**: System shall automatically compress images larger than 4MB for model processing while preserving originals
+- **REQ-IU-007**: System shall preserve original high-resolution images for final dataset export
+- **REQ-IU-008**: Mobile users shall be able to capture photos directly from device camera
+- **REQ-IU-009**: System shall support progressive image upload with resume capability for poor network conditions
+- **REQ-IU-010**: System shall generate thumbnails (≤100KB) for gallery view performance
 
 #### 3.1.2 Document Classification
 - **REQ-DC-001**: Users shall categorize images by document type:
@@ -89,6 +94,9 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 - **REQ-AR-002**: Users shall see all generated questions and answers for an image
 - **REQ-AR-003**: Users shall zoom and pan on images for detailed inspection
 - **REQ-AR-004**: Interface shall highlight selected bounding box when reviewing a question
+- **REQ-AR-005**: Interface shall display compressed images by default with option to view original resolution
+- **REQ-AR-006**: Mobile interface shall support touch gestures (pinch-to-zoom, swipe navigation)
+- **REQ-AR-007**: Interface shall be responsive and optimized for smartphone screens (minimum 375px width)
 
 #### 3.3.2 Annotation Editing
 - **REQ-AE-001**: Users shall edit question text
@@ -97,6 +105,8 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 - **REQ-AE-004**: Users shall add new bounding boxes manually
 - **REQ-AE-005**: Users shall delete bounding boxes
 - **REQ-AE-006**: Users shall add additional questions manually
+- **REQ-AE-007**: Touch interface shall provide adequately sized touch targets (minimum 44x44px) for mobile editing
+- **REQ-AE-008**: Bounding box corners and edges shall be touch-friendly (minimum 12px touch area)
 
 #### 3.3.3 Validation Actions
 - **REQ-VA-001**: Users shall approve individual question-answer pairs
@@ -168,11 +178,15 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 ## 4. Non-Functional Requirements
 
 ### 4.1 Performance
-- **REQ-NF-P-001**: Image upload shall complete within 10 seconds for files under 5MB
+- **REQ-NF-P-001**: Image upload shall complete within 15 seconds for files under 20MB on 4G networks
 - **REQ-NF-P-002**: AI annotation generation shall complete within 30 seconds per image
 - **REQ-NF-P-003**: Interface shall load annotation view within 2 seconds
 - **REQ-NF-P-004**: Dashboard statistics shall refresh within 3 seconds
 - **REQ-NF-P-005**: System shall support concurrent access by 10+ annotators
+- **REQ-NF-P-006**: Image compression shall complete within 5 seconds for images up to 20MB
+- **REQ-NF-P-007**: Thumbnail generation shall complete within 2 seconds
+- **REQ-NF-P-008**: Mobile UI shall achieve 60fps scrolling and gesture response
+- **REQ-NF-P-009**: Compressed images shall load within 3 seconds on 3G networks
 
 ### 4.2 Scalability
 - **REQ-NF-S-001**: System shall handle up to 10,000 images in a single dataset
@@ -180,10 +194,14 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 - **REQ-NF-S-003**: Database shall be partitionable for larger datasets
 
 ### 4.3 Usability
-- **REQ-NF-U-001**: Interface shall be responsive (mobile, tablet, desktop)
-- **REQ-NF-U-002**: System shall provide keyboard shortcuts for common actions
+- **REQ-NF-U-001**: Interface shall be responsive and mobile-first (smartphone, tablet, desktop)
+- **REQ-NF-U-002**: System shall provide keyboard shortcuts for common actions (desktop)
 - **REQ-NF-U-003**: System shall provide inline help and tooltips
 - **REQ-NF-U-004**: Error messages shall be clear and actionable
+- **REQ-NF-U-005**: Mobile interface shall support device camera access with appropriate permissions
+- **REQ-NF-U-006**: Interface shall work offline with local caching and sync when connection restored
+- **REQ-NF-U-007**: System shall provide visual feedback for all touch interactions (ripple, highlight)
+- **REQ-NF-U-008**: System shall support both portrait and landscape orientations on mobile devices
 
 ### 4.4 Security
 - **REQ-NF-SE-001**: System shall authenticate users via AWS Cognito
@@ -211,35 +229,42 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 
 ## 5. User Stories
 
-### 5.1 Image Upload
+### 5.1 Mobile Camera Capture
+```
+As an annotator using a smartphone,
+I want to capture photos of business documents directly with my device camera,
+So that I can quickly add new documents to the dataset without transferring files.
+```
+
+### 5.2 Image Upload
 ```
 As a dataset curator,
 I want to upload multiple business document images at once,
 So that I can efficiently add new data to the dataset.
 ```
 
-### 5.2 AI Annotation Review
+### 5.3 AI Annotation Review
 ```
 As an annotator,
 I want to review AI-generated questions with visual bounding boxes,
 So that I can quickly validate the accuracy of annotations.
 ```
 
-### 5.3 Annotation Correction
+### 5.4 Annotation Correction
 ```
 As an annotator,
 I want to adjust bounding boxes by dragging them,
 So that I can accurately mark the evidence area for answers.
 ```
 
-### 5.4 Quality Monitoring
+### 5.5 Quality Monitoring
 ```
 As a dataset curator,
 I want to see statistics on annotation quality and diversity,
 So that I can ensure we're building a high-quality, balanced dataset.
 ```
 
-### 5.5 Dataset Publishing
+### 5.6 Dataset Publishing
 ```
 As a dataset curator,
 I want to publish validated datasets to Hugging Face,

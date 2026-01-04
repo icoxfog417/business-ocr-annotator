@@ -47,11 +47,12 @@
 - ⬜ Add password reset functionality
 
 ### Storage
-- ⬜ Configure S3 bucket for image storage
+- ⬜ Configure S3 bucket for image storage with folder structure (original/, compressed/, thumbnail/)
 - ⬜ Set up bucket encryption at rest
 - ⬜ Configure CORS for S3 bucket
-- ⬜ Implement presigned URL generation for secure access
-- ⬜ Set up S3 lifecycle policies for old versions
+- ⬜ Implement presigned URL generation for secure access (separate URLs for original and compressed)
+- ⬜ Set up S3 lifecycle policies for old versions and thumbnail cleanup
+- ⬜ Configure S3 Intelligent-Tiering for cost optimization
 
 ### Database
 - ⬜ Design DynamoDB table schemas (Image, Annotation, Dataset, User)
@@ -72,12 +73,19 @@
 
 ### Lambda Functions
 - ⬜ Create ImageProcessor Lambda (S3 trigger)
+  - ⬜ Implement image metadata extraction
+  - ⬜ Implement smart compression algorithm (≤4MB target)
+  - ⬜ Implement thumbnail generation (≤100KB)
+  - ⬜ Add Sharp library for image processing
+  - ⬜ Handle multiple image formats (JPEG, PNG)
+  - ⬜ Update DynamoDB with all image versions
 - ⬜ Create AnnotationGenerator Lambda
 - ⬜ Create DatasetExporter Lambda
 - ⬜ Create HuggingFacePublisher Lambda
 - ⬜ Configure Lambda environment variables
-- ⬜ Set up Lambda layers for shared dependencies
+- ⬜ Set up Lambda layers for shared dependencies (Sharp, AWS SDK)
 - ⬜ Configure Lambda VPC settings (if needed)
+- ⬜ Optimize Lambda memory allocation for image processing (recommend 1024MB+)
 
 ---
 
@@ -116,26 +124,43 @@
 
 ### Image Upload
 - ⬜ Create FileDropzone component (drag-and-drop)
+- ⬜ Create CameraCapture component for mobile devices
+  - ⬜ Implement HTML5 camera access (capture="camera")
+  - ⬜ Add camera permission handling
+  - ⬜ Support front/back camera switching
+  - ⬜ Show live camera preview
+  - ⬜ Implement photo capture and preview
 - ⬜ Implement image preview before upload
-- ⬜ Add file validation (type, size)
-- ⬜ Create UploadProgress component
+- ⬜ Add file validation (type, size up to 20MB)
+- ⬜ Create UploadProgress component with cancel option
 - ⬜ Implement batch upload
+- ⬜ Add resumable upload for poor network conditions
+- ⬜ Optional: Implement client-side compression before upload
 - ⬜ Add document type selection
-- ⬜ Handle upload errors gracefully
+- ⬜ Handle upload errors gracefully with retry option
 
 ### Image Gallery
-- ⬜ Create ImageGallery layout
-- ⬜ Implement ImageGrid with lazy loading
+- ⬜ Create ImageGallery layout (mobile-first responsive)
+- ⬜ Implement ImageGrid with lazy loading (use thumbnails for performance)
 - ⬜ Create FilterPanel (by type, status, date)
 - ⬜ Add search functionality
 - ⬜ Implement pagination or infinite scroll
 - ⬜ Create ImageCard with metadata display
+  - ⬜ Display thumbnail by default
+  - ⬜ Show compression ratio and file sizes
+  - ⬜ Add touch-friendly actions
 - ⬜ Add image deletion functionality
 
 ### Annotation Workspace
-- ⬜ Create AnnotationWorkspace layout
+- ⬜ Create AnnotationWorkspace layout (mobile-first responsive)
 - ⬜ Implement ImageViewer component
-- ⬜ Create CanvasAnnotator for bounding boxes
+- ⬜ Create ProgressiveImageLoader
+  - ⬜ Load thumbnail first for instant display
+  - ⬜ Load compressed image progressively
+  - ⬜ Add "View Original" option for high-res inspection
+  - ⬜ Show loading progress indicator
+  - ⬜ Handle network errors gracefully
+- ⬜ Create CanvasAnnotator for desktop
   - ⬜ Render image with overlay canvas
   - ⬜ Draw existing bounding boxes
   - ⬜ Support drag-to-create new boxes
@@ -143,19 +168,29 @@
   - ⬜ Support drag box to move
   - ⬜ Implement box selection
   - ⬜ Add delete box functionality
+- ⬜ Create TouchAnnotator for mobile
+  - ⬜ Touch-friendly bounding box manipulation
+  - ⬜ Pinch-to-zoom gesture support
+  - ⬜ Two-finger pan gesture
+  - ⬜ Large touch targets (minimum 44x44px)
+  - ⬜ Corner handles for resizing (minimum 12px touch area)
+  - ⬜ Tap to select, long-press for context menu
+  - ⬜ Optional: Haptic feedback
 - ⬜ Create ZoomControls (zoom in, out, reset, fit)
-- ⬜ Implement pan functionality
+- ⬜ Implement pan functionality (mouse/touch)
 - ⬜ Create QuestionList component
 - ⬜ Create QuestionItem component with status badges
 - ⬜ Implement AnnotationEditor
-  - ⬜ QuestionInput field
+  - ⬜ QuestionInput field (mobile-optimized keyboard)
   - ⬜ AnswerInput field
   - ⬜ QuestionType selector
   - ⬜ BoundingBoxEditor (coordinate display/edit)
 - ⬜ Create ValidationControls (Approve, Reject, Flag)
-- ⬜ Implement keyboard shortcuts
+  - ⬜ Touch-friendly buttons (minimum 44x44px)
+- ⬜ Implement keyboard shortcuts (desktop only)
 - ⬜ Add annotation history view
 - ⬜ Implement auto-save (every 30 seconds)
+- ⬜ Support portrait and landscape orientations
 
 ### Dataset Management
 - ⬜ Create DatasetList view
@@ -196,11 +231,19 @@
 ### Image Processing
 - ⬜ Implement ImageProcessor Lambda handler
 - ⬜ Add image metadata extraction (dimensions, EXIF)
-- ⬜ Generate thumbnails using Sharp
+- ⬜ Implement smart compression algorithm
+  - ⬜ Dynamic quality adjustment to meet 4MB target
+  - ⬜ Maintain aspect ratio while resizing
+  - ⬜ Support max dimension of 2048px
+  - ⬜ Progressive JPEG encoding
+  - ⬜ Handle edge cases (already small images, PNG format)
+- ⬜ Generate thumbnails using Sharp (≤100KB, 200x200px)
+- ⬜ Upload compressed and thumbnail versions to S3
+- ⬜ Track compression metrics (ratio, processing time)
 - ⬜ Implement error handling and retry logic
-- ⬜ Add CloudWatch logging
-- ⬜ Update DynamoDB with metadata
-- ⬜ Trigger annotation generation
+- ⬜ Add CloudWatch logging with compression statistics
+- ⬜ Update DynamoDB with all image versions and metadata
+- ⬜ Trigger annotation generation with compressed image
 
 ### AI Integration
 - ⬜ Research and select Qwen model endpoint
@@ -253,35 +296,55 @@
 ### Unit Tests
 - ⬜ Set up Jest testing framework
 - ⬜ Write tests for utility functions
+- ⬜ Write tests for compression algorithm
+  - ⬜ Test various input sizes and formats
+  - ⬜ Verify output meets 4MB target
+  - ⬜ Test quality degradation limits
+  - ⬜ Test aspect ratio preservation
 - ⬜ Write tests for data models and validators
 - ⬜ Write tests for GraphQL resolvers
 - ⬜ Write tests for Lambda functions
-- ⬜ Write tests for React components
+- ⬜ Write tests for React components (desktop and mobile variants)
 - ⬜ Achieve >80% code coverage
 
 ### Integration Tests
 - ⬜ Set up integration test environment
 - ⬜ Write tests for image upload flow
-- ⬜ Write tests for annotation generation flow
+  - ⬜ Test upload, compression, and thumbnail generation pipeline
+  - ⬜ Verify all three versions stored correctly in S3
+  - ⬜ Test compression quality vs OCR accuracy
+- ⬜ Write tests for annotation generation flow (using compressed images)
 - ⬜ Write tests for validation workflow
-- ⬜ Write tests for dataset export
+- ⬜ Write tests for dataset export (verify original images exported)
 - ⬜ Write tests for Hugging Face publishing
 - ⬜ Test error scenarios and edge cases
+- ⬜ Test mobile camera capture flow
 
 ### End-to-End Tests
-- ⬜ Set up Cypress or Playwright
-- ⬜ Write E2E test for complete annotation workflow
+- ⬜ Set up Cypress or Playwright with mobile device emulation
+- ⬜ Write E2E test for complete annotation workflow (desktop and mobile)
+- ⬜ Write E2E test for mobile camera capture to annotation
 - ⬜ Write E2E test for dataset creation and publishing
 - ⬜ Write E2E test for user management
-- ⬜ Test across different browsers
+- ⬜ Test across different browsers (Chrome, Safari, Firefox)
 - ⬜ Test responsive design on different screen sizes
+  - ⬜ Mobile (375px - 767px)
+  - ⬜ Tablet (768px - 1023px)
+  - ⬜ Desktop (1024px+)
+- ⬜ Test portrait and landscape orientations
 
 ### Performance Tests
-- ⬜ Test image upload with large files
+- ⬜ Test image upload with large files (up to 20MB)
+- ⬜ Test compression performance
+  - ⬜ Various smartphone camera resolutions (12MP, 48MP, 108MP)
+  - ⬜ Measure compression time vs file size
+  - ⬜ Verify 99% of images compressed to ≤4MB
 - ⬜ Test batch upload performance
+- ⬜ Test network performance on simulated mobile networks (3G, 4G, 5G)
 - ⬜ Load test annotation generation with concurrent requests
 - ⬜ Test dashboard performance with large datasets
-- ⬜ Measure page load times
+- ⬜ Measure page load times on mobile devices
+- ⬜ Test progressive image loading performance
 - ⬜ Optimize slow queries and operations
 
 ---
