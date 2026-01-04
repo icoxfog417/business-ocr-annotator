@@ -56,6 +56,10 @@
 
 ### Database
 - ⬜ Design DynamoDB table schemas (Image, Annotation, Dataset, User)
+  - ⬜ Add OCRToken support to Image table
+  - ⬜ Add EvidenceSegment support to Annotation table
+  - ⬜ Add DocumentMetadata fields (Japanese-specific attributes)
+  - ⬜ Add new enum types (AnswerType, Difficulty, OCRStatus)
 - ⬜ Create DynamoDB tables with GSIs
 - ⬜ Configure DynamoDB encryption at rest
 - ⬜ Set up backup and point-in-time recovery
@@ -78,12 +82,34 @@
   - ⬜ Implement thumbnail generation (≤100KB)
   - ⬜ Add Sharp library for image processing
   - ⬜ Handle multiple image formats (JPEG, PNG)
+  - ⬜ Add WebP format support for compression
   - ⬜ Update DynamoDB with all image versions
 - ⬜ Create AnnotationGenerator Lambda
 - ⬜ Create DatasetExporter Lambda
+  - ⬜ Add JSON export with standard schema
+  - ⬜ Add JSONL export for streaming
+  - ⬜ Implement bounding box normalization to 0-1000 scale
 - ⬜ Create HuggingFacePublisher Lambda
+  - ⬜ Generate dataset card with Japanese legal context
+  - ⬜ Support Parquet format uploads
+- ⬜ Create OCRTokenExtractor Lambda
+  - ⬜ Integrate Tesseract OCR engine for Japanese
+  - ⬜ Parse OCR output into token format
+  - ⬜ Group tokens into words and lines
+  - ⬜ Store tokens in DynamoDB
+  - ⬜ Optional: Add Google Vision API support
+- ⬜ Create PIIRedactor Lambda
+  - ⬜ Implement regex-based PII detection for Japanese
+  - ⬜ Detect names, phone numbers, emails, addresses
+  - ⬜ Generate redacted images with blurred regions
+  - ⬜ Update annotations to remove PII text
+- ⬜ Create ParquetExporter Lambda
+  - ⬜ Transform data to J-BizDoc standard format
+  - ⬜ Convert to Apache Arrow format
+  - ⬜ Write optimized Parquet files
+  - ⬜ Generate dataset metadata
 - ⬜ Configure Lambda environment variables
-- ⬜ Set up Lambda layers for shared dependencies (Sharp, AWS SDK)
+- ⬜ Set up Lambda layers for shared dependencies (Sharp, Tesseract, AWS SDK, Arrow)
 - ⬜ Configure Lambda VPC settings (if needed)
 - ⬜ Optimize Lambda memory allocation for image processing (recommend 1024MB+)
 
@@ -137,6 +163,12 @@
 - ⬜ Add resumable upload for poor network conditions
 - ⬜ Optional: Implement client-side compression before upload
 - ⬜ Add document type selection
+- ⬜ Create EnhancedMetadataInput component
+  - ⬜ Document category and subcategory selection
+  - ⬜ Japanese-specific attributes (handwritten, seal presence, text direction)
+  - ⬜ Script type checkboxes (Kanji, Hiragana, Katakana, Romaji)
+  - ⬜ Layout attributes (tables, logos, orientation)
+  - ⬜ Business context fields (industry, region, year range)
 - ⬜ Handle upload errors gracefully with retry option
 
 ### Image Gallery
@@ -160,6 +192,12 @@
   - ⬜ Add "View Original" option for high-res inspection
   - ⬜ Show loading progress indicator
   - ⬜ Handle network errors gracefully
+- ⬜ Create OCRTokenViewer component
+  - ⬜ Display OCR tokens overlaid on image
+  - ⬜ Show token confidence scores
+  - ⬜ Allow editing of token text and bounding boxes
+  - ⬜ Support word and line groupings
+  - ⬜ Toggle OCR layer visibility
 - ⬜ Create CanvasAnnotator for desktop
   - ⬜ Render image with overlay canvas
   - ⬜ Draw existing bounding boxes
@@ -198,8 +236,23 @@
 - ⬜ Create VersionHistory component
 - ⬜ Implement version creation dialog
 - ⬜ Create ExportDialog (format selection)
+  - ⬜ Add Parquet format option
+  - ⬜ Add coordinate format options (absolute, normalized 0-1, normalized 0-1000)
+  - ⬜ Include/exclude OCR tokens option
+  - ⬜ PII handling options (include, redact, exclude)
+- ⬜ Create PIIRedactionControls component
+  - ⬜ Scan dataset for potential PII
+  - ⬜ Show PII detection results with confidence
+  - ⬜ Allow manual review and override
+  - ⬜ Trigger redaction process
+  - ⬜ Show redaction progress
 - ⬜ Add dataset deletion (with confirmation)
 - ⬜ Implement dataset cloning
+- ⬜ Create DatasetCardPreview component
+  - ⬜ Show generated dataset card
+  - ⬜ Edit citation and metadata
+  - ⬜ Preview licensing information
+  - ⬜ Include Japanese legal context
 
 ### Settings
 - ⬜ Create Settings layout
@@ -260,19 +313,75 @@
 
 ### Dataset Export
 - ⬜ Implement DatasetExporter Lambda handler
-- ⬜ Create JSON export formatter
-- ⬜ Create JSONL export formatter
-- ⬜ Create Parquet export formatter (using Arrow)
+- ⬜ Create JSON export formatter with J-BizDoc schema
+  - ⬜ Include dataset metadata and version info
+  - ⬜ Transform annotations to standard format
+  - ⬜ Include OCR tokens if requested
+  - ⬜ Support coordinate format options
+- ⬜ Create JSONL export formatter (one record per line)
+- ⬜ Create Parquet export formatter using Apache Arrow
+  - ⬜ Install and configure Apache Arrow library
+  - ⬜ Design Parquet schema for nested structures
+  - ⬜ Optimize row group size for streaming
+  - ⬜ Add compression (Snappy or ZSTD)
+  - ⬜ Validate Parquet output with pyarrow
+- ⬜ Implement bounding box normalization utilities
+  - ⬜ Convert absolute pixels to 0-1 normalized
+  - ⬜ Convert 0-1 to 0-1000 (LayoutLM standard)
+  - ⬜ Support both formats in export
 - ⬜ Implement data validation before export
 - ⬜ Upload export files to S3
 - ⬜ Generate export metadata file
 - ⬜ Update dataset version record
 
+### OCR Integration
+- ⬜ Research and select OCR engine (Tesseract vs Google Vision)
+- ⬜ Implement TesseractOCREngine class
+  - ⬜ Install Tesseract with Japanese language pack
+  - ⬜ Configure for horizontal and vertical text
+  - ⬜ Parse Tesseract output to OCRToken format
+  - ⬜ Extract confidence scores per token
+  - ⬜ Group characters into words and lines
+- ⬜ Optional: Implement GoogleVisionOCREngine class
+  - ⬜ Set up Google Cloud Vision API credentials
+  - ⬜ Parse Vision API response to OCRToken format
+  - ⬜ Handle script detection and language hints
+- ⬜ Create OCR service abstraction layer
+- ⬜ Implement OCRTokenExtractor Lambda handler
+- ⬜ Add OCR status tracking in DynamoDB
+- ⬜ Handle OCR failures and retries
+- ⬜ Measure OCR accuracy on test dataset
+
+### PII Detection and Redaction
+- ⬜ Implement PIIDetector service
+  - ⬜ Create regex patterns for Japanese phone numbers
+  - ⬜ Create regex patterns for email addresses
+  - ⬜ Create patterns for Japanese names (family name + given name)
+  - ⬜ Create patterns for postal codes and addresses
+  - ⬜ Implement confidence scoring for detections
+- ⬜ Implement image redaction using Sharp
+  - ⬜ Blur detected PII regions
+  - ⬜ Apply Gaussian blur with configurable radius
+  - ⬜ Preserve image quality outside redacted areas
+- ⬜ Implement text redaction in annotations
+  - ⬜ Replace PII text with placeholders ([NAME], [PHONE], etc.)
+  - ⬜ Update answer text in annotations
+  - ⬜ Log redaction actions for audit
+- ⬜ Create PIIRedactor Lambda handler
+- ⬜ Add PII redaction status to Image metadata
+- ⬜ Test PII detection accuracy on sample documents
+
 ### Hugging Face Integration
 - ⬜ Create HuggingFace API client
 - ⬜ Implement dataset creation
-- ⬜ Implement file upload to HF
+- ⬜ Implement file upload to HF (support Parquet)
 - ⬜ Generate dataset card (README.md)
+  - ⬜ Include dataset description and statistics
+  - ⬜ Add citation in BibTeX format
+  - ⬜ Include licensing information (CC BY-SA 4.0)
+  - ⬜ Document Japanese Copyright Act context
+  - ⬜ Add usage examples with datasets library
+  - ⬜ Include data collection methodology
 - ⬜ Implement HuggingFacePublisher Lambda handler
 - ⬜ Add version tagging
 - ⬜ Store HF dataset URL in DynamoDB
@@ -313,10 +422,32 @@
   - ⬜ Test upload, compression, and thumbnail generation pipeline
   - ⬜ Verify all three versions stored correctly in S3
   - ⬜ Test compression quality vs OCR accuracy
+- ⬜ Write tests for OCR extraction flow
+  - ⬜ Test Tesseract integration with Japanese documents
+  - ⬜ Verify OCR token accuracy for printed text
+  - ⬜ Test OCR token accuracy for handwritten text
+  - ⬜ Verify word and line grouping correctness
+  - ⬜ Test vertical text handling
+- ⬜ Write tests for PII detection and redaction
+  - ⬜ Test detection of Japanese names
+  - ⬜ Test detection of phone numbers and emails
+  - ⬜ Verify image blurring quality
+  - ⬜ Test false positive rate
+  - ⬜ Verify annotation text redaction
 - ⬜ Write tests for annotation generation flow (using compressed images)
 - ⬜ Write tests for validation workflow
 - ⬜ Write tests for dataset export (verify original images exported)
+  - ⬜ Test JSON export with J-BizDoc schema
+  - ⬜ Test JSONL export format
+  - ⬜ Test Parquet export and validate schema
+  - ⬜ Test bounding box normalization (0-1 and 0-1000)
+  - ⬜ Verify coordinate format options work correctly
+  - ⬜ Test export with/without OCR tokens
+  - ⬜ Test PII handling options in export
 - ⬜ Write tests for Hugging Face publishing
+  - ⬜ Test dataset card generation
+  - ⬜ Test Parquet file upload
+  - ⬜ Verify streaming with datasets library
 - ⬜ Test error scenarios and edge cases
 - ⬜ Test mobile camera capture flow
 
@@ -422,6 +553,19 @@
 - ⬜ Create video tutorials for key workflows
 - ⬜ Document best practices for annotation
 - ⬜ Create FAQ section
+- ⬜ Create dataset card template for Hugging Face
+  - ⬜ Include standard sections (Dataset Description, Dataset Structure, etc.)
+  - ⬜ Add Japanese legal context section
+  - ⬜ Include citation format (BibTeX and APA)
+  - ⬜ Document PII handling procedures
+  - ⬜ Add usage examples with datasets library
+- ⬜ Document Japanese Copyright Act Article 30-4 compliance
+  - ⬜ Explain information analysis exception
+  - ⬜ Guidelines for commercial vs research use
+  - ⬜ Attribution requirements
+- ⬜ Create citation guidelines for dataset users
+- ⬜ Document data collection methodology
+- ⬜ Create OCR token format documentation
 
 ### Technical Documentation
 - ⬜ Document API endpoints and usage

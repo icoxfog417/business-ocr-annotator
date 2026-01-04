@@ -109,6 +109,15 @@ interface Image {
     exif?: Record<string, any>;
   };
 
+  // OCR data
+  ocrTokens?: OCRToken[];        // Extracted OCR tokens
+  ocrStatus: OCRStatus;          // OCR extraction status
+  ocrEngine?: string;            // OCR engine used (e.g., "tesseract-5.3.0-jpn")
+  ocrError?: string;             // Error message if OCR failed
+
+  // Enhanced document metadata
+  documentMetadata?: DocumentMetadata; // Japanese-specific and layout attributes
+
   createdAt: string;
   updatedAt: string;
 }
@@ -129,6 +138,35 @@ enum ImageStatus {
   VALIDATED = 'VALIDATED',
   FAILED = 'FAILED'
 }
+
+enum OCRStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED'
+}
+
+interface DocumentMetadata {
+  category: string;              // Primary category (receipt, invoice, etc.)
+  subcategory?: string;          // e.g., "restaurant_receipt", "tax_withholding_form"
+
+  // Japanese-specific attributes
+  isHandwritten: boolean;        // Contains handwritten text
+  containsSeal: boolean;         // Contains Hanko stamps
+  textDirection: 'horizontal' | 'vertical' | 'mixed'; // Text direction
+  scriptTypes: ('kanji' | 'hiragana' | 'katakana' | 'romaji')[]; // Scripts present
+
+  // Layout attributes
+  orientation: 'portrait' | 'landscape';
+  hasTables: boolean;
+  hasLogos: boolean;
+  pageCount: number;
+
+  // Business context
+  industry?: string;             // e.g., "restaurant", "retail", "manufacturing"
+  region?: string;               // e.g., "Tokyo", "Osaka"
+  yearRange?: string;            // Document era, e.g., "2020-2025"
+}
 ```
 
 #### Annotation Table
@@ -140,7 +178,11 @@ interface Annotation {
   question: string;              // The question text
   answer: string;                // The answer text
   questionType: QuestionType;    // Classification of question
-  boundingBoxes: BoundingBox[];  // Answer evidence areas
+  boundingBoxes: BoundingBox[];  // Answer evidence areas (deprecated, use evidenceSegments)
+  evidenceSegments: EvidenceSegment[]; // Detailed evidence with text and labels
+  answerType: AnswerType;        // Type of answer
+  difficulty?: Difficulty;       // Question difficulty
+  requiresReasoning: boolean;    // Whether answer requires multi-step reasoning
   generatedBy: GenerationSource; // AI or Human
   modelVersion?: string;         // Model that generated this (if AI)
   confidence?: number;           // Model confidence (0-1)
@@ -162,13 +204,46 @@ interface BoundingBox {
   label?: string;                // Optional label
 }
 
+interface EvidenceSegment {
+  box_2d: [number, number, number, number]; // [x_min, y_min, x_max, y_max] in absolute pixels
+  text: string;                  // Text content in this region
+  label?: string;                // Semantic label (e.g., "payer_name", "total_amount")
+  confidence?: number;           // Model confidence (0-1)
+}
+
+interface OCRToken {
+  text: string;                  // Token text
+  box_2d: [number, number, number, number]; // [x_min, y_min, x_max, y_max] in absolute pixels
+  confidence: number;            // OCR confidence (0-1)
+  tokenId: number;               // Sequential token ID
+  wordId?: number;               // Word grouping ID
+  lineId?: number;               // Line grouping ID
+}
+
 enum QuestionType {
   INFORMATION_EXTRACTION = 'INFORMATION_EXTRACTION',
   ITEM_IDENTIFICATION = 'ITEM_IDENTIFICATION',
   DATE_TIME = 'DATE_TIME',
   ENTITY_RECOGNITION = 'ENTITY_RECOGNITION',
   CALCULATION = 'CALCULATION',
+  EXTRACTIVE = 'EXTRACTIVE',      // Added for academic compatibility
+  ABSTRACTIVE = 'ABSTRACTIVE',    // Added for academic compatibility
+  BOOLEAN = 'BOOLEAN',            // Added for academic compatibility
+  COUNTING = 'COUNTING',          // Added for academic compatibility
   OTHER = 'OTHER'
+}
+
+enum AnswerType {
+  SPAN = 'SPAN',                 // Text span from document
+  FREE_FORM = 'FREE_FORM',       // Generated answer
+  YES_NO = 'YES_NO',             // Boolean answer
+  NUMBER = 'NUMBER'              // Numeric answer
+}
+
+enum Difficulty {
+  EASY = 'EASY',
+  MEDIUM = 'MEDIUM',
+  HARD = 'HARD'
 }
 
 enum GenerationSource {
@@ -648,6 +723,52 @@ async function handler(event: { datasetId: string, version: string }) {
 }
 ```
 
+##### OCRTokenExtractor
+```typescript
+// Trigger: ImageProcessor completion or manual invocation
+// Purpose: Extract OCR tokens from images
+async function handler(event: { imageId: string, s3Key: string }) {
+  // 1. Fetch image from S3
+  // 2. Call OCR engine (Tesseract or Google Vision)
+  // 3. Parse OCR response into OCRToken format
+  // 4. Group tokens into words and lines
+  // 5. Store tokens in DynamoDB (Image.ocrTokens)
+  // 6. Update OCR status to COMPLETED
+  // 7. Calculate OCR confidence statistics
+}
+```
+
+##### PIIRedactor
+```typescript
+// Trigger: Manual invocation before dataset export
+// Purpose: Detect and redact PII in images and annotations
+async function handler(event: { imageId: string }) {
+  // 1. Fetch image and OCR tokens
+  // 2. Run PII detection (regex + ML model)
+  // 3. Identify sensitive fields (names, phone, email, address)
+  // 4. Generate redacted image with blurred regions
+  // 5. Update annotations to remove PII from answer text
+  // 6. Store redacted version in S3
+  // 7. Flag image as PII-redacted in metadata
+}
+```
+
+##### ParquetExporter
+```typescript
+// Trigger: Dataset export request
+// Purpose: Convert JSON dataset to Parquet format
+async function handler(event: { datasetId: string, version: string }) {
+  // 1. Fetch all annotations for dataset version
+  // 2. Transform to standardized schema (J-BizDoc format)
+  // 3. Normalize bounding boxes to 0-1000 scale
+  // 4. Convert to Apache Arrow format
+  // 5. Write Parquet file with optimal row group size
+  // 6. Upload to S3
+  // 7. Generate dataset metadata file
+  // 8. Update version record with Parquet URL
+}
+```
+
 ## 4. API Integrations
 
 ### 4.1 Qwen Model Integration
@@ -716,6 +837,155 @@ interface DatasetMetadata {
   size: number;
   format: string;
   examples: Example[];
+}
+```
+
+### 4.3 Dataset Export Service
+
+```typescript
+interface DatasetExportService {
+  // Export formats
+  exportToJSON(datasetId: string, version: string, options: ExportOptions): Promise<ExportResult>;
+  exportToJSONL(datasetId: string, version: string, options: ExportOptions): Promise<ExportResult>;
+  exportToParquet(datasetId: string, version: string, options: ExportOptions): Promise<ExportResult>;
+
+  // Transformation utilities
+  transformToStandardFormat(annotations: Annotation[], images: Image[]): StandardDatasetFormat;
+  normalizeBoundingBoxes(bbox: number[], imageWidth: number, imageHeight: number, targetScale: number): number[];
+  generateDatasetCard(metadata: DatasetCardMetadata): string;
+}
+
+interface ExportOptions {
+  includeOCRTokens: boolean;
+  normalizationScale: 1 | 1000;  // 0-1 or 0-1000
+  includePII: boolean;           // Whether to include PII or use redacted version
+  coordinateFormat: 'absolute' | 'normalized_1' | 'normalized_1000' | 'all';
+}
+
+interface ExportResult {
+  s3Url: string;
+  format: 'json' | 'jsonl' | 'parquet';
+  size: number;
+  recordCount: number;
+  checksum: string;
+  compressionRatio?: number;
+}
+
+interface StandardDatasetFormat {
+  dataset_version: string;
+  dataset_metadata: {
+    name: string;
+    description: string;
+    language: string;
+    license: string;
+    citation: string;
+    created_at: string;
+    version: string;
+    size_bytes: number;
+    num_examples: number;
+  };
+  data: StandardExample[];
+}
+
+interface StandardExample {
+  question_id: string;
+  image_id: string;
+  image_url: string;
+  image_metadata: ImageMetadata;
+  document_metadata: DocumentMetadata;
+  qa_pairs: QAPair[];
+  ocr_tokens: OCRToken[];
+  annotation_metadata: AnnotationMetadata;
+}
+
+interface QAPair {
+  question: string;
+  answer: string;
+  question_type: string;
+  evidence_segments: EvidenceSegment[];
+  answer_type: string;
+  difficulty: string;
+  requires_reasoning: boolean;
+}
+
+interface DatasetCardMetadata {
+  name: string;
+  description: string;
+  homepage: string;
+  license: string;
+  citation: string;
+  language: string;
+  task_categories: string[];
+  size_categories: string[];
+  tags: string[];
+  authors: string[];
+  version: string;
+  legal_notice?: string; // Japanese Copyright Act info
+}
+```
+
+### 4.4 OCR Engine Integration
+
+```typescript
+interface OCREngine {
+  extractTokens(imageBuffer: Buffer, language: string): Promise<OCRResult>;
+  getSupportedLanguages(): string[];
+  healthCheck(): Promise<boolean>;
+}
+
+interface OCRResult {
+  tokens: OCRToken[];
+  confidence: number;         // Overall confidence
+  processingTime: number;     // Milliseconds
+  engine: string;             // e.g., "tesseract-5.3.0-jpn"
+  warnings?: string[];        // Processing warnings
+}
+
+// Tesseract implementation
+class TesseractOCREngine implements OCREngine {
+  async extractTokens(imageBuffer: Buffer, language: string): Promise<OCRResult>
+  getSupportedLanguages(): string[]
+  healthCheck(): Promise<boolean>
+}
+
+// Google Vision API implementation (optional, premium)
+class GoogleVisionOCREngine implements OCREngine {
+  async extractTokens(imageBuffer: Buffer, language: string): Promise<OCRResult>
+  getSupportedLanguages(): string[]
+  healthCheck(): Promise<boolean>
+}
+```
+
+### 4.5 PII Detection Service
+
+```typescript
+interface PIIDetectionService {
+  detectPII(text: string, language: string): Promise<PIIDetection[]>;
+  redactImage(imageBuffer: Buffer, regions: PIIRegion[]): Promise<Buffer>;
+  redactText(text: string, detections: PIIDetection[]): string;
+}
+
+interface PIIDetection {
+  type: 'name' | 'email' | 'phone' | 'address' | 'id_number';
+  text: string;
+  startIndex: number;
+  endIndex: number;
+  confidence: number;
+  bbox?: [number, number, number, number]; // If associated with OCR token
+}
+
+interface PIIRegion {
+  bbox: [number, number, number, number];
+  type: string;
+}
+
+class PIIDetector implements PIIDetectionService {
+  // Regex patterns for Japanese phone numbers, emails, etc.
+  private patterns: Record<string, RegExp>;
+
+  async detectPII(text: string, language: string): Promise<PIIDetection[]>
+  async redactImage(imageBuffer: Buffer, regions: PIIRegion[]): Promise<Buffer>
+  redactText(text: string, detections: PIIDetection[]): string
 }
 ```
 

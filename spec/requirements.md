@@ -60,6 +60,11 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
   - Other (with custom label)
 - **REQ-DC-002**: System shall auto-suggest document type based on image analysis
 - **REQ-DC-003**: Users shall be able to manually override document type
+- **REQ-DC-004**: System shall support enhanced document metadata including:
+  - Japanese-specific attributes (handwritten flag, seal presence, text direction)
+  - Script types (Kanji, Hiragana, Katakana, Romaji)
+  - Layout attributes (tables, logos, orientation)
+  - Business context (industry, region, year range)
 
 #### 3.1.3 Image Management
 - **REQ-IM-001**: Users shall view all uploaded images in a gallery view
@@ -80,6 +85,10 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 - **REQ-QG-003**: System shall generate 3-10 questions per image based on content complexity
 - **REQ-QG-004**: System shall provide candidate answers for each question
 - **REQ-QG-005**: System shall generate bounding box coordinates for answer evidence
+- **REQ-QG-006**: System shall extract OCR tokens with bounding boxes and confidence scores for all text in images
+- **REQ-QG-007**: System shall classify question types (extractive, abstractive, boolean, counting)
+- **REQ-QG-008**: System shall classify answer types (span, free_form, yes_no, number)
+- **REQ-QG-009**: System shall assign difficulty levels (easy, medium, hard) to generated questions
 
 #### 3.2.2 Model Configuration
 - **REQ-MC-001**: Administrators shall configure OCR model endpoints
@@ -167,13 +176,19 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 #### 3.5.3 Export Formats
 - **REQ-EF-001**: System shall export datasets in JSON format
 - **REQ-EF-002**: System shall export datasets in JSONL format
-- **REQ-EF-003**: System shall export datasets in Parquet format
+- **REQ-EF-003**: System shall export datasets in Parquet format for efficient Hugging Face streaming
 - **REQ-EF-004**: Export shall include:
   - Image references (URLs or embedded)
   - Questions and answers
-  - Bounding box coordinates
+  - Bounding box coordinates (absolute and normalized)
+  - OCR tokens with confidence scores
   - Metadata (document type, validation status, timestamps)
+  - Evidence segments with text and labels
 - **REQ-EF-005**: Users shall download dataset versions locally
+- **REQ-EF-006**: System shall normalize bounding boxes to 0-1000 scale (LayoutLM standard) on export
+- **REQ-EF-007**: Export shall include both absolute pixel coordinates and normalized coordinates for bounding boxes
+- **REQ-EF-008**: System shall generate dataset cards with metadata, citation, and legal information for Hugging Face
+- **REQ-EF-009**: Export format shall conform to academic standards (DocVQA, LayoutLM, ICDAR)
 
 ## 4. Non-Functional Requirements
 
@@ -226,6 +241,10 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 - **REQ-NF-C-001**: System shall comply with data privacy regulations (GDPR, CCPA)
 - **REQ-NF-C-002**: System shall allow users to delete their data
 - **REQ-NF-C-003**: System shall track data provenance and licensing
+- **REQ-NF-C-004**: System shall comply with Japanese Copyright Act Article 30-4 for AI training data
+- **REQ-NF-C-005**: System shall detect and redact PII (personally identifiable information) in uploaded documents
+- **REQ-NF-C-006**: System shall use CC BY-SA 4.0 license for published datasets (or allow users to configure)
+- **REQ-NF-C-007**: System shall document legal context and licensing in dataset cards for international users
 
 ## 5. User Stories
 
@@ -269,6 +288,27 @@ So that I can ensure we're building a high-quality, balanced dataset.
 As a dataset curator,
 I want to publish validated datasets to Hugging Face,
 So that the research community can use them for model evaluation.
+```
+
+### 5.7 OCR Token Review
+```
+As an annotator,
+I want to review and correct OCR tokens extracted from images,
+So that the dataset includes accurate text localization for research.
+```
+
+### 5.8 Academic Dataset Export
+```
+As a researcher,
+I want to download datasets in standard academic formats (LayoutLM-compatible),
+So that I can use them directly with state-of-the-art models without format conversion.
+```
+
+### 5.9 PII Protection
+```
+As a dataset curator,
+I want the system to automatically detect and redact sensitive personal information,
+So that published datasets comply with privacy regulations.
 ```
 
 ## 6. Acceptance Criteria
