@@ -8,60 +8,87 @@
 
 ### 1.1 High-Level Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Client Layer                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │   Upload UI  │  │ Annotation UI│  │ Dashboard UI │          │
-│  └──────────────┘  └──────────────┘  └──────────────┘          │
-└────────────────────────┬────────────────────────────────────────┘
-                         │ HTTPS/GraphQL
-┌────────────────────────┴────────────────────────────────────────┐
-│                    AWS Amplify Gen2 Layer                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │   Auth       │  │   AppSync    │  │  Functions   │          │
-│  │  (Cognito)   │  │  (GraphQL)   │  │  (Lambda)    │          │
-│  └──────────────┘  └──────────────┘  └──────────────┘          │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-┌────────────────────────┴────────────────────────────────────────┐
-│                      Backend Services                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │   Storage    │  │   Database   │  │  AI Service  │          │
-│  │    (S3)      │  │  (DynamoDB)  │  │   (Qwen)     │          │
-│  └──────────────┘  └──────────────┘  └──────────────┘          │
-└─────────────────────────────────────────────────────────────────┘
-                         │
-┌────────────────────────┴────────────────────────────────────────┐
-│                  External Integrations                           │
-│  ┌──────────────────────────────────────────────────┐           │
-│  │         Hugging Face Dataset Hub                 │           │
-│  └──────────────────────────────────────────────────┘           │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "Client Layer - React 18+"
+        UI[Web UI<br/>Minimal Amplify UI]
+        MobileUI[Mobile Camera Capture]
+    end
+
+    subgraph "AWS Amplify Gen2 Layer"
+        Cognito[AWS Cognito<br/>Authentication]
+        AppSync[AWS AppSync<br/>GraphQL API]
+        S3Store[S3 Storage<br/>3 tiers: Original/Compressed/Thumbnail]
+    end
+
+    subgraph "Lambda Functions - Node.js 20.x"
+        ImageProc[ImageProcessor<br/>Sharp-based compression]
+        AnnotGen[AnnotationGenerator<br/>Bedrock integration]
+        DatasetExp[DatasetExporter<br/>JSON/JSONL/Parquet]
+        PIIRedact[PIIRedactor<br/>Multi-language PII]
+    end
+
+    subgraph "Data Layer"
+        DynamoDB[(DynamoDB<br/>Simplified Schema)]
+    end
+
+    subgraph "AI Services"
+        Bedrock[Amazon Bedrock<br/>Qwen-VL / Claude Vision<br/>Multi-language]
+    end
+
+    subgraph "External"
+        HF[Hugging Face Hub]
+    end
+
+    UI --> AppSync
+    MobileUI --> UI
+    AppSync --> Cognito
+    AppSync --> ImageProc
+    AppSync --> AnnotGen
+    AppSync --> DatasetExp
+    AppSync --> PIIRedact
+
+    ImageProc --> S3Store
+    ImageProc --> DynamoDB
+    AnnotGen --> Bedrock
+    AnnotGen --> DynamoDB
+    DatasetExp --> S3Store
+    DatasetExp --> DynamoDB
+    DatasetExp --> HF
+    PIIRedact --> S3Store
+
+    style Bedrock fill:#ff9900
+    style DynamoDB fill:#527FFF
+    style S3Store fill:#569A31
+    style AppSync fill:#945DF2
 ```
 
 ### 1.2 Technology Stack
 
 #### Frontend
-- **Framework**: React 18+ with TypeScript
-- **UI Library**: AWS Amplify UI Components + Custom components
-- **State Management**: React Context API + Amplify DataStore
-- **Image Annotation**: Custom canvas-based component or react-image-annotate
+- **Framework**: React 18.3+ with TypeScript 5.x
+- **UI Library**: **Minimal Amplify UI** (Authenticator only) + Custom React components
+- **State Management**: React Context API + React Query for server state
+- **Image Annotation**: Custom canvas-based component with touch support
 - **Routing**: React Router v6
+- **Build Tool**: Vite or AWS Amplify default
 
 #### Backend
 - **Infrastructure**: AWS Amplify Gen2
 - **Authentication**: AWS Cognito
 - **API**: AWS AppSync (GraphQL)
-- **Functions**: AWS Lambda (Node.js 18+)
-- **Storage**: AWS S3 for images
-- **Database**: AWS DynamoDB
-- **File Processing**: Lambda + Sharp for image processing
+- **Functions**: AWS Lambda (**Node.js 20.x** - latest LTS)
+- **Storage**: AWS S3 for images (3-tier storage)
+- **Database**: AWS DynamoDB (simplified schema)
+- **File Processing**: Lambda + Sharp v0.33+ for image processing
 
 #### AI/ML
-- **OCR Model**: Qwen (open-weight model)
-- **Model Hosting**: External API or AWS SageMaker endpoint
-- **Inference**: Lambda functions for orchestration
+- **Vision Models**: **Amazon Bedrock**
+  - Qwen-VL (open-weight vision-language model)
+  - Claude 3.5 Sonnet (high-accuracy vision)
+  - Future model support via Bedrock
+- **Model Inference**: Bedrock Runtime API
+- **Multi-language**: Native support in Bedrock models
 
 #### External Services
 - **Dataset Platform**: Hugging Face Hub API
@@ -71,63 +98,54 @@
 
 ### 2.1 Database Schema (DynamoDB)
 
-#### Image Table
+#### Image Table (Simplified)
 ```typescript
 interface Image {
   id: string;                    // Partition Key (UUID)
   datasetId: string;             // Sort Key (GSI)
 
-  // Image versions (multiple sizes for different use cases)
-  s3KeyOriginal: string;         // S3 key for original high-res image
-  s3KeyCompressed: string;       // S3 key for model-optimized image (≤4MB)
-  s3KeyThumbnail: string;        // S3 key for thumbnail (≤100KB)
-  s3Url: string;                 // Presigned URL (temporary, points to compressed by default)
-  s3UrlOriginal?: string;        // Presigned URL for original (on-demand)
+  // S3 Storage - Store KEYS not URLs for flexibility
+  s3KeyOriginal: string;         // Original high-res image (for export)
+  s3KeyCompressed: string;       // Model-optimized (≤4MB, for annotation)
+  s3KeyThumbnail: string;        // Gallery thumbnail (≤100KB)
 
+  // File metadata
   fileName: string;              // Original filename
-  originalSize: number;          // Original file size in bytes
-  compressedSize: number;        // Compressed file size in bytes
-  thumbnailSize: number;         // Thumbnail file size in bytes
-  compressionRatio: number;      // compressedSize / originalSize
+  mimeType: string;              // image/jpeg, image/png, image/webp
+  originalSize: number;          // Bytes
+  compressedSize: number;        // Bytes
+  compressionRatio: number;      // For analytics
 
-  mimeType: string;              // image/jpeg, image/png, etc.
-  documentType: DocumentType;    // Receipt, Invoice, etc.
-  uploadedBy: string;            // User ID
-  uploadedAt: string;            // ISO timestamp
-  status: ImageStatus;           // Uploaded, Processing, Annotated, Validated
-  processingError?: string;      // Error message if processing failed
+  // Image dimensions (original)
+  width: number;                 // Required for coordinate normalization
+  height: number;
 
-  metadata: {
-    original: {
-      width: number;
-      height: number;
-    };
-    compressed: {
-      width: number;
-      height: number;
-    };
-    exif?: Record<string, any>;
-  };
+  // Document classification
+  documentType: DocumentType;    // receipt, invoice, etc.
+  language: string;              // ISO 639-1 code (ja, en, zh, ko)
 
-  // OCR data
-  ocrTokens?: OCRToken[];        // Extracted OCR tokens
-  ocrStatus: OCRStatus;          // OCR extraction status
-  ocrEngine?: string;            // OCR engine used (e.g., "tesseract-5.3.0-jpn")
-  ocrError?: string;             // Error message if OCR failed
+  // Status tracking
+  status: ImageStatus;
+  processingError?: string;
 
-  // Enhanced document metadata
-  documentMetadata?: DocumentMetadata; // Japanese-specific and layout attributes
+  // User tracking
+  uploadedBy: string;
+  uploadedAt: string;
 
   createdAt: string;
   updatedAt: string;
 }
 
+// Note: Presigned URLs generated on-demand via AppSync field resolvers
+// This keeps the schema clean and allows bucket migration without DB updates
+
 enum DocumentType {
   RECEIPT = 'RECEIPT',
-  ORDER_FORM = 'ORDER_FORM',
-  OFFICIAL_FORM = 'OFFICIAL_FORM',
   INVOICE = 'INVOICE',
+  ORDER_FORM = 'ORDER_FORM',
+  TAX_FORM = 'TAX_FORM',
   CONTRACT = 'CONTRACT',
+  APPLICATION_FORM = 'APPLICATION_FORM',
   OTHER = 'OTHER'
 }
 
@@ -138,99 +156,61 @@ enum ImageStatus {
   VALIDATED = 'VALIDATED',
   FAILED = 'FAILED'
 }
-
-enum OCRStatus {
-  PENDING = 'PENDING',
-  PROCESSING = 'PROCESSING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED'
-}
-
-interface DocumentMetadata {
-  category: string;              // Primary category (receipt, invoice, etc.)
-  subcategory?: string;          // e.g., "restaurant_receipt", "tax_withholding_form"
-
-  // Japanese-specific attributes
-  isHandwritten: boolean;        // Contains handwritten text
-  containsSeal: boolean;         // Contains Hanko stamps
-  textDirection: 'horizontal' | 'vertical' | 'mixed'; // Text direction
-  scriptTypes: ('kanji' | 'hiragana' | 'katakana' | 'romaji')[]; // Scripts present
-
-  // Layout attributes
-  orientation: 'portrait' | 'landscape';
-  hasTables: boolean;
-  hasLogos: boolean;
-  pageCount: number;
-
-  // Business context
-  industry?: string;             // e.g., "restaurant", "retail", "manufacturing"
-  region?: string;               // e.g., "Tokyo", "Osaka"
-  yearRange?: string;            // Document era, e.g., "2020-2025"
-}
 ```
 
-#### Annotation Table
+#### Annotation Table (Simplified for Cost Efficiency)
 ```typescript
 interface Annotation {
   id: string;                    // Partition Key (UUID)
   imageId: string;               // Sort Key (GSI)
   datasetId: string;             // GSI
-  question: string;              // The question text
-  answer: string;                // The answer text
-  questionType: QuestionType;    // Classification of question
-  boundingBoxes: BoundingBox[];  // Answer evidence areas (deprecated, use evidenceSegments)
-  evidenceSegments: EvidenceSegment[]; // Detailed evidence with text and labels
-  answerType: AnswerType;        // Type of answer
-  difficulty?: Difficulty;       // Question difficulty
-  requiresReasoning: boolean;    // Whether answer requires multi-step reasoning
-  generatedBy: GenerationSource; // AI or Human
-  modelVersion?: string;         // Model that generated this (if AI)
-  confidence?: number;           // Model confidence (0-1)
+
+  // Core Q&A data
+  question: string;
+  answer: string;
+  language: string;              // ISO 639-1 code (ja, en, zh, ko)
+
+  // Evidence regions (single format - absolute pixels)
+  evidenceBoxes: BoundingBox[];  // Visual evidence for answer
+
+  // Classification (for academic compatibility)
+  questionType: QuestionType;    // extractive, abstractive, etc.
+  answerType: AnswerType;        // span, free_form, yes_no, number
+
+  // Validation
   validationStatus: ValidationStatus;
-  validatedBy?: string;          // User ID who validated
-  validatedAt?: string;          // ISO timestamp
-  rejectionReason?: string;      // If rejected
-  editHistory: AnnotationEdit[]; // Track changes
+  validatedBy?: string;
+  validatedAt?: string;
+
+  // Generation metadata
+  generatedBy: GenerationSource; // AI or Human
+  modelVersion?: string;         // Bedrock model ID (e.g., "qwen-vl-max")
+  confidence?: number;           // Model confidence (0-1)
+
   createdAt: string;
   updatedAt: string;
 }
 
+// Single bounding box format - stored as absolute pixels
+// Converted to normalized coordinates on export
 interface BoundingBox {
-  id: string;                    // UUID
-  x: number;                     // Top-left x (normalized 0-1)
-  y: number;                     // Top-left y (normalized 0-1)
-  width: number;                 // Width (normalized 0-1)
-  height: number;                // Height (normalized 0-1)
-  label?: string;                // Optional label
-}
+  x1: number;                    // Top-left x (absolute pixels)
+  y1: number;                    // Top-left y (absolute pixels)
+  x2: number;                    // Bottom-right x (absolute pixels)
+  y2: number;                    // Bottom-right y (absolute pixels)
 
-interface EvidenceSegment {
-  box_2d: [number, number, number, number]; // [x_min, y_min, x_max, y_max] in absolute pixels
-  text: string;                  // Text content in this region
-  label?: string;                // Semantic label (e.g., "payer_name", "total_amount")
-  confidence?: number;           // Model confidence (0-1)
-}
-
-interface OCRToken {
-  text: string;                  // Token text
-  box_2d: [number, number, number, number]; // [x_min, y_min, x_max, y_max] in absolute pixels
-  confidence: number;            // OCR confidence (0-1)
-  tokenId: number;               // Sequential token ID
-  wordId?: number;               // Word grouping ID
-  lineId?: number;               // Line grouping ID
+  // Optional metadata from vision model
+  text?: string;                 // Text content in this region
+  label?: string;                // Semantic label (e.g., "total_amount", "date")
+  confidence?: number;           // Detection confidence (0-1)
 }
 
 enum QuestionType {
-  INFORMATION_EXTRACTION = 'INFORMATION_EXTRACTION',
-  ITEM_IDENTIFICATION = 'ITEM_IDENTIFICATION',
-  DATE_TIME = 'DATE_TIME',
-  ENTITY_RECOGNITION = 'ENTITY_RECOGNITION',
-  CALCULATION = 'CALCULATION',
-  EXTRACTIVE = 'EXTRACTIVE',      // Added for academic compatibility
-  ABSTRACTIVE = 'ABSTRACTIVE',    // Added for academic compatibility
-  BOOLEAN = 'BOOLEAN',            // Added for academic compatibility
-  COUNTING = 'COUNTING',          // Added for academic compatibility
-  OTHER = 'OTHER'
+  EXTRACTIVE = 'EXTRACTIVE',      // Extract text from document
+  ABSTRACTIVE = 'ABSTRACTIVE',    // Requires summarization/reasoning
+  BOOLEAN = 'BOOLEAN',            // Yes/No questions
+  COUNTING = 'COUNTING',          // Count items in document
+  REASONING = 'REASONING'         // Multi-step reasoning required
 }
 
 enum AnswerType {
@@ -238,12 +218,6 @@ enum AnswerType {
   FREE_FORM = 'FREE_FORM',       // Generated answer
   YES_NO = 'YES_NO',             // Boolean answer
   NUMBER = 'NUMBER'              // Numeric answer
-}
-
-enum Difficulty {
-  EASY = 'EASY',
-  MEDIUM = 'MEDIUM',
-  HARD = 'HARD'
 }
 
 enum GenerationSource {
