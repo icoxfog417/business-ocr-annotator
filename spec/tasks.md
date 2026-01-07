@@ -69,9 +69,51 @@ This task list is organized into **sprints** that deliver working software incre
 
   # Install React Router for navigation (REQUIRED)
   npm install react-router-dom
+
+  # Install linting and formatting tools for code quality (REQUIRED)
+  npm install --save-dev eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin
+  npm install --save-dev prettier eslint-config-prettier eslint-plugin-react-hooks
   ```
 
-**Note**: We intentionally skip optional dev tools (ESLint, Prettier, Husky) to minimize dependencies and reduce security surface. Vite already includes TypeScript checking.
+- ⬜ Create ESLint configuration `.eslintrc.cjs`
+  ```javascript
+  module.exports = {
+    root: true,
+    env: { browser: true, es2020: true },
+    extends: [
+      'eslint:recommended',
+      'plugin:@typescript-eslint/recommended',
+      'plugin:react-hooks/recommended',
+      'prettier'
+    ],
+    ignorePatterns: ['dist', '.eslintrc.cjs', 'amplify_outputs.json'],
+    parser: '@typescript-eslint/parser',
+    plugins: ['react-hooks'],
+  };
+  ```
+
+- ⬜ Create Prettier configuration `.prettierrc`
+  ```json
+  {
+    "semi": true,
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "printWidth": 100,
+    "tabWidth": 2
+  }
+  ```
+
+- ⬜ Add lint scripts to `package.json`
+  ```json
+  {
+    "scripts": {
+      "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+      "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
+    }
+  }
+  ```
+
+**Note**: We use minimal linting setup - ESLint for code quality, Prettier for formatting. No git hooks to keep it simple.
 
 ### Authentication Setup (Amplify Gen2)
 - ⬜ Set up Google OAuth credentials
