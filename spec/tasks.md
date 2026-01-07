@@ -38,12 +38,19 @@ This task list is organized into **sprints** that deliver working software incre
 ### Project Initialization
 - ⬜ Create React app with Vite and TypeScript
   ```bash
+  # Create Vite project (this downloads create-vite temporarily via npx)
   npm create vite@latest business-ocr-annotator -- --template react-ts
+
+  # Enter project directory
   cd business-ocr-annotator
+
+  # Install base dependencies (React, Vite, TypeScript, etc.)
   npm install
   ```
+
 - ⬜ Initialize Amplify Gen2 project
   ```bash
+  # Add Amplify to existing project (run from project root)
   npm create amplify@latest
   ```
   This creates the `amplify/` directory structure:
@@ -52,17 +59,23 @@ This task list is organized into **sprints** that deliver working software incre
   - `amplify/backend.ts`
 
 ### Development Environment Setup
-- ⬜ Install required dependencies
+- ⬜ Install Amplify dependencies
   ```bash
+  # Install Amplify client libraries
   npm install aws-amplify @aws-amplify/ui-react
+
+  # Install Amplify backend development tools
   npm install --save-dev @aws-amplify/backend @aws-amplify/backend-cli
   ```
 - ⬜ Configure ESLint and Prettier
   ```bash
+  # Install code formatting and linting tools
   npm install --save-dev eslint prettier eslint-config-prettier
   ```
+
 - ⬜ Set up Git hooks with Husky
   ```bash
+  # Install pre-commit hooks
   npm install --save-dev husky lint-staged
   npx husky init
   ```
