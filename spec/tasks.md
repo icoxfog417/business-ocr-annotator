@@ -73,6 +73,9 @@ This task list is organized into **sprints** that deliver working software incre
   # Install linting and formatting tools for code quality (REQUIRED)
   npm install --save-dev eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin
   npm install --save-dev prettier eslint-config-prettier eslint-plugin-react-hooks
+
+  # Install git hooks for automated quality checks (REQUIRED)
+  npm install --save-dev husky lint-staged
   ```
 
 - ⬜ Create ESLint configuration `.eslintrc.cjs`
@@ -113,7 +116,28 @@ This task list is organized into **sprints** that deliver working software incre
   }
   ```
 
-**Note**: We use minimal linting setup - ESLint for code quality, Prettier for formatting. No git hooks to keep it simple.
+- ⬜ Set up Husky for git hooks
+  ```bash
+  npx husky init
+  echo "npm run lint-staged" > .husky/pre-commit
+  ```
+
+- ⬜ Configure lint-staged in `package.json`
+  ```json
+  {
+    "lint-staged": {
+      "*.{ts,tsx}": [
+        "prettier --write",
+        "eslint --fix"
+      ],
+      "*.{css,json,md}": [
+        "prettier --write"
+      ]
+    }
+  }
+  ```
+
+**Note**: Git hooks automatically run linting and formatting before each commit to maintain code quality.
 
 ### Authentication Setup (Amplify Gen2)
 - ⬜ Set up Google OAuth credentials
