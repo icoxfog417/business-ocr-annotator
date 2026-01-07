@@ -55,8 +55,14 @@
 - ⬜ Configure S3 Intelligent-Tiering for cost optimization
 
 ### Database
-- ⬜ Design DynamoDB table schemas (Image, Annotation, Dataset, User)
+- ⬜ Design simplified DynamoDB table schemas (Image, Annotation, Dataset, User)
+  - ⬜ Image table: Add language field, remove OCR fields
+  - ⬜ Annotation table: Add evidenceBoxes array (absolute pixels), language field
+  - ⬜ Add new enum types (QuestionType, AnswerType, GenerationSource)
+  - ⬜ Store S3 keys (not URLs) for flexibility
 - ⬜ Create DynamoDB tables with GSIs
+  - ⬜ GSI on datasetId for efficient queries
+  - ⬜ GSI on language for multi-language filtering
 - ⬜ Configure DynamoDB encryption at rest
 - ⬜ Set up backup and point-in-time recovery
 - ⬜ Implement DynamoDB streams for change tracking
@@ -71,33 +77,73 @@
 - ⬜ Configure AppSync authorization rules
 - ⬜ Enable AppSync caching for performance
 
-### Lambda Functions
-- ⬜ Create ImageProcessor Lambda (S3 trigger)
-  - ⬜ Implement image metadata extraction
+### Lambda Functions (Node.js 20.x)
+- ⬜ Create ImageProcessor Lambda (S3 trigger, Node.js 20.x)
+  - ⬜ Implement image metadata extraction (width, height, size)
   - ⬜ Implement smart compression algorithm (≤4MB target)
   - ⬜ Implement thumbnail generation (≤100KB)
-  - ⬜ Add Sharp library for image processing
-  - ⬜ Handle multiple image formats (JPEG, PNG)
-  - ⬜ Update DynamoDB with all image versions
-- ⬜ Create AnnotationGenerator Lambda
-- ⬜ Create DatasetExporter Lambda
-- ⬜ Create HuggingFacePublisher Lambda
+  - ⬜ Add Sharp v0.33+ library for image processing
+  - ⬜ Handle multiple image formats (JPEG, PNG, WebP)
+  - ⬜ Update DynamoDB with all image versions (store keys not URLs)
+  - ⬜ Implement presigned URL generation via AppSync field resolver
+
+- ⬜ Create AnnotationGenerator Lambda (Node.js 20.x)
+  - ⬜ Integrate AWS Bedrock Runtime SDK
+  - ⬜ Implement BedrockVisionClient service class
+  - ⬜ Add support for Qwen-VL model
+  - ⬜ Add support for Claude 3.5 Sonnet model
+  - ⬜ Implement multi-language prompt templates (ja, en, zh, ko)
+  - ⬜ Parse Bedrock response to extract Q&A pairs and bounding boxes
+  - ⬜ Store annotations with language metadata
+  - ⬜ Handle Bedrock API errors and retries
+
+- ⬜ Create DatasetExporter Lambda (Node.js 20.x)
+  - ⬜ Add JSON export with J-BizDoc standard schema
+  - ⬜ Add JSONL export for streaming
+  - ⬜ Add Parquet export using Apache Arrow
+  - ⬜ Implement bounding box normalization utilities
+    - ⬜ Convert absolute pixels to normalized 0-1
+    - ⬜ Convert absolute pixels to normalized 0-1000 (LayoutLM)
+  - ⬜ Support multi-language datasets with language tags
+  - ⬜ Generate dataset metadata file
+
+- ⬜ Create HuggingFacePublisher Lambda (Node.js 20.x)
+  - ⬜ Generate dataset card with multi-language context
+  - ⬜ Support Parquet format uploads
+  - ⬜ Add usage examples for datasets library
+  - ⬜ Include citation in BibTeX format
+
+- ⬜ Create PIIRedactor Lambda (Node.js 20.x)
+  - ⬜ Implement multi-language PII detection (ja, en, zh, ko)
+  - ⬜ Create regex patterns for each language
+  - ⬜ Generate redacted images with blurred regions using Sharp
+  - ⬜ Update annotations to remove PII text
+
 - ⬜ Configure Lambda environment variables
-- ⬜ Set up Lambda layers for shared dependencies (Sharp, AWS SDK)
-- ⬜ Configure Lambda VPC settings (if needed)
-- ⬜ Optimize Lambda memory allocation for image processing (recommend 1024MB+)
+  - ⬜ BEDROCK_REGION
+  - ⬜ DEFAULT_MODEL_ID
+  - ⬜ SUPPORTED_LANGUAGES
+
+- ⬜ Set up Lambda layers for shared dependencies
+  - ⬜ Sharp v0.33+ for image processing
+  - ⬜ AWS SDK v3 (Bedrock Runtime, S3, DynamoDB)
+  - ⬜ Apache Arrow for Parquet export
+
+- ⬜ Configure Lambda memory allocation (1536MB+ for image processing)
+- ⬜ Configure Lambda timeout (5 minutes for Bedrock calls)
 
 ---
 
 ## Phase 2: Frontend Development
 
 ### Project Setup
-- ⬜ Create React app with TypeScript
-- ⬜ Install and configure Amplify UI libraries
-- ⬜ Set up React Router for navigation
-- ⬜ Configure state management (Context API)
-- ⬜ Set up Amplify DataStore for offline support
-- ⬜ Configure build and bundle optimization
+- ⬜ Create React 18.3+ app with TypeScript 5.x
+- ⬜ Install minimal Amplify UI (Authenticator only)
+- ⬜ Set up React Router v6 for navigation
+- ⬜ Configure state management (React Context API + React Query)
+- ⬜ Set up i18n for multi-language UI (react-i18next)
+- ⬜ Configure build optimization (Vite or default Amplify)
+- ⬜ Set up custom component library (no heavy UI frameworks)
 
 ### Authentication UI
 - ⬜ Create Login page
@@ -136,8 +182,13 @@
 - ⬜ Implement batch upload
 - ⬜ Add resumable upload for poor network conditions
 - ⬜ Optional: Implement client-side compression before upload
-- ⬜ Add document type selection
+- ⬜ Add document type selection dropdown
+- ⬜ Add language selection (ja, en, zh, ko) - required field
+- ⬜ Create simple metadata input
+  - ⬜ Document category selection
+  - ⬜ Optional: Document subcategory
 - ⬜ Handle upload errors gracefully with retry option
+- ⬜ Display selected language prominently
 
 ### Image Gallery
 - ⬜ Create ImageGallery layout (mobile-first responsive)
@@ -160,6 +211,7 @@
   - ⬜ Add "View Original" option for high-res inspection
   - ⬜ Show loading progress indicator
   - ⬜ Handle network errors gracefully
+
 - ⬜ Create CanvasAnnotator for desktop
   - ⬜ Render image with overlay canvas
   - ⬜ Draw existing bounding boxes
@@ -198,15 +250,31 @@
 - ⬜ Create VersionHistory component
 - ⬜ Implement version creation dialog
 - ⬜ Create ExportDialog (format selection)
+  - ⬜ Add JSON, JSONL, and Parquet format options
+  - ⬜ Add coordinate format options (absolute, normalized 0-1, normalized 0-1000, all)
+  - ⬜ PII handling options (include, redact, exclude)
+  - ⬜ Language filter (export specific languages or all)
+- ⬜ Create PIIRedactionControls component
+  - ⬜ Scan dataset for potential PII
+  - ⬜ Show PII detection results with confidence
+  - ⬜ Allow manual review and override
+  - ⬜ Trigger redaction process
+  - ⬜ Show redaction progress
 - ⬜ Add dataset deletion (with confirmation)
 - ⬜ Implement dataset cloning
+- ⬜ Create DatasetCardPreview component
+  - ⬜ Show generated dataset card
+  - ⬜ Edit citation and metadata
+  - ⬜ Preview licensing information
+  - ⬜ Include Japanese legal context
 
 ### Settings
 - ⬜ Create Settings layout
-- ⬜ Implement ModelConfiguration panel
-  - ⬜ Model endpoint configuration
-  - ⬜ Parameter tuning (temperature, max tokens)
-  - ⬜ Model version selection
+- ⬜ Implement BedrockModelConfiguration panel
+  - ⬜ Bedrock model selection (Qwen-VL, Claude 3.5 Sonnet)
+  - ⬜ Parameter tuning (temperature, max tokens, top_p)
+  - ⬜ Default language selection
+  - ⬜ Model performance metrics display
 - ⬜ Create UserManagement panel (Admin only)
   - ⬜ List users
   - ⬜ Assign roles
@@ -245,35 +313,78 @@
 - ⬜ Update DynamoDB with all image versions and metadata
 - ⬜ Trigger annotation generation with compressed image
 
-### AI Integration
-- ⬜ Research and select Qwen model endpoint
-- ⬜ Create QwenClient service
-- ⬜ Implement API authentication
-- ⬜ Create request/response type definitions
-- ⬜ Implement AnnotationGenerator Lambda handler
-- ⬜ Add image preprocessing for model input
-- ⬜ Parse model output to Annotation format
-- ⬜ Handle model API errors and timeouts
-- ⬜ Implement confidence threshold filtering
-- ⬜ Store generated annotations in DynamoDB
-- ⬜ Publish completion event via AppSync subscription
+### Amazon Bedrock Integration
+- ⬜ Enable Amazon Bedrock in AWS account
+- ⬜ Request model access for Qwen-VL and Claude 3.5 Sonnet
+- ⬜ Create BedrockVisionClient service class
+  - ⬜ Implement Bedrock Runtime SDK integration
+  - ⬜ Add model invocation with converse API
+  - ⬜ Handle image encoding (base64 or S3 reference)
+- ⬜ Create multi-language prompt templates
+  - ⬜ Japanese prompts for Qwen-VL
+  - ⬜ English prompts for Claude Vision
+  - ⬜ Chinese and Korean prompts
+- ⬜ Implement response parsing
+  - ⬜ Extract Q&A pairs from model response
+  - ⬜ Parse bounding box coordinates
+  - ⬜ Extract text content from boxes
+  - ⬜ Classify question and answer types
+- ⬜ Add error handling and retries
+- ⬜ Implement cost tracking per model
+- ⬜ Store annotations with Bedrock model metadata
 
 ### Dataset Export
 - ⬜ Implement DatasetExporter Lambda handler
-- ⬜ Create JSON export formatter
-- ⬜ Create JSONL export formatter
-- ⬜ Create Parquet export formatter (using Arrow)
+- ⬜ Create JSON export formatter with J-BizDoc schema
+  - ⬜ Include dataset metadata and version info
+  - ⬜ Transform annotations to standard format
+  - ⬜ Include OCR tokens if requested
+  - ⬜ Support coordinate format options
+- ⬜ Create JSONL export formatter (one record per line)
+- ⬜ Create Parquet export formatter using Apache Arrow
+  - ⬜ Install and configure Apache Arrow library
+  - ⬜ Design Parquet schema for nested structures
+  - ⬜ Optimize row group size for streaming
+  - ⬜ Add compression (Snappy or ZSTD)
+  - ⬜ Validate Parquet output with pyarrow
+- ⬜ Implement bounding box normalization utilities
+  - ⬜ Convert absolute pixels to 0-1 normalized
+  - ⬜ Convert 0-1 to 0-1000 (LayoutLM standard)
+  - ⬜ Support both formats in export
 - ⬜ Implement data validation before export
 - ⬜ Upload export files to S3
 - ⬜ Generate export metadata file
 - ⬜ Update dataset version record
 
+### PII Detection and Redaction (Multi-Language)
+- ⬜ Implement PIIDetector service with multi-language support
+  - ⬜ Japanese patterns: phone numbers, names, addresses
+  - ⬜ English patterns: phone numbers, SSN, emails, names
+  - ⬜ Chinese patterns: ID numbers, phone numbers, names
+  - ⬜ Korean patterns: phone numbers, names, addresses
+  - ⬜ Universal patterns: emails, credit cards
+- ⬜ Implement image redaction using Sharp
+  - ⬜ Blur detected PII regions with Gaussian blur
+  - ⬜ Preserve image quality outside redacted areas
+- ⬜ Implement text redaction in annotations
+  - ⬜ Replace PII with language-appropriate placeholders
+  - ⬜ Update answer text in annotations
+  - ⬜ Log redaction actions for audit
+- ⬜ Test PII detection accuracy for each language
+
 ### Hugging Face Integration
 - ⬜ Create HuggingFace API client
-- ⬜ Implement dataset creation
-- ⬜ Implement file upload to HF
+- ⬜ Implement dataset creation with multi-language tags
+- ⬜ Implement Parquet file upload (primary format)
+- ⬜ Implement JSON/JSONL upload (secondary formats)
 - ⬜ Generate dataset card (README.md)
-- ⬜ Implement HuggingFacePublisher Lambda handler
+  - ⬜ Include multi-language dataset description
+  - ⬜ Add citation in BibTeX format
+  - ⬜ Include licensing information (CC BY-SA 4.0)
+  - ⬜ Document legal context for international users
+  - ⬜ Add usage examples with datasets library
+  - ⬜ Include language distribution statistics
+  - ⬜ Document data collection methodology
 - ⬜ Add version tagging
 - ⬜ Store HF dataset URL in DynamoDB
 - ⬜ Handle API rate limits
@@ -311,14 +422,44 @@
 - ⬜ Set up integration test environment
 - ⬜ Write tests for image upload flow
   - ⬜ Test upload, compression, and thumbnail generation pipeline
-  - ⬜ Verify all three versions stored correctly in S3
-  - ⬜ Test compression quality vs OCR accuracy
-- ⬜ Write tests for annotation generation flow (using compressed images)
-- ⬜ Write tests for validation workflow
-- ⬜ Write tests for dataset export (verify original images exported)
+  - ⬜ Verify all three versions stored correctly in S3 (as keys)
+  - ⬜ Test presigned URL generation
+  - ⬜ Verify compression maintains visual quality
+
+- ⬜ Write tests for Bedrock integration
+  - ⬜ Test Qwen-VL model invocation
+  - ⬜ Test Claude 3.5 Sonnet model invocation
+  - ⬜ Verify multi-language prompt handling (ja, en, zh, ko)
+  - ⬜ Test response parsing for Q&A pairs
+  - ⬜ Test bounding box extraction from responses
+  - ⬜ Verify language metadata in annotations
+  - ⬜ Test error handling and retries
+
+- ⬜ Write tests for PII detection (multi-language)
+  - ⬜ Test Japanese PII detection (names, phone, address)
+  - ⬜ Test English PII detection
+  - ⬜ Test Chinese PII detection
+  - ⬜ Test Korean PII detection
+  - ⬜ Verify image blurring quality
+  - ⬜ Test false positive/negative rates per language
+
+- ⬜ Write tests for dataset export
+  - ⬜ Test JSON export with J-BizDoc schema
+  - ⬜ Test JSONL export format
+  - ⬜ Test Parquet export and validate with pyarrow
+  - ⬜ Test bounding box normalization (0-1, 0-1000)
+  - ⬜ Verify coordinate format options
+  - ⬜ Test multi-language dataset export
+  - ⬜ Test PII handling in export
+
 - ⬜ Write tests for Hugging Face publishing
-- ⬜ Test error scenarios and edge cases
+  - ⬜ Test multi-language dataset card generation
+  - ⬜ Test Parquet file upload
+  - ⬜ Verify streaming with datasets library
+  - ⬜ Test language filtering
+
 - ⬜ Test mobile camera capture flow
+- ⬜ Test error scenarios and edge cases
 
 ### End-to-End Tests
 - ⬜ Set up Cypress or Playwright with mobile device emulation
@@ -422,6 +563,21 @@
 - ⬜ Create video tutorials for key workflows
 - ⬜ Document best practices for annotation
 - ⬜ Create FAQ section
+- ⬜ Create dataset card template for Hugging Face
+  - ⬜ Include standard sections (Dataset Description, Dataset Structure, etc.)
+  - ⬜ Add multi-language support section
+  - ⬜ Include citation format (BibTeX and APA)
+  - ⬜ Document PII handling procedures
+  - ⬜ Add usage examples with datasets library for each language
+  - ⬜ Include legal context for international users
+- ⬜ Create citation guidelines for dataset users
+- ⬜ Document data collection methodology
+- ⬜ Document bounding box format and normalization
+- ⬜ Create Bedrock integration guide
+  - ⬜ How to enable and configure Bedrock models
+  - ⬜ Multi-language prompt templates
+  - ⬜ Model selection guidelines
+  - ⬜ Cost optimization tips
 
 ### Technical Documentation
 - ⬜ Document API endpoints and usage

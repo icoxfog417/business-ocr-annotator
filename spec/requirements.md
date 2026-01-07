@@ -53,13 +53,15 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 #### 3.1.2 Document Classification
 - **REQ-DC-001**: Users shall categorize images by document type:
   - Receipts
-  - Order forms
-  - Official application forms
   - Invoices
+  - Order forms
+  - Tax forms
   - Business contracts
+  - Application forms
   - Other (with custom label)
 - **REQ-DC-002**: System shall auto-suggest document type based on image analysis
 - **REQ-DC-003**: Users shall be able to manually override document type
+- **REQ-DC-004**: Users shall specify document language on upload (ja, en, zh, ko, etc.)
 
 #### 3.1.3 Image Management
 - **REQ-IM-001**: Users shall view all uploaded images in a gallery view
@@ -70,22 +72,35 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 
 ### 3.2 AI-Powered Question Generation
 
-#### 3.2.1 Automatic Annotation
-- **REQ-QG-001**: System shall automatically generate questions for uploaded images using open-weight models (Qwen)
+#### 3.2.1 Automatic Annotation via Amazon Bedrock
+- **REQ-BR-001**: System shall use Amazon Bedrock for vision model inference
+- **REQ-BR-002**: System shall support multiple Bedrock models (Qwen-VL, Claude 3.5 Sonnet)
+- **REQ-QG-001**: System shall automatically generate questions for uploaded images using Bedrock vision models
 - **REQ-QG-002**: System shall generate diverse question types:
-  - Information extraction ("What is the total amount?")
-  - Item identification ("What is the highest priced item?")
-  - Date/time queries ("What is the invoice date?")
-  - Entity recognition ("What is the vendor name?")
+  - Extractive ("What is the total amount?")
+  - Abstractive ("What is the highest priced item?")
+  - Boolean ("Does this receipt include tax?")
+  - Counting ("How many items are listed?")
+  - Reasoning ("What is the change due if paid with ¥20,000?")
 - **REQ-QG-003**: System shall generate 3-10 questions per image based on content complexity
 - **REQ-QG-004**: System shall provide candidate answers for each question
-- **REQ-QG-005**: System shall generate bounding box coordinates for answer evidence
+- **REQ-QG-005**: System shall generate bounding box coordinates (absolute pixels) for answer evidence
+- **REQ-QG-006**: System shall extract text content from bounding box regions (via vision model)
+- **REQ-QG-007**: System shall classify question types (extractive, abstractive, boolean, counting, reasoning)
+- **REQ-QG-008**: System shall classify answer types (span, free_form, yes_no, number)
 
-#### 3.2.2 Model Configuration
-- **REQ-MC-001**: Administrators shall configure OCR model endpoints
-- **REQ-MC-002**: System shall support multiple model backends (Qwen, future models)
+#### 3.2.2 Multi-Language Support
+- **REQ-ML-001**: System shall support multiple document languages (Japanese, English, Chinese, Korean)
+- **REQ-ML-002**: System shall generate annotations in the same language as the document
+- **REQ-ML-003**: System shall use language-specific prompts for each supported language
+- **REQ-ML-004**: Annotations shall include language metadata (ISO 639-1 code)
+
+#### 3.2.3 Model Configuration
+- **REQ-MC-001**: Administrators shall select Bedrock models for annotation generation
+- **REQ-MC-002**: System shall support multiple Bedrock model versions
 - **REQ-MC-003**: System shall allow model parameter tuning (temperature, max tokens)
-- **REQ-MC-004**: System shall track which model version generated each annotation
+- **REQ-MC-004**: System shall track which Bedrock model version generated each annotation
+- **REQ-MC-005**: System shall provide model performance metrics (latency, cost, accuracy)
 
 ### 3.3 Human Validation Workflow
 
@@ -166,14 +181,20 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 
 #### 3.5.3 Export Formats
 - **REQ-EF-001**: System shall export datasets in JSON format
-- **REQ-EF-002**: System shall export datasets in JSONL format
-- **REQ-EF-003**: System shall export datasets in Parquet format
+- **REQ-EF-002**: System shall export datasets in JSONL format (one record per line)
+- **REQ-EF-003**: System shall export datasets in Parquet format for efficient Hugging Face streaming
 - **REQ-EF-004**: Export shall include:
-  - Image references (URLs or embedded)
-  - Questions and answers
-  - Bounding box coordinates
-  - Metadata (document type, validation status, timestamps)
+  - Image references (S3 URLs)
+  - Questions and answers with language metadata
+  - Bounding box coordinates (configurable: absolute or normalized)
+  - Evidence boxes with optional text content and labels
+  - Metadata (document type, language, validation status, timestamps, model version)
 - **REQ-EF-005**: Users shall download dataset versions locally
+- **REQ-EF-006**: System shall normalize bounding boxes to 0-1000 scale (LayoutLM standard) on export
+- **REQ-EF-007**: Users shall select coordinate format on export (absolute, normalized 0-1, normalized 0-1000, or all)
+- **REQ-EF-008**: System shall generate dataset cards with metadata, citation, and legal information for Hugging Face
+- **REQ-EF-009**: Export format shall conform to academic standards (DocVQA, LayoutLM, ICDAR)
+- **REQ-EF-010**: Export shall support multi-language datasets with language tags per annotation
 
 ## 4. Non-Functional Requirements
 
@@ -226,6 +247,10 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 - **REQ-NF-C-001**: System shall comply with data privacy regulations (GDPR, CCPA)
 - **REQ-NF-C-002**: System shall allow users to delete their data
 - **REQ-NF-C-003**: System shall track data provenance and licensing
+- **REQ-NF-C-004**: System shall detect and redact PII (personally identifiable information) in uploaded documents
+- **REQ-NF-C-005**: PII detection shall support multiple languages (Japanese, English, Chinese, Korean)
+- **REQ-NF-C-006**: System shall use CC BY-SA 4.0 license for published datasets (or allow users to configure)
+- **REQ-NF-C-007**: System shall document legal context and licensing in dataset cards for international users
 
 ## 5. User Stories
 
@@ -271,37 +296,72 @@ I want to publish validated datasets to Hugging Face,
 So that the research community can use them for model evaluation.
 ```
 
+### 5.7 Multi-Language Annotation
+```
+As a dataset curator,
+I want to create datasets in multiple languages (Japanese, English, Chinese, Korean),
+So that I can build comprehensive multi-language document understanding benchmarks.
+```
+
+### 5.8 Academic Dataset Export
+```
+As a researcher,
+I want to download datasets in standard academic formats (LayoutLM-compatible),
+So that I can use them directly with state-of-the-art models without format conversion.
+```
+
+### 5.9 PII Protection
+```
+As a dataset curator,
+I want the system to automatically detect and redact sensitive personal information in multiple languages,
+So that published datasets comply with privacy regulations globally.
+```
+
+### 5.10 Bedrock Model Selection
+```
+As an administrator,
+I want to select and configure different Bedrock vision models (Qwen-VL, Claude Vision),
+So that I can optimize for accuracy, cost, and performance based on document types.
+```
+
 ## 6. Acceptance Criteria
 
 ### 6.1 Minimum Viable Product (MVP)
-- Image upload and basic management
-- Qwen-based automatic question generation with bounding boxes
+- Image upload and basic management (multi-format support)
+- Language selection on upload
+- Amazon Bedrock-based automatic question generation with bounding boxes
+- Support for at least 2 Bedrock models (Qwen-VL, Claude Vision)
 - Manual annotation review and editing interface
 - Basic approval/rejection workflow
-- Export to JSON format
+- Export to JSON and Parquet formats
 - Simple statistics dashboard
+- Multi-language UI (English, Japanese minimum)
 
 ### 6.2 Future Enhancements
 - Multi-annotator consensus workflow
 - Advanced quality metrics and analytics
-- Support for additional model backends
+- Support for additional Bedrock models
+- Additional language support (beyond initial 4)
 - Collaborative annotation features
 - API for programmatic access
-- Integration with other annotation tools
+- Advanced PII detection with ML models
 
 ## 7. Constraints
 
 - Must use AWS Amplify Gen2 for infrastructure
-- Must use open-weight models without restrictive licenses (e.g., Qwen)
+- Must use Amazon Bedrock for vision model inference
 - Must integrate with Hugging Face for dataset publishing
-- Must support standard bounding box formats (COCO, Pascal VOC compatible)
+- Must support standard bounding box formats (LayoutLM, DocVQA compatible)
+- Must use Node.js 20.x for Lambda functions
+- Must minimize Amplify UI dependency (only Authenticator)
 
 ## 8. Dependencies
 
-- AWS Account with appropriate permissions
+- AWS Account with Amazon Bedrock access enabled
+- Bedrock model access (Qwen-VL, Claude 3.5 Sonnet)
 - Hugging Face account and API access
-- Access to Qwen or similar open-weight OCR model API
-- Node.js and npm development environment
+- Node.js 20.x development environment
+- AWS Amplify Gen2 CLI
 
 ---
 
