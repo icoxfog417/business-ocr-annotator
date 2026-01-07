@@ -36,10 +36,11 @@ This task list is organized into **sprints** that deliver working software incre
 **Deliverable**: Users can log in and see an empty dashboard
 
 ### Project Initialization
-- ⬜ Create React app with TypeScript
+- ⬜ Create React app with Vite and TypeScript
   ```bash
-  npx create-react-app business-ocr-annotator --template typescript
+  npm create vite@latest business-ocr-annotator -- --template react-ts
   cd business-ocr-annotator
+  npm install
   ```
 - ⬜ Initialize Amplify Gen2 project
   ```bash
@@ -1133,8 +1134,11 @@ business-ocr-annotator/
 │   ├── components/
 │   ├── pages/
 │   ├── App.tsx
-│   └── index.tsx
+│   └── main.tsx                  # Vite entry point
+├── public/                       # Static assets
+├── index.html                    # HTML entry point (Vite)
 ├── amplify_outputs.json          # Generated after deployment
+├── vite.config.ts                # Vite configuration
 ├── package.json
 └── tsconfig.json
 ```
