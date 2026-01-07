@@ -59,37 +59,58 @@ This task list is organized into **sprints** that deliver working software incre
   - `amplify/backend.ts`
 
 ### Development Environment Setup
-- ⬜ Install Amplify dependencies
+- ⬜ Install essential dependencies only
   ```bash
-  # Install Amplify client libraries
+  # Install Amplify client libraries (REQUIRED)
   npm install aws-amplify @aws-amplify/ui-react
 
-  # Install Amplify backend development tools
+  # Install Amplify backend development tools (REQUIRED)
   npm install --save-dev @aws-amplify/backend @aws-amplify/backend-cli
-  ```
-- ⬜ Configure ESLint and Prettier
-  ```bash
-  # Install code formatting and linting tools
-  npm install --save-dev eslint prettier eslint-config-prettier
+
+  # Install React Router for navigation (REQUIRED)
+  npm install react-router-dom
   ```
 
-- ⬜ Set up Git hooks with Husky
-  ```bash
-  # Install pre-commit hooks
-  npm install --save-dev husky lint-staged
-  npx husky init
-  ```
+**Note**: We intentionally skip optional dev tools (ESLint, Prettier, Husky) to minimize dependencies and reduce security surface. Vite already includes TypeScript checking.
 
 ### Authentication Setup (Amplify Gen2)
-- ⬜ Configure basic auth in `amplify/auth/resource.ts`
+- ⬜ Set up Google OAuth credentials
+  - Go to [Google Cloud Console](https://console.cloud.google.com/)
+  - Create a new project or use existing one
+  - Enable Google+ API
+  - Create OAuth 2.0 credentials (OAuth client ID)
+  - Add authorized redirect URIs (Amplify will provide these)
+  - Save Client ID and Client Secret
+
+- ⬜ Configure Google OAuth in `amplify/auth/resource.ts`
   ```typescript
   import { defineAuth } from '@aws-amplify/backend';
 
   export const auth = defineAuth({
     loginWith: {
-      email: true
+      externalProviders: {
+        google: {
+          clientId: process.env.GOOGLE_CLIENT_ID!,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        },
+        callbackUrls: [
+          'http://localhost:5173',  // Vite dev server
+          'https://your-app-domain.amplifyapp.com'  // Production
+        ],
+        logoutUrls: [
+          'http://localhost:5173',
+          'https://your-app-domain.amplifyapp.com'
+        ]
+      }
     }
   });
+  ```
+
+- ⬜ Add Google credentials to environment
+  ```bash
+  # For local development
+  npx ampx sandbox secret set GOOGLE_CLIENT_ID
+  npx ampx sandbox secret set GOOGLE_CLIENT_SECRET
   ```
 - ⬜ Update `amplify/backend.ts` to include auth
   ```typescript
@@ -100,22 +121,39 @@ This task list is organized into **sprints** that deliver working software incre
     auth
   });
   ```
-- ⬜ Add Amplify Authenticator UI component to App.tsx
 - ⬜ Configure Amplify client in frontend
   ```typescript
+  // In src/main.tsx
   import { Amplify } from 'aws-amplify';
   import outputs from '../amplify_outputs.json';
 
   Amplify.configure(outputs);
   ```
 
+- ⬜ Add Google OAuth sign-in to App.tsx
+  ```typescript
+  import { Authenticator } from '@aws-amplify/ui-react';
+  import '@aws-amplify/ui-react/styles.css';
+
+  // The Authenticator will automatically show Google sign-in button
+  function App() {
+    return (
+      <Authenticator socialProviders={['google']}>
+        {({ signOut, user }) => (
+          <main>
+            <h1>Hello {user?.username}</h1>
+            <button onClick={signOut}>Sign out</button>
+          </main>
+        )}
+      </Authenticator>
+    );
+  }
+  ```
+
 ### Basic Frontend Structure
 - ⬜ Create main layout component with navigation
 - ⬜ Create empty Dashboard page
-- ⬜ Set up React Router v6
-  ```bash
-  npm install react-router-dom
-  ```
+- ⬜ Set up React Router v6 (already installed above)
 - ⬜ Implement authenticated routing wrapper
 - ⬜ Add logout functionality
 
@@ -144,10 +182,11 @@ This task list is organized into **sprints** that deliver working software incre
 
 **Sprint 0 Acceptance Criteria:**
 - ✅ App deployed to AWS Amplify
-- ✅ Users can sign up with email
-- ✅ Users can log in and log out
+- ✅ Users can sign in with Google account
+- ✅ Users can log out
 - ✅ Authenticated users see a dashboard (even if empty)
 - ✅ Sandbox environment working locally
+- ✅ Google OAuth credentials configured securely
 
 ---
 
@@ -233,12 +272,14 @@ This task list is organized into **sprints** that deliver working software incre
   ```
 
 ### Image Upload UI
-- ⬜ Create FileUpload page with drag-and-drop
-  ```bash
-  npm install react-dropzone
+- ⬜ Create FileUpload page with native drag-and-drop
+  ```typescript
+  // Use native HTML5 drag-and-drop events (no external library needed)
+  // onDrop, onDragOver, onDragEnter, onDragLeave
+  // <input type="file" multiple accept="image/*" />
   ```
 - ⬜ Implement file validation (type, size ≤20MB)
-- ⬜ Add image preview before upload
+- ⬜ Add image preview before upload using FileReader API
 - ⬜ Implement S3 upload using Amplify Storage
   ```typescript
   import { uploadData } from 'aws-amplify/storage';
@@ -320,13 +361,16 @@ This task list is organized into **sprints** that deliver working software incre
 - ⬜ Enable Amazon Bedrock in AWS account
 - ⬜ Request model access for Claude 3.5 Sonnet
 - ⬜ Configure IAM permissions for Bedrock access
-- ⬜ Add Bedrock SDK dependencies
-  ```bash
-  npm install @aws-sdk/client-bedrock-runtime
-  ```
 
 ### Lambda Function for Annotation Generation
 - ⬜ Create `amplify/functions/generate-annotation/` directory
+- ⬜ Initialize function package
+  ```bash
+  cd amplify/functions/generate-annotation
+  npm init -y
+  npm install @aws-sdk/client-bedrock-runtime
+  cd ../../..
+  ```
 - ⬜ Create `amplify/functions/generate-annotation/resource.ts`
   ```typescript
   import { defineFunction } from '@aws-amplify/backend';
@@ -521,11 +565,12 @@ This task list is organized into **sprints** that deliver working software incre
   - ⬜ Display selected language prominently
 - ⬜ Add language filter to Image Gallery
 - ⬜ Display language badge on image cards
-- ⬜ Set up i18n framework for UI
+- ⬜ (Optional) Set up i18n framework for UI localization
   ```bash
+  # Only if you need multi-language UI (not required for MVP)
   npm install react-i18next i18next
   ```
-- ⬜ Add UI translations (en, ja as minimum)
+  Note: Can start with English-only UI and add translations later if needed
 
 ### Multi-Language Bedrock Prompts
 - ⬜ Create prompt templates directory `amplify/functions/generate-annotation/prompts/`
