@@ -1,8 +1,10 @@
 # Implementation Tasks
 
 **Project**: Business OCR Annotator
-**Last Updated**: 2026-01-04
+**Last Updated**: 2026-01-07
 **Status**: Planning Phase
+**Approach**: Agile Incremental Development
+**Reference**: See [spec/proposals/20260107_reorganize_tasks_agile_approach.md](proposals/20260107_reorganize_tasks_agile_approach.md)
 
 ## Task Status Legend
 
@@ -14,16 +16,107 @@
 
 ---
 
-## Phase 0: Project Setup
+## Agile Development Approach
 
-### Development Environment
-- ⬜ Initialize Node.js project with TypeScript
-- ⬜ Set up AWS Amplify Gen2 project structure
+This task list is organized into **sprints** that deliver working software incrementally. Each sprint includes both frontend and backend tasks necessary to deliver a complete, deployable feature.
+
+**Key Principles:**
+- Each sprint delivers a working, deployable application
+- Frontend and backend tasks are integrated within each sprint
+- User feedback is collected after key sprints (1, 2, 3)
+- Infrastructure is built incrementally as needed for features
+- Complexity is added gradually based on validated learning
+
+---
+
+## Sprint 0: Foundation & Deployment
+
+**Goal**: Deploy a working authenticated "Hello World" app to AWS
+**Duration**: 1-2 weeks
+**Deliverable**: Users can log in and see an empty dashboard
+
+### Project Initialization
+- ⬜ Create React app with TypeScript
+  ```bash
+  npx create-react-app business-ocr-annotator --template typescript
+  cd business-ocr-annotator
+  ```
+- ⬜ Initialize Amplify Gen2 project
+  ```bash
+  npm create amplify@latest
+  ```
+  This creates the `amplify/` directory structure:
+  - `amplify/auth/resource.ts`
+  - `amplify/data/resource.ts`
+  - `amplify/backend.ts`
+
+### Development Environment Setup
+- ⬜ Install required dependencies
+  ```bash
+  npm install aws-amplify @aws-amplify/ui-react
+  npm install --save-dev @aws-amplify/backend @aws-amplify/backend-cli
+  ```
 - ⬜ Configure ESLint and Prettier
-- ⬜ Set up Git hooks (Husky) for pre-commit checks
-- ⬜ Create development and staging AWS environments
-- ⬜ Configure AWS credentials and profiles
-- ⬜ Set up CI/CD pipeline (GitHub Actions or Amplify CI/CD)
+  ```bash
+  npm install --save-dev eslint prettier eslint-config-prettier
+  ```
+- ⬜ Set up Git hooks with Husky
+  ```bash
+  npm install --save-dev husky lint-staged
+  npx husky init
+  ```
+
+### Authentication Setup (Amplify Gen2)
+- ⬜ Configure basic auth in `amplify/auth/resource.ts`
+  ```typescript
+  import { defineAuth } from '@aws-amplify/backend';
+
+  export const auth = defineAuth({
+    loginWith: {
+      email: true
+    }
+  });
+  ```
+- ⬜ Update `amplify/backend.ts` to include auth
+  ```typescript
+  import { defineBackend } from '@aws-amplify/backend';
+  import { auth } from './auth/resource';
+
+  defineBackend({
+    auth
+  });
+  ```
+- ⬜ Add Amplify Authenticator UI component to App.tsx
+- ⬜ Configure Amplify client in frontend
+  ```typescript
+  import { Amplify } from 'aws-amplify';
+  import outputs from '../amplify_outputs.json';
+
+  Amplify.configure(outputs);
+  ```
+
+### Basic Frontend Structure
+- ⬜ Create main layout component with navigation
+- ⬜ Create empty Dashboard page
+- ⬜ Set up React Router v6
+  ```bash
+  npm install react-router-dom
+  ```
+- ⬜ Implement authenticated routing wrapper
+- ⬜ Add logout functionality
+
+### Deployment & Testing
+- ⬜ Start local sandbox environment
+  ```bash
+  npx ampx sandbox
+  ```
+- ⬜ Test authentication flow locally
+- ⬜ Configure AWS credentials
+  ```bash
+  aws configure
+  ```
+- ⬜ Deploy to Amplify Hosting
+- ⬜ Verify authentication works in deployed app
 
 ### Documentation
 - ✅ Create README.md
@@ -33,660 +126,1079 @@
 - ✅ Create spec/tasks.md
 - ⬜ Create CONTRIBUTING.md
 - ⬜ Create LICENSE file
+- ⬜ Document Sprint 0 setup process
+
+**Sprint 0 Acceptance Criteria:**
+- ✅ App deployed to AWS Amplify
+- ✅ Users can sign up with email
+- ✅ Users can log in and log out
+- ✅ Authenticated users see a dashboard (even if empty)
+- ✅ Sandbox environment working locally
 
 ---
 
-## Phase 1: Infrastructure Setup (AWS Amplify Gen2)
+## Sprint 1: Image Upload & Manual Annotation (MVP)
 
-### Authentication
-- ⬜ Configure AWS Cognito User Pool
-- ⬜ Set up user roles (Admin, Curator, Annotator, Viewer)
-- ⬜ Implement role-based access control (RBAC)
-- ⬜ Create authentication UI components (Login, SignUp)
-- ⬜ Implement session management
-- ⬜ Add password reset functionality
+**Goal**: Upload images and create annotations manually (no AI yet)
+**Duration**: 2-3 weeks
+**Deliverable**: Working annotation tool with manual Q&A entry
 
-### Storage
-- ⬜ Configure S3 bucket for image storage with folder structure (original/, compressed/, thumbnail/)
-- ⬜ Set up bucket encryption at rest
-- ⬜ Configure CORS for S3 bucket
-- ⬜ Implement presigned URL generation for secure access (separate URLs for original and compressed)
-- ⬜ Set up S3 lifecycle policies for old versions and thumbnail cleanup
-- ⬜ Configure S3 Intelligent-Tiering for cost optimization
+### Storage Setup (Amplify Gen2)
+- ⬜ Create `amplify/storage/resource.ts`
+  ```typescript
+  import { defineStorage } from '@aws-amplify/backend';
 
-### Database
-- ⬜ Design simplified DynamoDB table schemas (Image, Annotation, Dataset, User)
-  - ⬜ Image table: Add language field, remove OCR fields
-  - ⬜ Annotation table: Add evidenceBoxes array (absolute pixels), language field
-  - ⬜ Add new enum types (QuestionType, AnswerType, GenerationSource)
-  - ⬜ Store S3 keys (not URLs) for flexibility
-- ⬜ Create DynamoDB tables with GSIs
-  - ⬜ GSI on datasetId for efficient queries
-  - ⬜ GSI on language for multi-language filtering
-- ⬜ Configure DynamoDB encryption at rest
-- ⬜ Set up backup and point-in-time recovery
-- ⬜ Implement DynamoDB streams for change tracking
+  export const storage = defineStorage({
+    name: 'businessOcrImages',
+    access: (allow) => ({
+      'images/*': [
+        allow.authenticated.to(['read', 'write', 'delete'])
+      ]
+    })
+  });
+  ```
+- ⬜ Update `amplify/backend.ts` to include storage
+  ```typescript
+  import { storage } from './storage/resource';
 
-### API (GraphQL)
-- ⬜ Set up AWS AppSync GraphQL API
-- ⬜ Define GraphQL schema (queries, mutations, subscriptions)
-- ⬜ Implement resolvers for Image operations
-- ⬜ Implement resolvers for Annotation operations
-- ⬜ Implement resolvers for Dataset operations
-- ⬜ Implement resolvers for User operations
-- ⬜ Configure AppSync authorization rules
-- ⬜ Enable AppSync caching for performance
+  defineBackend({
+    auth,
+    storage
+  });
+  ```
+- ⬜ Test S3 upload functionality in sandbox
+  ```bash
+  npx ampx sandbox
+  ```
 
-### Lambda Functions (Node.js 20.x)
-- ⬜ Create ImageProcessor Lambda (S3 trigger, Node.js 20.x)
-  - ⬜ Implement image metadata extraction (width, height, size)
-  - ⬜ Implement smart compression algorithm (≤4MB target)
-  - ⬜ Implement thumbnail generation (≤100KB)
-  - ⬜ Add Sharp v0.33+ library for image processing
-  - ⬜ Handle multiple image formats (JPEG, PNG, WebP)
-  - ⬜ Update DynamoDB with all image versions (store keys not URLs)
-  - ⬜ Implement presigned URL generation via AppSync field resolver
+### Data Model Setup (Amplify Gen2)
+- ⬜ Define minimal data schema in `amplify/data/resource.ts`
+  ```typescript
+  import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 
-- ⬜ Create AnnotationGenerator Lambda (Node.js 20.x)
-  - ⬜ Integrate AWS Bedrock Runtime SDK
-  - ⬜ Implement BedrockVisionClient service class
-  - ⬜ Add support for Qwen-VL model
-  - ⬜ Add support for Claude 3.5 Sonnet model
-  - ⬜ Implement multi-language prompt templates (ja, en, zh, ko)
-  - ⬜ Parse Bedrock response to extract Q&A pairs and bounding boxes
-  - ⬜ Store annotations with language metadata
-  - ⬜ Handle Bedrock API errors and retries
+  const schema = a.schema({
+    Image: a.model({
+      fileName: a.string().required(),
+      s3Key: a.string().required(),
+      uploadedBy: a.string().required(),
+      uploadedAt: a.datetime().required(),
+      metadata: a.json()
+    }).authorization((allow) => [allow.authenticated()]),
 
-- ⬜ Create DatasetExporter Lambda (Node.js 20.x)
-  - ⬜ Add JSON export with J-BizDoc standard schema
-  - ⬜ Add JSONL export for streaming
-  - ⬜ Add Parquet export using Apache Arrow
-  - ⬜ Implement bounding box normalization utilities
-    - ⬜ Convert absolute pixels to normalized 0-1
-    - ⬜ Convert absolute pixels to normalized 0-1000 (LayoutLM)
-  - ⬜ Support multi-language datasets with language tags
-  - ⬜ Generate dataset metadata file
+    Annotation: a.model({
+      imageId: a.id().required(),
+      question: a.string().required(),
+      answer: a.string().required(),
+      boundingBox: a.json(), // {x, y, width, height}
+      createdBy: a.string().required(),
+      createdAt: a.datetime().required()
+    }).authorization((allow) => [allow.authenticated()])
+  });
 
-- ⬜ Create HuggingFacePublisher Lambda (Node.js 20.x)
-  - ⬜ Generate dataset card with multi-language context
-  - ⬜ Support Parquet format uploads
-  - ⬜ Add usage examples for datasets library
-  - ⬜ Include citation in BibTeX format
+  export type Schema = ClientSchema<typeof schema>;
+  export const data = defineData({
+    schema,
+    authorizationModes: {
+      defaultAuthorizationMode: 'userPool'
+    }
+  });
+  ```
+- ⬜ Update `amplify/backend.ts` to include data
+  ```typescript
+  import { data } from './data/resource';
 
-- ⬜ Create PIIRedactor Lambda (Node.js 20.x)
-  - ⬜ Implement multi-language PII detection (ja, en, zh, ko)
-  - ⬜ Create regex patterns for each language
-  - ⬜ Generate redacted images with blurred regions using Sharp
-  - ⬜ Update annotations to remove PII text
+  defineBackend({
+    auth,
+    storage,
+    data
+  });
+  ```
+- ⬜ Generate GraphQL client types
+  ```bash
+  npx ampx generate graphql-client-code
+  ```
 
-- ⬜ Configure Lambda environment variables
-  - ⬜ BEDROCK_REGION
-  - ⬜ DEFAULT_MODEL_ID
-  - ⬜ SUPPORTED_LANGUAGES
+### Image Upload UI
+- ⬜ Create FileUpload page with drag-and-drop
+  ```bash
+  npm install react-dropzone
+  ```
+- ⬜ Implement file validation (type, size ≤20MB)
+- ⬜ Add image preview before upload
+- ⬜ Implement S3 upload using Amplify Storage
+  ```typescript
+  import { uploadData } from 'aws-amplify/storage';
+  ```
+- ⬜ Save image metadata to DynamoDB via GraphQL
+  ```typescript
+  import { generateClient } from 'aws-amplify/data';
+  const client = generateClient<Schema>();
+  ```
+- ⬜ Show upload progress indicator
+- ⬜ Handle upload errors with retry option
 
-- ⬜ Set up Lambda layers for shared dependencies
-  - ⬜ Sharp v0.33+ for image processing
-  - ⬜ AWS SDK v3 (Bedrock Runtime, S3, DynamoDB)
-  - ⬜ Apache Arrow for Parquet export
+### Image Gallery UI
+- ⬜ Create ImageGallery page
+- ⬜ Implement image grid with lazy loading
+- ⬜ Fetch images from GraphQL API
+- ⬜ Display image thumbnails using S3 presigned URLs
+  ```typescript
+  import { getUrl } from 'aws-amplify/storage';
+  ```
+- ⬜ Add click to open annotation workspace
+- ⬜ Implement basic filtering (date, uploaded by)
+- ⬜ Add image deletion functionality
 
-- ⬜ Configure Lambda memory allocation (1536MB+ for image processing)
-- ⬜ Configure Lambda timeout (5 minutes for Bedrock calls)
+### Manual Annotation Workspace
+- ⬜ Create AnnotationWorkspace page with layout
+- ⬜ Implement ImageViewer component
+  - ⬜ Display full-size image from S3
+  - ⬜ Add zoom controls (zoom in, out, reset, fit)
+  - ⬜ Implement pan functionality
+- ⬜ Create CanvasAnnotator for bounding boxes
+  - ⬜ Render image with HTML5 canvas overlay
+  - ⬜ Implement drag-to-create bounding box
+  - ⬜ Support drag corners/edges to resize box
+  - ⬜ Support drag box to move
+  - ⬜ Implement box selection (click to select)
+  - ⬜ Add delete box functionality (Delete key)
+  - ⬜ Store coordinates in pixels {x, y, width, height}
+- ⬜ Create AnnotationForm component
+  - ⬜ QuestionInput text field
+  - ⬜ AnswerInput text field
+  - ⬜ Associate annotation with selected bounding box
+  - ⬜ Display bounding box coordinates
+- ⬜ Create AnnotationList component
+  - ⬜ Display all annotations for current image
+  - ⬜ Click annotation to highlight its bounding box
+  - ⬜ Edit/delete existing annotations
+- ⬜ Implement save functionality (save to DynamoDB via GraphQL)
+- ⬜ Implement auto-save every 30 seconds
+- ⬜ Add keyboard shortcuts (desktop)
+  - ⬜ Delete: Remove selected box
+  - ⬜ Escape: Deselect box
+  - ⬜ Ctrl+S: Save
+
+### Dashboard Updates
+- ⬜ Display total images count
+- ⬜ Display total annotations count
+- ⬜ Show recent uploads list
+
+**Sprint 1 Acceptance Criteria:**
+- ✅ Users can upload images (single or batch)
+- ✅ Uploaded images appear in gallery
+- ✅ Users can open annotation workspace
+- ✅ Users can draw bounding boxes on images
+- ✅ Users can manually enter questions and answers
+- ✅ Annotations are saved and persisted
+- ✅ Users can view, edit, and delete annotations
+- ✅ Dashboard shows basic statistics
 
 ---
 
-## Phase 2: Frontend Development
+## Sprint 2: AI-Assisted Annotation (Bedrock Integration)
 
-### Project Setup
-- ⬜ Create React 18.3+ app with TypeScript 5.x
-- ⬜ Install minimal Amplify UI (Authenticator only)
-- ⬜ Set up React Router v6 for navigation
-- ⬜ Configure state management (React Context API + React Query)
-- ⬜ Set up i18n for multi-language UI (react-i18next)
-- ⬜ Configure build optimization (Vite or default Amplify)
-- ⬜ Set up custom component library (no heavy UI frameworks)
+**Goal**: Auto-generate annotations using AWS Bedrock
+**Duration**: 2-3 weeks
+**Deliverable**: One-click AI annotation generation
 
-### Authentication UI
-- ⬜ Create Login page
-- ⬜ Create SignUp page
-- ⬜ Create Password Reset page
-- ⬜ Implement authenticated app wrapper
-- ⬜ Add logout functionality
-- ⬜ Implement session timeout handling
+### Bedrock Setup
+- ⬜ Enable Amazon Bedrock in AWS account
+- ⬜ Request model access for Claude 3.5 Sonnet
+- ⬜ Configure IAM permissions for Bedrock access
+- ⬜ Add Bedrock SDK dependencies
+  ```bash
+  npm install @aws-sdk/client-bedrock-runtime
+  ```
 
-### Navigation
-- ⬜ Create main navigation component
-- ⬜ Implement role-based menu items
-- ⬜ Add breadcrumbs for deep navigation
-- ⬜ Create responsive mobile menu
+### Lambda Function for Annotation Generation
+- ⬜ Create `amplify/functions/generate-annotation/` directory
+- ⬜ Create `amplify/functions/generate-annotation/resource.ts`
+  ```typescript
+  import { defineFunction } from '@aws-amplify/backend';
 
-### Dashboard
-- ⬜ Create Dashboard layout
-- ⬜ Implement StatisticsCards component
-- ⬜ Create DocumentTypeChart (distribution visualization)
-- ⬜ Create QuestionTypeChart
-- ⬜ Implement RecentActivity feed
-- ⬜ Add date range filter
-- ⬜ Implement export statistics to CSV
+  export const generateAnnotation = defineFunction({
+    name: 'generateAnnotation',
+    runtime: 20, // Node.js 20.x
+    timeoutSeconds: 300, // 5 minutes for Bedrock call
+    memoryMB: 1024
+  });
+  ```
+- ⬜ Implement handler in `amplify/functions/generate-annotation/handler.ts`
+  ```typescript
+  import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
+  ```
+- ⬜ Implement BedrockVisionClient service class
+  - ⬜ Initialize Bedrock Runtime client
+  - ⬜ Create prompt template for Claude 3.5 Sonnet
+  - ⬜ Implement converse API call with image (base64 or S3 reference)
+  - ⬜ Parse response to extract Q&A pairs and bounding boxes
+- ⬜ Add Lambda environment variables
+  ```typescript
+  // In resource.ts
+  environment: {
+    BEDROCK_REGION: 'us-east-1',
+    MODEL_ID: 'anthropic.claude-3-5-sonnet-20241022-v2:0'
+  }
+  ```
+- ⬜ Grant Lambda permissions to access S3 and Bedrock
+- ⬜ Store generated annotations in DynamoDB
+- ⬜ Add error handling and retry logic
+- ⬜ Implement CloudWatch logging
 
-### Image Upload
-- ⬜ Create FileDropzone component (drag-and-drop)
-- ⬜ Create CameraCapture component for mobile devices
-  - ⬜ Implement HTML5 camera access (capture="camera")
+### Update Backend Configuration
+- ⬜ Update `amplify/backend.ts` to include function
+  ```typescript
+  import { generateAnnotation } from './functions/generate-annotation/resource';
+
+  defineBackend({
+    auth,
+    storage,
+    data,
+    generateAnnotation
+  });
+  ```
+- ⬜ Add GraphQL custom query/mutation for annotation generation
+- ⬜ Test Lambda function in sandbox
+  ```bash
+  npx ampx sandbox --stream-function-logs
+  ```
+
+### Frontend Integration
+- ⬜ Add "Generate Annotations" button to AnnotationWorkspace
+- ⬜ Implement API call to Lambda function
+  ```typescript
+  import { generateClient } from 'aws-amplify/api';
+  ```
+- ⬜ Show loading state during generation (with spinner)
+- ⬜ Display generated annotations in AnnotationList
+- ⬜ Allow users to edit/approve/reject AI annotations
+- ⬜ Add confidence score display (if available from Bedrock)
+- ⬜ Highlight AI-generated vs manual annotations
+- ⬜ Handle generation errors gracefully
+
+### Annotation Validation UI
+- ⬜ Create ValidationControls component
+  - ⬜ Approve button (green checkmark)
+  - ⬜ Reject button (red X)
+  - ⬜ Edit button (pencil icon)
+- ⬜ Track annotation status (pending, approved, rejected)
+- ⬜ Update data model to include status field
+- ⬜ Filter annotations by status in AnnotationList
+
+**Sprint 2 Acceptance Criteria:**
+- ✅ Users can click "Generate Annotations" button
+- ✅ AI generates Q&A pairs with bounding boxes
+- ✅ Generated annotations appear in the workspace
+- ✅ Users can approve, reject, or edit AI annotations
+- ✅ Annotation status is tracked and persisted
+- ✅ Error handling works for Bedrock failures
+
+---
+
+## Sprint 3: Dataset Management & Export
+
+**Goal**: Create datasets and export in JSON format
+**Duration**: 1-2 weeks
+**Deliverable**: Dataset creation and basic export functionality
+
+### Data Model Extension
+- ⬜ Add Dataset model to `amplify/data/resource.ts`
+  ```typescript
+  Dataset: a.model({
+    name: a.string().required(),
+    description: a.string(),
+    version: a.string().required(),
+    createdBy: a.string().required(),
+    createdAt: a.datetime().required(),
+    imageCount: a.integer(),
+    annotationCount: a.integer()
+  }).authorization((allow) => [allow.authenticated()])
+  ```
+- ⬜ Add relationship: Image belongs to Dataset
+- ⬜ Add relationship: Annotation belongs to Image
+- ⬜ Deploy schema updates
+  ```bash
+  npx ampx sandbox
+  ```
+
+### Dataset Management UI
+- ⬜ Create DatasetList page
+  - ⬜ Display all datasets in a grid/list
+  - ⬜ Show dataset metadata (name, version, count)
+  - ⬜ Add "Create New Dataset" button
+- ⬜ Create DatasetForm dialog
+  - ⬜ Name input field
+  - ⬜ Description textarea
+  - ⬜ Version input field
+  - ⬜ Select images to include (multi-select)
+- ⬜ Implement dataset creation (save to DynamoDB)
+- ⬜ Create DatasetDetails page
+  - ⬜ Display dataset metadata
+  - ⬜ Show included images and annotations
+  - ⬜ Display statistics (total Q&A pairs, image count)
+  - ⬜ Add edit/delete dataset functionality
+
+### Export Lambda Function
+- ⬜ Create `amplify/functions/export-dataset/` directory
+- ⬜ Create `amplify/functions/export-dataset/resource.ts`
+  ```typescript
+  import { defineFunction } from '@aws-amplify/backend';
+
+  export const exportDataset = defineFunction({
+    name: 'exportDataset',
+    runtime: 20,
+    timeoutSeconds: 300,
+    memoryMB: 2048
+  });
+  ```
+- ⬜ Implement handler in `amplify/functions/export-dataset/handler.ts`
+  - ⬜ Fetch dataset data from DynamoDB
+  - ⬜ Fetch associated images and annotations
+  - ⬜ Transform to JSON format (simple structure)
+  - ⬜ Upload export file to S3
+  - ⬜ Return presigned URL for download
+- ⬜ Add error handling and validation
+- ⬜ Update `amplify/backend.ts` to include function
+
+### Export UI
+- ⬜ Add "Export Dataset" button to DatasetDetails page
+- ⬜ Create ExportDialog component
+  - ⬜ Format selection (JSON only for now)
+  - ⬜ Show export progress
+  - ⬜ Display download link when ready
+- ⬜ Implement download functionality
+- ⬜ Handle export errors
+
+### Dashboard Enhancements
+- ⬜ Display total datasets count
+- ⬜ Show recent datasets list
+- ⬜ Add quick actions (Create Dataset, Upload Image)
+
+**Sprint 3 Acceptance Criteria:**
+- ✅ Users can create new datasets
+- ✅ Users can add images to datasets
+- ✅ Datasets are listed and searchable
+- ✅ Users can view dataset details
+- ✅ Users can export datasets in JSON format
+- ✅ Export file is downloadable
+
+---
+
+## Sprint 4: Multi-Language Support & Image Optimization
+
+**Goal**: Support multiple languages and optimize image storage
+**Duration**: 2 weeks
+**Deliverable**: Multi-language annotation + image compression
+
+### Multi-Language Data Model
+- ⬜ Add language field to Image model
+  ```typescript
+  language: a.enum(['ja', 'en', 'zh', 'ko']).required()
+  ```
+- ⬜ Add language field to Annotation model
+- ⬜ Add GSI on language field for filtering
+- ⬜ Deploy schema updates
+
+### Multi-Language UI
+- ⬜ Add language selection to Upload page
+  - ⬜ Language dropdown (Japanese, English, Chinese, Korean)
+  - ⬜ Make language required field
+  - ⬜ Display selected language prominently
+- ⬜ Add language filter to Image Gallery
+- ⬜ Display language badge on image cards
+- ⬜ Set up i18n framework for UI
+  ```bash
+  npm install react-i18next i18next
+  ```
+- ⬜ Add UI translations (en, ja as minimum)
+
+### Multi-Language Bedrock Prompts
+- ⬜ Create prompt templates directory `amplify/functions/generate-annotation/prompts/`
+  - ⬜ `ja.ts` - Japanese prompt template
+  - ⬜ `en.ts` - English prompt template
+  - ⬜ `zh.ts` - Chinese prompt template
+  - ⬜ `ko.ts` - Korean prompt template
+- ⬜ Update BedrockVisionClient to select prompt by language
+- ⬜ Add language parameter to annotation generation Lambda
+- ⬜ Test prompts for each language
+- ⬜ Update Lambda environment variables
+  ```typescript
+  SUPPORTED_LANGUAGES: 'ja,en,zh,ko'
+  ```
+
+### Additional Bedrock Models
+- ⬜ Request model access for Qwen-VL
+- ⬜ Add model selection to annotation generation
+- ⬜ Update BedrockVisionClient to support multiple models
+  - ⬜ Claude 3.5 Sonnet (current)
+  - ⬜ Qwen-VL (new)
+- ⬜ Add model configuration to settings
+
+### Image Compression Lambda
+- ⬜ Create `amplify/functions/image-processor/` directory
+- ⬜ Create `amplify/functions/image-processor/resource.ts`
+  ```typescript
+  import { defineFunction } from '@aws-amplify/backend';
+
+  export const imageProcessor = defineFunction({
+    name: 'imageProcessor',
+    runtime: 20,
+    timeoutSeconds: 300,
+    memoryMB: 1536
+  });
+  ```
+- ⬜ Install Sharp library
+  ```bash
+  cd amplify/functions/image-processor
+  npm install sharp
+  ```
+- ⬜ Implement handler
+  - ⬜ Extract image metadata (width, height, size)
+  - ⬜ Implement smart compression (≤4MB target)
+    - ⬜ Dynamic quality adjustment
+    - ⬜ Max dimension 2048px
+    - ⬜ Maintain aspect ratio
+  - ⬜ Generate thumbnail (≤100KB, 200x200px)
+  - ⬜ Upload compressed and thumbnail to S3
+  - ⬜ Update Image record with all versions
+- ⬜ Configure S3 trigger for original/ folder
+- ⬜ Add S3 folder structure: `original/`, `compressed/`, `thumbnail/`
+- ⬜ Update `amplify/storage/resource.ts` for folder access
+- ⬜ Update `amplify/backend.ts` to include function
+
+### Frontend Updates
+- ⬜ Create ProgressiveImageLoader component
+  - ⬜ Load thumbnail first
+  - ⬜ Load compressed image progressively
+  - ⬜ Add "View Original" option
+  - ⬜ Show loading progress
+- ⬜ Update ImageViewer to use ProgressiveImageLoader
+- ⬜ Display compression statistics in image metadata
+- ⬜ Use thumbnails in gallery for performance
+
+### Settings Page
+- ⬜ Create Settings page layout
+- ⬜ Implement BedrockModelConfiguration panel
+  - ⬜ Model selection dropdown
+  - ⬜ Default language selection
+  - ⬜ Parameter tuning (temperature, max tokens)
+- ⬜ Save settings to user preferences (DynamoDB)
+
+**Sprint 4 Acceptance Criteria:**
+- ✅ Users can select language when uploading images
+- ✅ Images can be filtered by language
+- ✅ Bedrock prompts use appropriate language
+- ✅ Multiple Bedrock models are supported
+- ✅ Images are automatically compressed on upload
+- ✅ Thumbnails are generated for gallery view
+- ✅ Progressive image loading works
+- ✅ Settings page allows model configuration
+
+---
+
+## Sprint 5: Mobile Optimization & Camera Capture
+
+**Goal**: First-class mobile experience with camera capture
+**Duration**: 2 weeks
+**Deliverable**: Mobile-optimized annotation and camera integration
+
+### Camera Capture UI
+- ⬜ Create CameraCapture component
+  - ⬜ Implement HTML5 camera access
+    ```html
+    <input type="file" accept="image/*" capture="camera" />
+    ```
   - ⬜ Add camera permission handling
   - ⬜ Support front/back camera switching
   - ⬜ Show live camera preview
-  - ⬜ Implement photo capture and preview
-- ⬜ Implement image preview before upload
-- ⬜ Add file validation (type, size up to 20MB)
-- ⬜ Create UploadProgress component with cancel option
-- ⬜ Implement batch upload
-- ⬜ Add resumable upload for poor network conditions
-- ⬜ Optional: Implement client-side compression before upload
-- ⬜ Add document type selection dropdown
-- ⬜ Add language selection (ja, en, zh, ko) - required field
-- ⬜ Create simple metadata input
-  - ⬜ Document category selection
-  - ⬜ Optional: Document subcategory
-- ⬜ Handle upload errors gracefully with retry option
-- ⬜ Display selected language prominently
+  - ⬜ Implement photo capture
+  - ⬜ Add photo preview before upload
+  - ⬜ Integrate with existing upload flow
+- ⬜ Add camera capture option to Upload page
+- ⬜ Test camera on iOS and Android browsers
 
-### Image Gallery
-- ⬜ Create ImageGallery layout (mobile-first responsive)
-- ⬜ Implement ImageGrid with lazy loading (use thumbnails for performance)
-- ⬜ Create FilterPanel (by type, status, date)
-- ⬜ Add search functionality
-- ⬜ Implement pagination or infinite scroll
-- ⬜ Create ImageCard with metadata display
-  - ⬜ Display thumbnail by default
-  - ⬜ Show compression ratio and file sizes
-  - ⬜ Add touch-friendly actions
-- ⬜ Add image deletion functionality
-
-### Annotation Workspace
-- ⬜ Create AnnotationWorkspace layout (mobile-first responsive)
-- ⬜ Implement ImageViewer component
-- ⬜ Create ProgressiveImageLoader
-  - ⬜ Load thumbnail first for instant display
-  - ⬜ Load compressed image progressively
-  - ⬜ Add "View Original" option for high-res inspection
-  - ⬜ Show loading progress indicator
-  - ⬜ Handle network errors gracefully
-
-- ⬜ Create CanvasAnnotator for desktop
-  - ⬜ Render image with overlay canvas
-  - ⬜ Draw existing bounding boxes
-  - ⬜ Support drag-to-create new boxes
-  - ⬜ Support drag corners/edges to resize
-  - ⬜ Support drag box to move
-  - ⬜ Implement box selection
-  - ⬜ Add delete box functionality
-- ⬜ Create TouchAnnotator for mobile
-  - ⬜ Touch-friendly bounding box manipulation
+### Mobile-Optimized Annotation UI
+- ⬜ Create TouchAnnotator component (mobile version)
+  - ⬜ Touch-friendly bounding box creation
   - ⬜ Pinch-to-zoom gesture support
   - ⬜ Two-finger pan gesture
-  - ⬜ Large touch targets (minimum 44x44px)
-  - ⬜ Corner handles for resizing (minimum 12px touch area)
-  - ⬜ Tap to select, long-press for context menu
+  - ⬜ Large touch targets (44x44px minimum)
+  - ⬜ Corner handles for resizing (12px+ touch area)
+  - ⬜ Tap to select box
+  - ⬜ Long-press for context menu
   - ⬜ Optional: Haptic feedback
-- ⬜ Create ZoomControls (zoom in, out, reset, fit)
-- ⬜ Implement pan functionality (mouse/touch)
-- ⬜ Create QuestionList component
-- ⬜ Create QuestionItem component with status badges
-- ⬜ Implement AnnotationEditor
-  - ⬜ QuestionInput field (mobile-optimized keyboard)
-  - ⬜ AnswerInput field
-  - ⬜ QuestionType selector
-  - ⬜ BoundingBoxEditor (coordinate display/edit)
-- ⬜ Create ValidationControls (Approve, Reject, Flag)
-  - ⬜ Touch-friendly buttons (minimum 44x44px)
-- ⬜ Implement keyboard shortcuts (desktop only)
-- ⬜ Add annotation history view
-- ⬜ Implement auto-save (every 30 seconds)
-- ⬜ Support portrait and landscape orientations
+- ⬜ Implement mobile-specific controls
+  - ⬜ Touch-friendly validation buttons (44x44px)
+  - ⬜ Bottom sheet for annotation form
+  - ⬜ Mobile-optimized keyboard for text input
+- ⬜ Add orientation support (portrait and landscape)
 
-### Dataset Management
-- ⬜ Create DatasetList view
-- ⬜ Implement DatasetDetails page
-- ⬜ Create VersionHistory component
-- ⬜ Implement version creation dialog
-- ⬜ Create ExportDialog (format selection)
-  - ⬜ Add JSON, JSONL, and Parquet format options
-  - ⬜ Add coordinate format options (absolute, normalized 0-1, normalized 0-1000, all)
-  - ⬜ PII handling options (include, redact, exclude)
-  - ⬜ Language filter (export specific languages or all)
-- ⬜ Create PIIRedactionControls component
-  - ⬜ Scan dataset for potential PII
-  - ⬜ Show PII detection results with confidence
-  - ⬜ Allow manual review and override
-  - ⬜ Trigger redaction process
-  - ⬜ Show redaction progress
-- ⬜ Add dataset deletion (with confirmation)
-- ⬜ Implement dataset cloning
-- ⬜ Create DatasetCardPreview component
-  - ⬜ Show generated dataset card
-  - ⬜ Edit citation and metadata
-  - ⬜ Preview licensing information
-  - ⬜ Include Japanese legal context
+### Responsive Design
+- ⬜ Audit all pages for mobile responsiveness
+- ⬜ Implement mobile-first CSS
+  - ⬜ Mobile (375px - 767px)
+  - ⬜ Tablet (768px - 1023px)
+  - ⬜ Desktop (1024px+)
+- ⬜ Update navigation for mobile (hamburger menu)
+- ⬜ Optimize dashboard for mobile layout
+- ⬜ Test on various device sizes
 
-### Settings
-- ⬜ Create Settings layout
-- ⬜ Implement BedrockModelConfiguration panel
-  - ⬜ Bedrock model selection (Qwen-VL, Claude 3.5 Sonnet)
-  - ⬜ Parameter tuning (temperature, max tokens, top_p)
-  - ⬜ Default language selection
-  - ⬜ Model performance metrics display
-- ⬜ Create UserManagement panel (Admin only)
-  - ⬜ List users
-  - ⬜ Assign roles
-  - ⬜ View user statistics
-- ⬜ Implement HuggingFaceSettings
-  - ⬜ API token configuration
-  - ⬜ Default dataset settings
-  - ⬜ Organization selection
+### Performance Optimization for Mobile
+- ⬜ Implement lazy loading for images
+- ⬜ Add service worker for offline support (optional)
+- ⬜ Optimize bundle size
+  ```bash
+  npm install --save-dev webpack-bundle-analyzer
+  ```
+- ⬜ Test on 3G/4G networks (throttling)
+- ⬜ Measure page load times on mobile devices
 
 ### Common Components
 - ⬜ Create NotificationToast component
 - ⬜ Implement LoadingSpinner
 - ⬜ Create ErrorBoundary
-- ⬜ Implement ConfirmDialog
+- ⬜ Implement ConfirmDialog (mobile-friendly)
 - ⬜ Create Tooltip component
 - ⬜ Implement ProgressBar
 
+**Sprint 5 Acceptance Criteria:**
+- ✅ Users can capture photos with device camera
+- ✅ Camera works on iOS and Android browsers
+- ✅ Touch annotation works smoothly on mobile
+- ✅ Pinch-to-zoom and pan gestures work
+- ✅ All pages are responsive and mobile-friendly
+- ✅ App performs well on mobile networks
+- ✅ Portrait and landscape orientations supported
+
 ---
 
-## Phase 3: Backend Services
+## Sprint 6: Dataset Publishing & PII Handling
 
-### Image Processing
-- ⬜ Implement ImageProcessor Lambda handler
-- ⬜ Add image metadata extraction (dimensions, EXIF)
-- ⬜ Implement smart compression algorithm
-  - ⬜ Dynamic quality adjustment to meet 4MB target
-  - ⬜ Maintain aspect ratio while resizing
-  - ⬜ Support max dimension of 2048px
-  - ⬜ Progressive JPEG encoding
-  - ⬜ Handle edge cases (already small images, PNG format)
-- ⬜ Generate thumbnails using Sharp (≤100KB, 200x200px)
-- ⬜ Upload compressed and thumbnail versions to S3
-- ⬜ Track compression metrics (ratio, processing time)
-- ⬜ Implement error handling and retry logic
-- ⬜ Add CloudWatch logging with compression statistics
-- ⬜ Update DynamoDB with all image versions and metadata
-- ⬜ Trigger annotation generation with compressed image
+**Goal**: Publish datasets to Hugging Face with PII redaction
+**Duration**: 2 weeks
+**Deliverable**: One-click dataset publishing with compliance
 
-### Amazon Bedrock Integration
-- ⬜ Enable Amazon Bedrock in AWS account
-- ⬜ Request model access for Qwen-VL and Claude 3.5 Sonnet
-- ⬜ Create BedrockVisionClient service class
-  - ⬜ Implement Bedrock Runtime SDK integration
-  - ⬜ Add model invocation with converse API
-  - ⬜ Handle image encoding (base64 or S3 reference)
-- ⬜ Create multi-language prompt templates
-  - ⬜ Japanese prompts for Qwen-VL
-  - ⬜ English prompts for Claude Vision
-  - ⬜ Chinese and Korean prompts
-- ⬜ Implement response parsing
-  - ⬜ Extract Q&A pairs from model response
-  - ⬜ Parse bounding box coordinates
-  - ⬜ Extract text content from boxes
-  - ⬜ Classify question and answer types
-- ⬜ Add error handling and retries
-- ⬜ Implement cost tracking per model
-- ⬜ Store annotations with Bedrock model metadata
-
-### Dataset Export
-- ⬜ Implement DatasetExporter Lambda handler
-- ⬜ Create JSON export formatter with J-BizDoc schema
-  - ⬜ Include dataset metadata and version info
-  - ⬜ Transform annotations to standard format
-  - ⬜ Include OCR tokens if requested
-  - ⬜ Support coordinate format options
-- ⬜ Create JSONL export formatter (one record per line)
-- ⬜ Create Parquet export formatter using Apache Arrow
-  - ⬜ Install and configure Apache Arrow library
+### Advanced Export Formats
+- ⬜ Extend export Lambda to support multiple formats
+  - ⬜ JSON (existing)
+  - ⬜ JSONL (streaming format)
+  - ⬜ Parquet (for HuggingFace)
+- ⬜ Install Apache Arrow for Parquet export
+  ```bash
+  cd amplify/functions/export-dataset
+  npm install apache-arrow parquetjs
+  ```
+- ⬜ Implement Parquet export formatter
   - ⬜ Design Parquet schema for nested structures
-  - ⬜ Optimize row group size for streaming
-  - ⬜ Add compression (Snappy or ZSTD)
-  - ⬜ Validate Parquet output with pyarrow
-- ⬜ Implement bounding box normalization utilities
+  - ⬜ Optimize row group size
+  - ⬜ Add compression (Snappy)
+  - ⬜ Validate output
+- ⬜ Add bounding box normalization utilities
   - ⬜ Convert absolute pixels to 0-1 normalized
-  - ⬜ Convert 0-1 to 0-1000 (LayoutLM standard)
+  - ⬜ Convert to 0-1000 (LayoutLM standard)
   - ⬜ Support both formats in export
-- ⬜ Implement data validation before export
-- ⬜ Upload export files to S3
-- ⬜ Generate export metadata file
-- ⬜ Update dataset version record
+- ⬜ Update ExportDialog to support all formats
 
-### PII Detection and Redaction (Multi-Language)
-- ⬜ Implement PIIDetector service with multi-language support
-  - ⬜ Japanese patterns: phone numbers, names, addresses
-  - ⬜ English patterns: phone numbers, SSN, emails, names
-  - ⬜ Chinese patterns: ID numbers, phone numbers, names
-  - ⬜ Korean patterns: phone numbers, names, addresses
-  - ⬜ Universal patterns: emails, credit cards
+### PII Detection & Redaction
+- ⬜ Create `amplify/functions/pii-redactor/` directory
+- ⬜ Create `amplify/functions/pii-redactor/resource.ts`
+- ⬜ Implement PIIDetector service (multi-language)
+  - ⬜ Japanese patterns (phone, names, addresses)
+  - ⬜ English patterns (SSN, phone, emails)
+  - ⬜ Chinese patterns (ID numbers, phone)
+  - ⬜ Korean patterns (phone, names)
+  - ⬜ Universal patterns (emails, credit cards)
 - ⬜ Implement image redaction using Sharp
-  - ⬜ Blur detected PII regions with Gaussian blur
-  - ⬜ Preserve image quality outside redacted areas
+  - ⬜ Blur detected PII regions (Gaussian blur)
+  - ⬜ Preserve quality outside redacted areas
+  - ⬜ Generate redacted image version
 - ⬜ Implement text redaction in annotations
-  - ⬜ Replace PII with language-appropriate placeholders
-  - ⬜ Update answer text in annotations
+  - ⬜ Replace PII with placeholders
   - ⬜ Log redaction actions for audit
-- ⬜ Test PII detection accuracy for each language
+- ⬜ Add PII scanning to dataset export process
+- ⬜ Update `amplify/backend.ts` to include function
+
+### PII Detection UI
+- ⬜ Create PIIRedactionControls component
+  - ⬜ "Scan for PII" button
+  - ⬜ Display PII detection results with confidence
+  - ⬜ Allow manual review and override
+  - ⬜ Show redaction progress
+- ⬜ Add PII handling options to ExportDialog
+  - ⬜ Include (no redaction)
+  - ⬜ Redact (blur images, replace text)
+  - ⬜ Exclude (remove PII annotations)
+- ⬜ Display PII warnings before export
 
 ### Hugging Face Integration
-- ⬜ Create HuggingFace API client
-- ⬜ Implement dataset creation with multi-language tags
-- ⬜ Implement Parquet file upload (primary format)
-- ⬜ Implement JSON/JSONL upload (secondary formats)
-- ⬜ Generate dataset card (README.md)
-  - ⬜ Include multi-language dataset description
-  - ⬜ Add citation in BibTeX format
-  - ⬜ Include licensing information (CC BY-SA 4.0)
-  - ⬜ Document legal context for international users
-  - ⬜ Add usage examples with datasets library
-  - ⬜ Include language distribution statistics
-  - ⬜ Document data collection methodology
-- ⬜ Add version tagging
-- ⬜ Store HF dataset URL in DynamoDB
-- ⬜ Handle API rate limits
-- ⬜ Implement retry logic for network failures
+- ⬜ Create `amplify/functions/hf-publisher/` directory
+- ⬜ Create `amplify/functions/hf-publisher/resource.ts`
+- ⬜ Install Hugging Face Hub SDK
+  ```bash
+  npm install @huggingface/hub
+  ```
+- ⬜ Implement HuggingFace client
+  - ⬜ Create dataset repository
+  - ⬜ Upload Parquet files
+  - ⬜ Generate dataset card (README.md)
+    - ⬜ Multi-language dataset description
+    - ⬜ Citation (BibTeX and APA)
+    - ⬜ Licensing (CC BY-SA 4.0)
+    - ⬜ Usage examples with datasets library
+    - ⬜ Language distribution statistics
+    - ⬜ Legal context for international users
+  - ⬜ Add version tagging
+  - ⬜ Store HF dataset URL in DynamoDB
+- ⬜ Add HF API token management to Settings
+- ⬜ Update `amplify/backend.ts` to include function
 
-### Statistics Calculation
-- ⬜ Create StatisticsCalculator service
-- ⬜ Implement document type distribution calculation
-- ⬜ Implement question type distribution calculation
-- ⬜ Calculate approval rates
-- ⬜ Calculate inter-annotator agreement
-- ⬜ Implement scheduled statistics update (daily)
-- ⬜ Cache statistics in DynamoDB
-- ⬜ Add incremental statistics update on annotation changes
+### Publishing UI
+- ⬜ Add "Publish to Hugging Face" button to DatasetDetails
+- ⬜ Create PublishDialog component
+  - ⬜ HuggingFace organization selection
+  - ⬜ Dataset name and description
+  - ⬜ License selection
+  - ⬜ PII handling options
+  - ⬜ Language filter
+  - ⬜ Preview dataset card
+- ⬜ Implement publish workflow
+- ⬜ Display publication status and HF URL
+- ⬜ Handle API rate limits and errors
 
----
+### Dataset Card Template
+- ⬜ Create dataset card template
+- ⬜ Include standard sections
+  - ⬜ Dataset Description
+  - ⬜ Dataset Structure
+  - ⬜ Multi-language support
+  - ⬜ Citation format
+  - ⬜ PII handling procedures
+  - ⬜ Usage examples
+  - ⬜ Legal context
 
-## Phase 4: Testing
-
-### Unit Tests
-- ⬜ Set up Jest testing framework
-- ⬜ Write tests for utility functions
-- ⬜ Write tests for compression algorithm
-  - ⬜ Test various input sizes and formats
-  - ⬜ Verify output meets 4MB target
-  - ⬜ Test quality degradation limits
-  - ⬜ Test aspect ratio preservation
-- ⬜ Write tests for data models and validators
-- ⬜ Write tests for GraphQL resolvers
-- ⬜ Write tests for Lambda functions
-- ⬜ Write tests for React components (desktop and mobile variants)
-- ⬜ Achieve >80% code coverage
-
-### Integration Tests
-- ⬜ Set up integration test environment
-- ⬜ Write tests for image upload flow
-  - ⬜ Test upload, compression, and thumbnail generation pipeline
-  - ⬜ Verify all three versions stored correctly in S3 (as keys)
-  - ⬜ Test presigned URL generation
-  - ⬜ Verify compression maintains visual quality
-
-- ⬜ Write tests for Bedrock integration
-  - ⬜ Test Qwen-VL model invocation
-  - ⬜ Test Claude 3.5 Sonnet model invocation
-  - ⬜ Verify multi-language prompt handling (ja, en, zh, ko)
-  - ⬜ Test response parsing for Q&A pairs
-  - ⬜ Test bounding box extraction from responses
-  - ⬜ Verify language metadata in annotations
-  - ⬜ Test error handling and retries
-
-- ⬜ Write tests for PII detection (multi-language)
-  - ⬜ Test Japanese PII detection (names, phone, address)
-  - ⬜ Test English PII detection
-  - ⬜ Test Chinese PII detection
-  - ⬜ Test Korean PII detection
-  - ⬜ Verify image blurring quality
-  - ⬜ Test false positive/negative rates per language
-
-- ⬜ Write tests for dataset export
-  - ⬜ Test JSON export with J-BizDoc schema
-  - ⬜ Test JSONL export format
-  - ⬜ Test Parquet export and validate with pyarrow
-  - ⬜ Test bounding box normalization (0-1, 0-1000)
-  - ⬜ Verify coordinate format options
-  - ⬜ Test multi-language dataset export
-  - ⬜ Test PII handling in export
-
-- ⬜ Write tests for Hugging Face publishing
-  - ⬜ Test multi-language dataset card generation
-  - ⬜ Test Parquet file upload
-  - ⬜ Verify streaming with datasets library
-  - ⬜ Test language filtering
-
-- ⬜ Test mobile camera capture flow
-- ⬜ Test error scenarios and edge cases
-
-### End-to-End Tests
-- ⬜ Set up Cypress or Playwright with mobile device emulation
-- ⬜ Write E2E test for complete annotation workflow (desktop and mobile)
-- ⬜ Write E2E test for mobile camera capture to annotation
-- ⬜ Write E2E test for dataset creation and publishing
-- ⬜ Write E2E test for user management
-- ⬜ Test across different browsers (Chrome, Safari, Firefox)
-- ⬜ Test responsive design on different screen sizes
-  - ⬜ Mobile (375px - 767px)
-  - ⬜ Tablet (768px - 1023px)
-  - ⬜ Desktop (1024px+)
-- ⬜ Test portrait and landscape orientations
-
-### Performance Tests
-- ⬜ Test image upload with large files (up to 20MB)
-- ⬜ Test compression performance
-  - ⬜ Various smartphone camera resolutions (12MP, 48MP, 108MP)
-  - ⬜ Measure compression time vs file size
-  - ⬜ Verify 99% of images compressed to ≤4MB
-- ⬜ Test batch upload performance
-- ⬜ Test network performance on simulated mobile networks (3G, 4G, 5G)
-- ⬜ Load test annotation generation with concurrent requests
-- ⬜ Test dashboard performance with large datasets
-- ⬜ Measure page load times on mobile devices
-- ⬜ Test progressive image loading performance
-- ⬜ Optimize slow queries and operations
+**Sprint 6 Acceptance Criteria:**
+- ✅ Datasets can be exported in JSON, JSONL, Parquet
+- ✅ Bounding box normalization works correctly
+- ✅ PII detection identifies sensitive data
+- ✅ PII can be redacted from images and text
+- ✅ Datasets can be published to Hugging Face
+- ✅ Dataset card is auto-generated
+- ✅ Publication URL is stored and displayed
 
 ---
 
-## Phase 5: Security & Compliance
+## Sprint 7: Production Readiness & Polish
+
+**Goal**: Production-ready secure and monitored platform
+**Duration**: 2 weeks
+**Deliverable**: Secure, documented, monitored system
 
 ### Security Hardening
 - ⬜ Implement input validation on all forms
-- ⬜ Sanitize user inputs to prevent XSS
+- ⬜ Sanitize user inputs (prevent XSS)
 - ⬜ Implement CSRF protection
 - ⬜ Set up Content Security Policy headers
 - ⬜ Enable HTTPS only (HSTS)
-- ⬜ Configure S3 bucket policies (least privilege)
-- ⬜ Review and update IAM roles and policies
+- ⬜ Review S3 bucket policies (least privilege)
+- ⬜ Review IAM roles and policies
 - ⬜ Enable AWS CloudTrail for audit logs
-- ⬜ Set up AWS Config for compliance monitoring
-
-### Data Protection
-- ⬜ Implement data encryption at rest (verify S3, DynamoDB)
-- ⬜ Implement data encryption in transit (verify HTTPS)
+- ⬜ Set up AWS Config for compliance
 - ⬜ Secure API keys in AWS Secrets Manager
-- ⬜ Implement presigned URL expiration
-- ⬜ Add data retention policies
-- ⬜ Implement data deletion workflow (GDPR compliance)
+  ```bash
+  aws secretsmanager create-secret --name hf-api-token
+  ```
+- ⬜ Implement presigned URL expiration (1 hour)
+- ⬜ Enable DynamoDB encryption at rest (verify)
+- ⬜ Enable S3 encryption at rest (verify)
 
 ### Vulnerability Scanning
-- ⬜ Set up npm audit for dependency scanning
-- ⬜ Integrate Snyk or similar for security scanning
-- ⬜ Schedule regular security audits
+- ⬜ Set up npm audit
+  ```bash
+  npm audit
+  ```
+- ⬜ Integrate Snyk for security scanning
+  ```bash
+  npm install -g snyk
+  snyk test
+  ```
 - ⬜ Fix identified vulnerabilities
+- ⬜ Schedule regular security audits
 
----
-
-## Phase 6: Monitoring & Operations
-
-### Monitoring
+### Monitoring & Logging
 - ⬜ Set up CloudWatch dashboards
-- ⬜ Configure CloudWatch alarms for critical metrics
   - ⬜ Lambda error rates
   - ⬜ API latency
-  - ⬜ Model API failures
+  - ⬜ Bedrock API failures
   - ⬜ Storage usage
-- ⬜ Implement structured logging across all services
-- ⬜ Set up log aggregation and search (CloudWatch Insights)
-- ⬜ Configure SNS notifications for alarms
+  - ⬜ DynamoDB read/write capacity
+- ⬜ Configure CloudWatch alarms
+  - ⬜ High error rates (email notification)
+  - ⬜ High latency (>3s)
+  - ⬜ Storage nearing quota
+- ⬜ Implement structured logging in Lambda functions
+  ```typescript
+  import { Logger } from '@aws-lambda-powertools/logger';
+  const logger = new Logger();
+  ```
+- ⬜ Set up log aggregation (CloudWatch Insights)
+- ⬜ Configure SNS notifications for critical alarms
+  ```bash
+  aws sns create-topic --name amplify-alerts
+  ```
 
 ### Error Tracking
-- ⬜ Integrate error tracking service (Sentry, Rollbar)
-- ⬜ Set up frontend error tracking
-- ⬜ Set up backend error tracking
-- ⬜ Configure error alert notifications
+- ⬜ Integrate frontend error tracking (Sentry or Rollbar)
+  ```bash
+  npm install @sentry/react
+  ```
+- ⬜ Configure error reporting for Lambda functions
+- ⬜ Set up error alert notifications
 - ⬜ Create error triage workflow
 
 ### Performance Monitoring
 - ⬜ Implement APM (Application Performance Monitoring)
 - ⬜ Set up X-Ray tracing for Lambda functions
+  ```typescript
+  import { captureLambdaHandler } from '@aws-lambda-powertools/tracer';
+  ```
 - ⬜ Monitor database query performance
-- ⬜ Monitor model API latency
+- ⬜ Monitor Bedrock API latency
 - ⬜ Create performance optimization plan
 
 ### Backup & Recovery
-- ⬜ Verify DynamoDB backup configuration
-- ⬜ Verify S3 versioning and backup
-- ⬜ Create disaster recovery plan
+- ⬜ Enable DynamoDB point-in-time recovery
+  ```bash
+  aws dynamodb update-continuous-backups \
+    --table-name Image \
+    --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true
+  ```
+- ⬜ Enable S3 versioning for critical buckets
+- ⬜ Create disaster recovery plan document
 - ⬜ Document recovery procedures
 - ⬜ Test backup restoration process
 
----
+### Testing
+- ⬜ Set up Jest testing framework
+  ```bash
+  npm install --save-dev jest @types/jest ts-jest
+  ```
+- ⬜ Write unit tests for utility functions
+  - ⬜ Bounding box normalization
+  - ⬜ PII detection patterns
+  - ⬜ Image compression logic
+- ⬜ Write tests for React components
+  ```bash
+  npm install --save-dev @testing-library/react
+  ```
+- ⬜ Write integration tests for Lambda functions
+- ⬜ Set up E2E testing with Cypress/Playwright
+  ```bash
+  npm install --save-dev @playwright/test
+  ```
+- ⬜ Write E2E test for annotation workflow
+- ⬜ Test across browsers (Chrome, Safari, Firefox)
+- ⬜ Test responsive design on devices
+- ⬜ Achieve >80% code coverage
 
-## Phase 7: Documentation & Training
+### Performance Testing
+- ⬜ Load test image upload (concurrent users)
+- ⬜ Load test annotation generation
+- ⬜ Test compression with various image sizes
+- ⬜ Test on simulated mobile networks
+- ⬜ Optimize slow queries and operations
 
-### User Documentation
-- ⬜ Create user guide for dataset curators
+### Documentation
+- ⬜ Create user guide for curators
 - ⬜ Create user guide for annotators
-- ⬜ Create video tutorials for key workflows
-- ⬜ Document best practices for annotation
-- ⬜ Create FAQ section
-- ⬜ Create dataset card template for Hugging Face
-  - ⬜ Include standard sections (Dataset Description, Dataset Structure, etc.)
-  - ⬜ Add multi-language support section
-  - ⬜ Include citation format (BibTeX and APA)
-  - ⬜ Document PII handling procedures
-  - ⬜ Add usage examples with datasets library for each language
-  - ⬜ Include legal context for international users
-- ⬜ Create citation guidelines for dataset users
-- ⬜ Document data collection methodology
-- ⬜ Document bounding box format and normalization
-- ⬜ Create Bedrock integration guide
-  - ⬜ How to enable and configure Bedrock models
-  - ⬜ Multi-language prompt templates
-  - ⬜ Model selection guidelines
-  - ⬜ Cost optimization tips
-
-### Technical Documentation
-- ⬜ Document API endpoints and usage
+- ⬜ Document API endpoints
 - ⬜ Create architecture diagrams
+  ```bash
+  npm install --save-dev mermaid
+  ```
 - ⬜ Document deployment process
 - ⬜ Create troubleshooting guide
-- ⬜ Document model integration process
+- ⬜ Document Bedrock integration
+- ⬜ Create video tutorials (optional)
 
-### Developer Documentation
-- ⬜ Create contributing guidelines
-- ⬜ Document code structure and conventions
-- ⬜ Create development setup guide
-- ⬜ Document testing procedures
-- ⬜ Create release process documentation
+### CI/CD Pipeline
+- ⬜ Set up GitHub Actions workflow
+  ```yaml
+  # .github/workflows/deploy.yml
+  name: Deploy to Amplify
+  on: [push]
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+        - run: npm ci
+        - run: npm test
+        - run: npx ampx pipeline-deploy
+  ```
+- ⬜ Configure automated testing on PR
+- ⬜ Set up staging environment
+- ⬜ Configure production deployment
+- ⬜ Add deployment approval workflow
+
+### Launch Preparation
+- ⬜ Complete security review checklist
+- ⬜ Complete performance testing
+- ⬜ Verify all monitoring is active
+- ⬜ Create launch plan document
+- ⬜ Prepare rollback plan
+- ⬜ Train initial users
+- ⬜ Set up support channels (email, chat)
+- ⬜ Prepare announcement (blog post, social media)
+
+**Sprint 7 Acceptance Criteria:**
+- ✅ Security scan passes with no critical issues
+- ✅ All monitoring dashboards are active
+- ✅ Error tracking is configured
+- ✅ Backup and recovery tested
+- ✅ Test coverage >80%
+- ✅ Documentation is complete
+- ✅ CI/CD pipeline is operational
+- ✅ Ready for production launch
 
 ---
 
-## Phase 8: Launch Preparation
+## Post-Launch: Maintenance & Enhancements
 
-### Pre-launch Checklist
-- ⬜ Complete security review
-- ⬜ Complete performance testing
-- ⬜ Verify all monitoring is in place
-- ⬜ Create launch plan
-- ⬜ Prepare rollback plan
-- ⬜ Train initial users
-- ⬜ Set up support channels
-
-### Launch
+### Launch Activities
 - ⬜ Deploy to production
-- ⬜ Monitor for issues
+  ```bash
+  npx ampx pipeline-deploy --branch main
+  ```
+- ⬜ Monitor for issues (first 48 hours)
 - ⬜ Collect initial user feedback
-- ⬜ Address critical issues
+- ⬜ Address critical issues immediately
 - ⬜ Publish announcement
+- ⬜ Conduct retrospective meeting
 
-### Post-Launch
-- ⬜ Conduct retrospective
-- ⬜ Document lessons learned
-- ⬜ Plan next iteration
+### Post-Launch Optimization
+- ⬜ Analyze user behavior with analytics
+- ⬜ Identify bottlenecks and optimize
 - ⬜ Gather feature requests
 - ⬜ Prioritize roadmap
+- ⬜ Plan next sprint
 
 ---
 
 ## Future Enhancements (Backlog)
 
-### Features
+### Advanced Features
 - ⬜ Multi-annotator consensus workflow
 - ⬜ Real-time collaboration on annotations
-- ⬜ Advanced analytics and ML insights
+- ⬜ Advanced analytics dashboard with ML insights
 - ⬜ Custom model training pipeline
-- ⬜ Mobile application (React Native)
-- ⬜ API for programmatic access
+- ⬜ Native mobile app (React Native)
+- ⬜ Public API for programmatic access
 - ⬜ Webhook integrations
-- ⬜ Support for additional document types (videos, audio)
 - ⬜ Annotation templates and presets
-- ⬜ Bulk operations (approve all, delete all)
+- ⬜ Bulk operations (batch approve/delete)
+- ⬜ Dataset versioning with diff view
+- ⬜ Annotation quality scoring
 
-### Integrations
+### Additional Integrations
 - ⬜ Integration with Label Studio
 - ⬜ Integration with CVAT
-- ⬜ Integration with other annotation tools
-- ⬜ Support for additional AI models (GPT-4V, Claude Vision)
+- ⬜ Support for GPT-4V model
 - ⬜ Export to COCO format
 - ⬜ Export to Pascal VOC format
+- ⬜ Integration with Labelbox
+- ⬜ IIIF (International Image Interoperability Framework) support
 
-### Infrastructure
+### Infrastructure Enhancements
 - ⬜ Multi-region deployment
-- ⬜ CDN for global performance
+- ⬜ CDN for global performance (CloudFront)
+- ⬜ Redis caching layer for API responses
+- ⬜ Dataset partitioning for large collections
 - ⬜ Database migration to Aurora (if needed)
-- ⬜ Implement dataset partitioning
-- ⬜ Add Redis caching layer
+- ⬜ Implement search with OpenSearch
+
+### Advanced AI Features
+- ⬜ Support for additional Bedrock models
+- ⬜ Custom prompt engineering interface
+- ⬜ Active learning to improve annotation quality
+- ⬜ Automated quality assessment
+- ⬜ Confidence scoring for annotations
+
+---
+
+## Amplify Gen2 Command Reference
+
+### Development Commands
+```bash
+# Initialize new Amplify project
+npm create amplify@latest
+
+# Install Amplify dependencies
+npm install aws-amplify @aws-amplify/ui-react
+npm install --save-dev @aws-amplify/backend @aws-amplify/backend-cli
+
+# Start local sandbox (with hot reload)
+npx ampx sandbox
+
+# Stream function logs while in sandbox
+npx ampx sandbox --stream-function-logs
+
+# Filter logs from specific functions
+npx ampx sandbox --logs-filter "generateAnnotation"
+
+# Generate GraphQL client types
+npx ampx generate graphql-client-code
+
+# Delete sandbox
+npx ampx sandbox delete
+```
+
+### Deployment Commands
+```bash
+# Deploy to Amplify (production)
+npx ampx pipeline-deploy --branch main
+
+# Deploy to staging
+npx ampx pipeline-deploy --branch staging
+
+# Check deployment status
+aws amplify list-apps
+```
+
+### AWS Configuration
+```bash
+# Configure AWS credentials
+aws configure
+
+# Create secrets for sensitive data
+aws secretsmanager create-secret --name hf-api-token --secret-string "your-token"
+
+# Enable Bedrock model access (via AWS Console)
+# Navigate to: Amazon Bedrock > Model access > Request model access
+```
+
+### Testing Commands
+```bash
+# Run unit tests
+npm test
+
+# Run E2E tests
+npx playwright test
+
+# Security audit
+npm audit
+snyk test
+
+# Bundle analysis
+npm run build
+npx webpack-bundle-analyzer build/stats.json
+```
+
+---
+
+## Amplify Gen2 File Structure
+
+```
+business-ocr-annotator/
+├── amplify/
+│   ├── auth/
+│   │   └── resource.ts           # defineAuth()
+│   ├── storage/
+│   │   └── resource.ts           # defineStorage()
+│   ├── data/
+│   │   └── resource.ts           # defineData() with schema
+│   ├── functions/
+│   │   ├── generate-annotation/
+│   │   │   ├── resource.ts       # defineFunction()
+│   │   │   ├── handler.ts        # Lambda handler
+│   │   │   └── package.json
+│   │   ├── export-dataset/
+│   │   │   ├── resource.ts
+│   │   │   ├── handler.ts
+│   │   │   └── package.json
+│   │   ├── image-processor/
+│   │   │   ├── resource.ts
+│   │   │   ├── handler.ts
+│   │   │   └── package.json
+│   │   ├── pii-redactor/
+│   │   │   ├── resource.ts
+│   │   │   ├── handler.ts
+│   │   │   └── package.json
+│   │   └── hf-publisher/
+│   │       ├── resource.ts
+│   │       ├── handler.ts
+│   │       └── package.json
+│   └── backend.ts                # defineBackend() - imports all resources
+├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── App.tsx
+│   └── index.tsx
+├── amplify_outputs.json          # Generated after deployment
+├── package.json
+└── tsconfig.json
+```
 
 ---
 
 ## Risk Management
 
 ### Known Risks
-1. **Qwen Model Availability**: Dependency on external model API
-   - Mitigation: Have fallback model options, implement robust error handling
+1. **Bedrock Model Availability**: Dependency on external model API
+   - Mitigation: Multiple model options, robust error handling
 
 2. **Hugging Face API Limits**: Rate limiting and quotas
-   - Mitigation: Implement retry logic, batch operations, upgrade plan if needed
+   - Mitigation: Retry logic, batch operations, upgrade plan if needed
 
 3. **Dataset Size**: Large datasets may impact performance
-   - Mitigation: Implement pagination, lazy loading, dataset partitioning
+   - Mitigation: Pagination, lazy loading, partitioning
 
-4. **Annotation Quality**: AI-generated annotations may have low quality
-   - Mitigation: Human validation workflow, confidence thresholds, model tuning
+4. **Annotation Quality**: AI-generated annotations may have errors
+   - Mitigation: Human validation workflow, confidence thresholds
 
-5. **Cost Overruns**: AWS and model API costs may exceed budget
-   - Mitigation: Monitor costs, implement resource limits, optimize storage
+5. **Cost Overruns**: AWS and Bedrock costs may exceed budget
+   - Mitigation: Monitor costs, implement limits, optimize storage
 
-### Blocked Items
-(None currently)
+6. **Mobile Browser Compatibility**: Camera API may vary across devices
+   - Mitigation: Fallback mechanisms, progressive enhancement, testing
+
+---
+
+## Progress Tracking
+
+**Last Review Date**: 2026-01-07
+**Next Review Date**: TBD
+**Completed Tasks**: 5 / 250+
+**Current Sprint**: Sprint 0 (Foundation)
+
+### Sprint Completion Status
+- ⬜ Sprint 0: Foundation & Deployment
+- ⬜ Sprint 1: Image Upload & Manual Annotation (MVP)
+- ⬜ Sprint 2: AI-Assisted Annotation
+- ⬜ Sprint 3: Dataset Management & Export
+- ⬜ Sprint 4: Multi-Language Support & Optimization
+- ⬜ Sprint 5: Mobile Optimization & Camera
+- ⬜ Sprint 6: Publishing & PII Handling
+- ⬜ Sprint 7: Production Readiness
 
 ---
 
 ## Notes
 
-- Tasks are organized by phases for logical progression
-- Dependencies between tasks should be considered before starting
-- Regular reviews of this document are recommended (weekly during active development)
-- When completing tasks, update this document immediately
-- Create proposal documents for any significant changes to the plan
+- **Agile Approach**: Each sprint delivers working, deployable software
+- **User Feedback**: Collect feedback after Sprints 1, 2, and 3
+- **Incremental Complexity**: Start simple, add features gradually
+- **Integration**: Frontend and backend tasks are integrated per sprint
+- **Flexibility**: Sprint order can be adjusted based on priorities
+- **Documentation**: Update this file after each sprint completion
+- **Proposals**: Create proposal documents for significant changes
 
 ---
 
-**Last Review Date**: 2026-01-04
-**Next Review Date**: TBD
-**Completed Tasks**: 5 / 250+
-**Current Phase**: Phase 0 (Project Setup)
+## Sources & References
+
+- [AWS Amplify Gen2 Documentation](https://docs.amplify.aws/)
+- [CLI Commands Reference](https://docs.amplify.aws/react/reference/cli-commands/)
+- [Sandbox Features](https://docs.amplify.aws/react/deploy-and-host/sandbox-environments/features/)
+- [create-amplify npm package](https://www.npmjs.com/package/create-amplify)
+- [Amplify Storage with TypeScript](https://aws.amazon.com/blogs/mobile/amplify-storage-now-with-fullstack-typescript-powered-by-amazon-s3/)
