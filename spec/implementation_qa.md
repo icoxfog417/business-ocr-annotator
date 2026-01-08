@@ -143,10 +143,13 @@ export const data = defineData({
 - ⚠️ Must run `npm create amplify` from React app **root directory** (where package.json is)
 - ⚠️ Cannot re-run initialization if `amplify/` directory already exists
 - ⚠️ Requires **AWS credentials** configured (`aws configure`) before running sandbox
+- ⚠️ Requires **interactive terminal** for sandbox deployment (doesn't work well in background)
 - ⚠️ **Backend TypeScript** uses separate tsconfig.json for CDK compilation
 - ⚠️ Default auth mode is `identityPool` (allows guest access) - change for production
 - ⚠️ Sandbox deploys to **actual AWS account** - not fully local (uses AWS resources)
 - ⚠️ Each developer gets isolated sandbox environment (by system username)
+- ⚠️ **Permissions required**: CloudFormation, Cognito, AppSync, DynamoDB, IAM
+- ⚠️ First deployment can take **5-10 minutes** (creates multiple AWS resources)
 
 **References**:
 - [AWS Amplify Gen2 Documentation](https://docs.amplify.aws/gen2/)
