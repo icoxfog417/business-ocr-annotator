@@ -4,7 +4,7 @@ This document records questions and answers discovered during sandbox verificati
 
 **Last Updated**: 2026-01-08
 **Total Questions**: 9
-**Total Verified**: 0 / 9
+**Total Verified**: 1 / 9
 
 ## Overview
 
@@ -27,7 +27,7 @@ These questions MUST be answered before Sprint 0 as they affect system architect
 
 **Priority**: 🔴 Critical (Sprint 0)
 **Affects Design**: ✅ Yes - Project structure and deployment pipeline
-**Status**: ⏳ Pending Verification
+**Status**: ✅ Verified
 
 **Question Details**:
 - How to create a React + TypeScript app with Vite?
@@ -36,19 +36,123 @@ These questions MUST be answered before Sprint 0 as they affect system architect
 - How to deploy to Amplify Hosting?
 - What is the project structure for Amplify Gen2?
 
-**Answer**: [To be documented after verification]
+**Answer**:
+
+1. **Create React + TypeScript App with Vite**:
+```bash
+npm create vite@latest app-name -- --template react-ts
+cd app-name
+npm install
+```
+
+2. **Initialize Amplify Gen2**:
+```bash
+# Run from React app root directory (where package.json is)
+npm create amplify@latest -- --yes
+```
+
+This command automatically:
+- Installs `aws-amplify` (runtime) and `@aws-amplify/backend`, `@aws-amplify/backend-cli`, `aws-cdk-lib` (dev dependencies)
+- Creates `amplify/` directory with auth, data resources pre-configured
+- Generates `amplify/backend.ts` as the main backend definition
+
+3. **Project Structure**:
+```
+app-name/
+├── amplify/                    # Backend resources (Infrastructure as Code)
+│   ├── auth/
+│   │   └── resource.ts         # Auth config (email by default)
+│   ├── data/
+│   │   └── resource.ts         # GraphQL schema (Todo example)
+│   ├── backend.ts              # Main backend definition
+│   ├── package.json            # Backend config
+│   └── tsconfig.json           # Backend TypeScript config
+├── src/                        # Frontend React code
+├── package.json                # Project dependencies
+└── vite.config.ts              # Vite configuration
+```
+
+4. **Run Local Sandbox**:
+```bash
+npx ampx sandbox
+```
+
+This starts a local cloud sandbox that:
+- Deploys backend to AWS in dev environment
+- Watches for file changes and auto-deploys
+- Generates `amplify_outputs.json` for frontend configuration
+- Streams function logs (optional: `--stream-function-logs`)
+
+**Code Sample**:
+```typescript
+// amplify/backend.ts - Main backend definition
+import { defineBackend } from '@aws-amplify/backend';
+import { auth } from './auth/resource';
+import { data } from './data/resource';
+
+defineBackend({
+  auth,
+  data,
+  // Add more resources: storage, functions, etc.
+});
+
+// amplify/auth/resource.ts - Email authentication
+import { defineAuth } from '@aws-amplify/backend';
+
+export const auth = defineAuth({
+  loginWith: {
+    email: true,
+    // Can add social providers: google, facebook, etc.
+  },
+});
+
+// amplify/data/resource.ts - GraphQL schema
+import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+
+const schema = a.schema({
+  Todo: a
+    .model({
+      content: a.string(),
+    })
+    .authorization((allow) => [allow.guest()]),
+});
+
+export type Schema = ClientSchema<typeof schema>;
+
+export const data = defineData({
+  schema,
+  authorizationModes: {
+    defaultAuthorizationMode: 'identityPool',
+  },
+});
+```
 
 **Verified in**: [`.sandbox/01-react-amplify-init/`](.sandbox/01-react-amplify-init/)
 
 **Key Findings**:
-- [To be documented]
+- ✅ Amplify Gen2 uses **TypeScript-first** approach for backend configuration
+- ✅ **Modular structure** - each resource (auth, data, storage) in separate file
+- ✅ **Type-safe** - Full TypeScript support with generated types for GraphQL
+- ✅ **Default configurations** provided (email auth, Todo example) - easy to modify
+- ✅ **IaC (Infrastructure as Code)** - All backend config version-controlled
+- ✅ **AWS CDK under the hood** - Powerful infrastructure abstraction
+- ✅ **Sandbox environment** isolates dev from production
+- ✅ **Watch mode** auto-deploys changes during development
 
 **Gotchas**:
-- [To be documented]
+- ⚠️ Must run `npm create amplify` from React app **root directory** (where package.json is)
+- ⚠️ Cannot re-run initialization if `amplify/` directory already exists
+- ⚠️ Requires **AWS credentials** configured (`aws configure`) before running sandbox
+- ⚠️ **Backend TypeScript** uses separate tsconfig.json for CDK compilation
+- ⚠️ Default auth mode is `identityPool` (allows guest access) - change for production
+- ⚠️ Sandbox deploys to **actual AWS account** - not fully local (uses AWS resources)
+- ⚠️ Each developer gets isolated sandbox environment (by system username)
 
 **References**:
 - [AWS Amplify Gen2 Documentation](https://docs.amplify.aws/gen2/)
 - [Vite React TypeScript Template](https://vitejs.dev/guide/)
+- [Amplify Gen2 Quickstart](https://docs.amplify.aws/gen2/start/quickstart/)
+- [Amplify CLI Reference](https://docs.amplify.aws/gen2/reference/cli-commands/)
 
 ---
 
@@ -329,7 +433,7 @@ These questions can be verified as needed during later sprints (Sprint 4-6).
 ## Topics Verification Status
 
 ### Critical Path (Must verify first)
-- [ ] **Q1**: React app initialization with Amplify Gen2
+- [x] **Q1**: React app initialization with Amplify Gen2 ✅
 - [ ] **Q2**: Google OAuth authentication
 - [ ] **Q3**: Amplify Gen2 Data (AppSync + DynamoDB)
 
