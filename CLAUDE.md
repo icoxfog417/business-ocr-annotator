@@ -149,6 +149,103 @@ See spec/proposals/20260104_implement_qwen_integration.md for details.
 Closes #123
 ```
 
+## Code Quality Standards
+
+### Principles
+
+We maintain high code quality through automated tooling and consistent practices:
+
+1. **Zero Warnings Policy**: All code must pass linting with zero warnings
+2. **Consistent Formatting**: All code is auto-formatted using Prettier
+3. **Type Safety**: TypeScript strict mode enabled, no `any` types without justification
+4. **Automated Enforcement**: Pre-commit hooks ensure quality before code is committed
+5. **Minimal Dependencies**: Only include dependencies that are truly necessary
+
+### Tooling
+
+**ESLint** - Catches bugs and enforces best practices:
+- TypeScript-aware linting
+- React hooks rules (prevents common mistakes)
+- Zero warnings allowed in commits
+- Auto-fix enabled where possible
+
+**Prettier** - Ensures consistent code formatting:
+- Single quotes
+- Semicolons required
+- 100 character line width
+- 2-space indentation
+- Auto-format on commit
+
+**Husky + lint-staged** - Automated pre-commit checks:
+- Runs Prettier on all staged files
+- Runs ESLint with auto-fix on TypeScript files
+- Prevents commits with linting errors
+- Formats JSON, CSS, and Markdown files
+
+### Workflow
+
+**During Development:**
+```bash
+# Manual formatting (optional, pre-commit hook will do this)
+npm run format
+
+# Manual linting check
+npm run lint
+```
+
+**Before Committing:**
+- Pre-commit hook automatically runs:
+  1. Prettier formats all staged files
+  2. ESLint checks and fixes TypeScript files
+  3. Commit is blocked if errors remain
+
+**In CI/CD:**
+```bash
+npm run lint  # Fail build on any warnings
+npm test      # All tests must pass
+```
+
+### Best Practices
+
+1. **Write Clean Code First**: Don't rely solely on auto-fix
+2. **Review Linter Warnings**: Understand why they appear
+3. **Document Complex Logic**: Add comments for non-obvious code
+4. **Keep Functions Small**: Single responsibility principle
+5. **Use Descriptive Names**: Variables and functions should be self-documenting
+6. **Avoid Premature Optimization**: Make it work, then make it fast
+7. **Test Edge Cases**: Don't just test the happy path
+
+### Code Review Checklist
+
+Before requesting review, ensure:
+- ✅ All linting passes with zero warnings
+- ✅ Code is properly formatted
+- ✅ TypeScript types are explicit and correct
+- ✅ No console.log statements (use proper logging)
+- ✅ Comments explain "why", not "what"
+- ✅ Tests cover new functionality
+- ✅ No hardcoded secrets or credentials
+- ✅ Error handling is appropriate
+
+### Lambda Function Quality
+
+Lambda functions have additional requirements:
+- Each function has its own `package.json`
+- Dependencies are isolated to each function
+- Use structured logging (AWS Lambda Powertools)
+- Include error handling and retries
+- Set appropriate timeout and memory limits
+- No unused dependencies
+
+### Security Considerations
+
+- Never commit secrets or API keys
+- Use environment variables for configuration
+- Sanitize user inputs
+- Validate data at system boundaries
+- Keep dependencies up to date
+- Run security audits regularly: `npm audit`
+
 ## Communication
 
 - Use clear, descriptive language in all documentation
