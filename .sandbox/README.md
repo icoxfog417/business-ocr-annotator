@@ -16,17 +16,23 @@ Each subdirectory represents a specific verification test, numbered to match Q&A
 
 ```
 .sandbox/
-├── 01-static-react-site/       # Q1: Basic Amplify Gen2 React deployment
-├── 02-bedrock-image-lambda/    # Q2: Lambda with Bedrock image processing
-├── 03-google-oauth/            # Q3: Google OAuth integration
-├── 04-s3-storage/              # Q4: S3 storage operations
-├── 05-appsync-lambda/          # Q5: AppSync GraphQL API with Lambda
-├── 06-huggingface-integration/ # Q6: Hugging Face Datasets API
-├── 07-image-compression/       # Q7: Image compression with Sharp
-└── ...                         # Additional verifications
+├── 01-react-amplify-init/      # Q1: 🔴 React + Amplify Gen2 initialization
+├── 02-google-oauth/            # Q2: 🔴 Google OAuth authentication
+├── 03-amplify-data/            # Q3: 🔴 Amplify Gen2 Data (AppSync + DynamoDB)
+├── 04-s3-storage/              # Q4: 🟠 S3 storage configuration
+├── 05-lambda-functions/        # Q5: 🟠 Lambda function creation
+├── 06-bedrock-lambda/          # Q6: 🟠 Bedrock integration
+├── 07-sharp-compression/       # Q7: 🟡 Sharp image compression
+├── 08-huggingface-integration/ # Q8: 🟡 Hugging Face Hub API
+└── 09-secrets-management/      # Q9: 🟡 Secrets and environment variables
 ```
 
 **Naming Convention**: `{NN-feature-name}/` where NN matches the question number in `spec/implementation_qa.md`
+
+**Priority Indicators**:
+- 🔴 Critical (Q1-Q3): Must verify before Sprint 0
+- 🟠 High (Q4-Q6): Verify before Sprint 1-2
+- 🟡 Medium (Q7-Q9): Verify as needed in later sprints
 
 ## Guidelines
 
