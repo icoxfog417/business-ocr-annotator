@@ -149,6 +149,152 @@ See spec/proposals/20260104_implement_qwen_integration.md for details.
 Closes #123
 ```
 
+## Sandbox Verification Workflow
+
+### Purpose
+
+Before implementing production features, verify AWS Amplify Gen2 components and integrations in isolated sandbox environments. This reduces risk and documents working patterns.
+
+### Directory Structure
+
+```
+.sandbox/
+├── README.md                     # Sandbox overview and guidelines
+├── .gitkeep                      # Preserve directory in git
+├── {feature-name}/              # Individual verification tests
+│   ├── README.md                # What this test verifies
+│   ├── amplify/                 # Amplify configuration
+│   ├── src/                     # Source code
+│   └── package.json             # Dependencies
+└── ...
+```
+
+**Note**: The `.sandbox/` directory is in `.gitignore` except for `.gitkeep` and `README.md`. Sandbox samples are disposable learning environments.
+
+### Workflow Process
+
+1. **Identify Need**: Before implementing a feature, determine what needs verification
+   ```
+   Example: "Need to verify Lambda can call Bedrock API for image analysis"
+   ```
+
+2. **Create Sandbox Sample**:
+   ```bash
+   mkdir -p .sandbox/bedrock-image-lambda
+   cd .sandbox/bedrock-image-lambda
+   # Create minimal test implementation
+   ```
+
+3. **Test and Iterate**:
+   - Build minimal reproducible sample
+   - Test functionality
+   - Debug and fix issues
+   - Verify it works as expected
+
+4. **Document in Q&A**:
+   - Add entry to `spec/implementation_qa.md`
+   - Include clear question and detailed answer
+   - Reference sandbox directory
+   - Document key findings and gotchas
+
+5. **Reference in Production**:
+   - When implementing production code, reference the Q&A
+   - Follow verified patterns from sandbox
+   - Adapt patterns to production requirements
+
+### Q&A Documentation Format
+
+Each entry in `spec/implementation_qa.md` should include:
+
+```markdown
+### Q#: How to [specific question]?
+
+**Status**: ✅ Verified / ⏳ Pending / 🔬 In Progress
+
+**Answer**: [Detailed explanation with context]
+
+**Code Sample**:
+```typescript
+// Minimal working example
+```
+
+**Verified in**: `.sandbox/{directory}/`
+
+**Key Findings**:
+- Important discovery 1
+- Important discovery 2
+
+**Gotchas**:
+- Potential issue to watch for
+- Common mistake to avoid
+
+**References**:
+- [AWS Documentation]
+- [Related Q&A]
+```
+
+### Sandbox Guidelines
+
+**DO**:
+- ✅ Create minimal, focused samples
+- ✅ Test one feature at a time
+- ✅ Document findings thoroughly
+- ✅ Include README explaining the test
+- ✅ Use realistic test data
+- ✅ Verify against AWS Amplify Gen2 best practices
+
+**DON'T**:
+- ❌ Mix multiple features in one sample
+- ❌ Include production code
+- ❌ Add unnecessary dependencies
+- ❌ Commit secrets or credentials
+- ❌ Skip documentation
+- ❌ Leave samples in broken state
+
+### Example Workflow
+
+```bash
+# 1. Create sandbox for testing Google OAuth
+mkdir -p .sandbox/google-oauth
+cd .sandbox/google-oauth
+
+# 2. Initialize minimal Amplify project
+npm create amplify@latest
+
+# 3. Configure OAuth
+# ... implement and test ...
+
+# 4. Document findings
+# Add entry to spec/implementation_qa.md
+
+# 5. Reference when implementing production
+# Use verified pattern in main application
+```
+
+### Integration with Development Process
+
+**Before Starting Feature Development**:
+1. Check `spec/implementation_qa.md` for relevant Q&A
+2. If pattern not verified, create sandbox sample first
+3. Document findings before production implementation
+
+**During Feature Development**:
+- Reference verified patterns from Q&A
+- Adapt patterns to production requirements
+- If new integration pattern needed, return to sandbox
+
+**After Feature Completion**:
+- Update Q&A if new findings discovered
+- Share learnings with team
+- Keep sandbox samples updated
+
+### Maintenance
+
+- Review Q&A quarterly for outdated entries
+- Update samples when Amplify Gen2 versions change
+- Archive obsolete patterns with migration notes
+- Keep documentation synchronized with AWS best practices
+
 ## Code Quality Standards
 
 ### Principles
@@ -270,5 +416,5 @@ If you encounter ambiguity or need clarification:
 
 ---
 
-**Last Updated**: 2026-01-04
+**Last Updated**: 2026-01-08
 **Maintained By**: Project Team
