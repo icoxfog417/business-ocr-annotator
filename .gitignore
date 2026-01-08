@@ -137,3 +137,8 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Sandbox directory (keep .gitkeep and README.md)
+.sandbox/*
+!.sandbox/.gitkeep
+!.sandbox/README.md

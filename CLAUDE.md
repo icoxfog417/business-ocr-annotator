@@ -149,6 +149,181 @@ See spec/proposals/20260104_implement_qwen_integration.md for details.
 Closes #123
 ```
 
+## Sandbox Verification Workflow
+
+### Purpose
+
+Before implementing production features, verify AWS Amplify Gen2 components and integrations in isolated sandbox environments. This reduces risk and documents working patterns.
+
+### Directory Structure
+
+```
+.sandbox/
+├── README.md                     # Sandbox overview and guidelines
+├── .gitkeep                      # Preserve directory in git
+├── {feature-name}/              # Individual verification tests
+│   ├── README.md                # What this test verifies
+│   ├── amplify/                 # Amplify configuration
+│   ├── src/                     # Source code
+│   └── package.json             # Dependencies
+└── ...
+```
+
+**Note**: The `.sandbox/` directory is in `.gitignore` except for `.gitkeep` and `README.md`. Sandbox samples are disposable learning environments.
+
+### Workflow Process
+
+**IMPORTANT**: Follow the "Question First" approach - always start by formulating clear questions before creating sandbox samples.
+
+#### Step 1: Question First
+Before implementing any feature, identify and document technical questions:
+
+```markdown
+Example questions:
+- How to build a static React site in Amplify Gen2?
+- How to implement Lambda that receives images and processes with Amazon Bedrock?
+- How to configure 3-tier S3 storage (original/compressed/thumbnail)?
+```
+
+**Add questions to `spec/implementation_qa.md` FIRST**, with status "⏳ Pending Verification"
+
+#### Step 2: Sandbox Examination
+Create minimal sandbox sample to answer the question:
+
+```bash
+# Example: For Q2 - Bedrock image processing
+mkdir -p .sandbox/02-bedrock-image-lambda
+cd .sandbox/02-bedrock-image-lambda
+
+# Create minimal test implementation
+npm create amplify@latest
+# ... configure and test ...
+```
+
+**Update question status to "🔬 In Progress"** in `spec/implementation_qa.md`
+
+#### Step 3: Test and Iterate
+- Build minimal reproducible sample
+- Test functionality thoroughly
+- Debug and fix issues
+- Verify it works as expected
+- Document unexpected behaviors
+
+#### Step 4: Write Answer
+Document findings in `spec/implementation_qa.md`:
+
+- Update the question entry with detailed answer
+- Include code samples from sandbox
+- Document key findings and gotchas
+- Add references to official documentation
+- **Update status to "✅ Verified"**
+
+#### Step 5: Reference in Production
+When implementing production features:
+
+- Check `spec/implementation_qa.md` for related Q&A entries
+- Follow verified patterns from sandbox
+- Adapt patterns to production requirements
+- If new questions arise, return to Step 1
+
+### Q&A Documentation Format
+
+Each entry in `spec/implementation_qa.md` should include:
+
+```markdown
+### Q#: How to [specific question]?
+
+**Status**: ✅ Verified / ⏳ Pending / 🔬 In Progress
+
+**Answer**: [Detailed explanation with context]
+
+**Code Sample**:
+```typescript
+// Minimal working example
+```
+
+**Verified in**: `.sandbox/{directory}/`
+
+**Key Findings**:
+- Important discovery 1
+- Important discovery 2
+
+**Gotchas**:
+- Potential issue to watch for
+- Common mistake to avoid
+
+**References**:
+- [AWS Documentation]
+- [Related Q&A]
+```
+
+### Sandbox Guidelines
+
+**DO**:
+- ✅ Create minimal, focused samples
+- ✅ Test one feature at a time
+- ✅ Document findings thoroughly
+- ✅ Include README explaining the test
+- ✅ Use realistic test data
+- ✅ Verify against AWS Amplify Gen2 best practices
+
+**DON'T**:
+- ❌ Mix multiple features in one sample
+- ❌ Include production code
+- ❌ Add unnecessary dependencies
+- ❌ Commit secrets or credentials
+- ❌ Skip documentation
+- ❌ Leave samples in broken state
+
+### Example Workflow
+
+```bash
+# 1. Create sandbox for testing Google OAuth
+mkdir -p .sandbox/google-oauth
+cd .sandbox/google-oauth
+
+# 2. Initialize minimal Amplify project
+npm create amplify@latest
+
+# 3. Configure OAuth
+# ... implement and test ...
+
+# 4. Document findings
+# Add entry to spec/implementation_qa.md
+
+# 5. Reference when implementing production
+# Use verified pattern in main application
+```
+
+### Integration with Development Process
+
+**Before Starting Feature Development**:
+1. **Ask Questions First**: What technical unknowns exist?
+2. **Check Existing Q&A**: Review `spec/implementation_qa.md` for answers
+3. **Document New Questions**: Add unanswered questions to Q&A (status: ⏳ Pending)
+4. **Verify Before Building**: Create sandbox samples to answer questions
+5. **Document Answers**: Update Q&A with findings (status: ✅ Verified)
+6. **Then Implement**: Build production code with confidence
+
+**During Feature Development**:
+- Reference verified patterns from Q&A
+- Adapt patterns to production requirements
+- If new questions arise, document them first
+- Don't guess - verify in sandbox if uncertain
+
+**After Feature Completion**:
+- Update Q&A if new findings discovered during implementation
+- Document any deviations from sandbox patterns
+- Share learnings with team
+- Keep sandbox samples updated with latest best practices
+
+### Maintenance
+
+- Review Q&A quarterly for outdated entries
+- Update samples when Amplify Gen2 versions change
+- Archive obsolete patterns with migration notes
+- Keep documentation synchronized with AWS best practices
+
 ## Code Quality Standards
 
 ### Principles
@@ -270,5 +445,5 @@ If you encounter ambiguity or need clarification:
 
 ---
 
-**Last Updated**: 2026-01-04
+**Last Updated**: 2026-01-08
 **Maintained By**: Project Team
