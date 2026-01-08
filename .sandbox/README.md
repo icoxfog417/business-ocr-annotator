@@ -12,26 +12,48 @@ The sandbox serves as a safe space to:
 
 ## Structure
 
-Each subdirectory represents a specific verification test:
+Each subdirectory represents a specific verification test, numbered to match Q&A entries:
 
 ```
 .sandbox/
-├── static-react-site/          # Basic Amplify Gen2 React deployment
-├── bedrock-image-lambda/       # Lambda with Bedrock image processing
-├── google-oauth/               # Google OAuth integration
-├── s3-storage/                 # S3 storage operations
-└── api-gateway/                # API Gateway configuration
+├── 01-static-react-site/       # Q1: Basic Amplify Gen2 React deployment
+├── 02-bedrock-image-lambda/    # Q2: Lambda with Bedrock image processing
+├── 03-google-oauth/            # Q3: Google OAuth integration
+├── 04-s3-storage/              # Q4: S3 storage operations
+├── 05-appsync-lambda/          # Q5: AppSync GraphQL API with Lambda
+├── 06-huggingface-integration/ # Q6: Hugging Face Datasets API
+├── 07-image-compression/       # Q7: Image compression with Sharp
+└── ...                         # Additional verifications
 ```
+
+**Naming Convention**: `{NN-feature-name}/` where NN matches the question number in `spec/implementation_qa.md`
 
 ## Guidelines
 
-### Creating a Sandbox Sample
+### Creating a Sandbox Sample (Question-First Approach)
 
-1. **Create Directory**: `mkdir .sandbox/{feature-name}`
-2. **Add README**: Explain what's being tested
-3. **Minimal Code**: Only include necessary code
-4. **Test**: Verify it works as expected
-5. **Document**: Add findings to `spec/implementation_qa.md`
+**IMPORTANT**: Always start with a question, not code.
+
+1. **Formulate Question**: Write a clear technical question in `spec/implementation_qa.md`
+   - Example: "How to configure 3-tier S3 storage in Amplify Gen2?"
+   - Status: ⏳ Pending Verification
+
+2. **Create Directory**: `mkdir -p .sandbox/{NN-feature-name}` (use number from Q&A)
+   - Example: `.sandbox/04-s3-storage/`
+
+3. **Update Status**: Change question status to 🔬 In Progress
+
+4. **Add README**: Explain what question you're answering
+
+5. **Minimal Code**: Write only necessary code to answer the question
+
+6. **Test**: Verify it works as expected
+
+7. **Document Answer**: Update `spec/implementation_qa.md` with:
+   - Detailed answer with code samples
+   - Key findings and gotchas
+   - References to documentation
+   - Status: ✅ Verified
 
 ### Running Sandbox Samples
 
@@ -59,13 +81,44 @@ npm run dev  # or appropriate command
 - ❌ Secrets or credentials
 - ❌ node_modules (add to .gitignore)
 
-## Verification Workflow
+## Verification Workflow (Question-First)
 
-1. **Before Implementation**: Identify what needs verification
-2. **Create Sample**: Build minimal test in sandbox
-3. **Iterate**: Test, debug, fix issues
-4. **Document**: Record findings in Q&A format
-5. **Reference**: Use verified patterns in production
+```
+┌─────────────────────────────────────────────────┐
+│ 1. QUESTION FIRST                               │
+│    Write question in spec/implementation_qa.md  │
+│    Status: ⏳ Pending Verification              │
+└────────────────┬────────────────────────────────┘
+                 ↓
+┌─────────────────────────────────────────────────┐
+│ 2. CREATE SANDBOX                               │
+│    mkdir .sandbox/{NN-feature-name}/            │
+│    Status: 🔬 In Progress                       │
+└────────────────┬────────────────────────────────┘
+                 ↓
+┌─────────────────────────────────────────────────┐
+│ 3. TEST & ITERATE                               │
+│    Build minimal code, test, debug              │
+└────────────────┬────────────────────────────────┘
+                 ↓
+┌─────────────────────────────────────────────────┐
+│ 4. WRITE ANSWER                                 │
+│    Document findings in implementation_qa.md    │
+│    Status: ✅ Verified                          │
+└────────────────┬────────────────────────────────┘
+                 ↓
+┌─────────────────────────────────────────────────┐
+│ 5. REFERENCE IN PRODUCTION                      │
+│    Use verified patterns when implementing      │
+└─────────────────────────────────────────────────┘
+```
+
+### Key Principles
+
+1. **Question Before Code**: Always formulate the question first
+2. **Document Before Testing**: Add question to Q&A before creating sandbox
+3. **Verify Before Production**: Never implement unverified patterns
+4. **Share Knowledge**: Document findings for the entire team
 
 ## Documentation
 

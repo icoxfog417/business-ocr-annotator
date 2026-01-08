@@ -173,34 +173,58 @@ Before implementing production features, verify AWS Amplify Gen2 components and 
 
 ### Workflow Process
 
-1. **Identify Need**: Before implementing a feature, determine what needs verification
-   ```
-   Example: "Need to verify Lambda can call Bedrock API for image analysis"
-   ```
+**IMPORTANT**: Follow the "Question First" approach - always start by formulating clear questions before creating sandbox samples.
 
-2. **Create Sandbox Sample**:
-   ```bash
-   mkdir -p .sandbox/bedrock-image-lambda
-   cd .sandbox/bedrock-image-lambda
-   # Create minimal test implementation
-   ```
+#### Step 1: Question First
+Before implementing any feature, identify and document technical questions:
 
-3. **Test and Iterate**:
-   - Build minimal reproducible sample
-   - Test functionality
-   - Debug and fix issues
-   - Verify it works as expected
+```markdown
+Example questions:
+- How to build a static React site in Amplify Gen2?
+- How to implement Lambda that receives images and processes with Amazon Bedrock?
+- How to configure 3-tier S3 storage (original/compressed/thumbnail)?
+```
 
-4. **Document in Q&A**:
-   - Add entry to `spec/implementation_qa.md`
-   - Include clear question and detailed answer
-   - Reference sandbox directory
-   - Document key findings and gotchas
+**Add questions to `spec/implementation_qa.md` FIRST**, with status "⏳ Pending Verification"
 
-5. **Reference in Production**:
-   - When implementing production code, reference the Q&A
-   - Follow verified patterns from sandbox
-   - Adapt patterns to production requirements
+#### Step 2: Sandbox Examination
+Create minimal sandbox sample to answer the question:
+
+```bash
+# Example: For Q2 - Bedrock image processing
+mkdir -p .sandbox/02-bedrock-image-lambda
+cd .sandbox/02-bedrock-image-lambda
+
+# Create minimal test implementation
+npm create amplify@latest
+# ... configure and test ...
+```
+
+**Update question status to "🔬 In Progress"** in `spec/implementation_qa.md`
+
+#### Step 3: Test and Iterate
+- Build minimal reproducible sample
+- Test functionality thoroughly
+- Debug and fix issues
+- Verify it works as expected
+- Document unexpected behaviors
+
+#### Step 4: Write Answer
+Document findings in `spec/implementation_qa.md`:
+
+- Update the question entry with detailed answer
+- Include code samples from sandbox
+- Document key findings and gotchas
+- Add references to official documentation
+- **Update status to "✅ Verified"**
+
+#### Step 5: Reference in Production
+When implementing production features:
+
+- Check `spec/implementation_qa.md` for related Q&A entries
+- Follow verified patterns from sandbox
+- Adapt patterns to production requirements
+- If new questions arise, return to Step 1
 
 ### Q&A Documentation Format
 
@@ -274,19 +298,24 @@ npm create amplify@latest
 ### Integration with Development Process
 
 **Before Starting Feature Development**:
-1. Check `spec/implementation_qa.md` for relevant Q&A
-2. If pattern not verified, create sandbox sample first
-3. Document findings before production implementation
+1. **Ask Questions First**: What technical unknowns exist?
+2. **Check Existing Q&A**: Review `spec/implementation_qa.md` for answers
+3. **Document New Questions**: Add unanswered questions to Q&A (status: ⏳ Pending)
+4. **Verify Before Building**: Create sandbox samples to answer questions
+5. **Document Answers**: Update Q&A with findings (status: ✅ Verified)
+6. **Then Implement**: Build production code with confidence
 
 **During Feature Development**:
 - Reference verified patterns from Q&A
 - Adapt patterns to production requirements
-- If new integration pattern needed, return to sandbox
+- If new questions arise, document them first
+- Don't guess - verify in sandbox if uncertain
 
 **After Feature Completion**:
-- Update Q&A if new findings discovered
+- Update Q&A if new findings discovered during implementation
+- Document any deviations from sandbox patterns
 - Share learnings with team
-- Keep sandbox samples updated
+- Keep sandbox samples updated with latest best practices
 
 ### Maintenance
 
