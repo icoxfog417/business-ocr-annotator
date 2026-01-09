@@ -36,7 +36,7 @@ This task list is organized into **sprints** that deliver working software incre
 **Deliverable**: Users can log in and see an empty dashboard
 
 ### Project Initialization
-- ⬜ Create React app with Vite and TypeScript
+- ✅ Create React app with Vite and TypeScript
   ```bash
   # Create Vite project (this downloads create-vite temporarily via npx)
   npm create vite@latest business-ocr-annotator -- --template react-ts
@@ -48,7 +48,7 @@ This task list is organized into **sprints** that deliver working software incre
   npm install
   ```
 
-- ⬜ Initialize Amplify Gen2 project
+- ✅ Initialize Amplify Gen2 project
   ```bash
   # Add Amplify to existing project (run from project root)
   npm create amplify@latest
@@ -59,7 +59,7 @@ This task list is organized into **sprints** that deliver working software incre
   - `amplify/backend.ts`
 
 ### Development Environment Setup
-- ⬜ Install essential dependencies only
+- ✅ Install essential dependencies only
   ```bash
   # Install Amplify client libraries (REQUIRED)
   npm install aws-amplify @aws-amplify/ui-react
@@ -78,7 +78,7 @@ This task list is organized into **sprints** that deliver working software incre
   npm install --save-dev husky lint-staged
   ```
 
-- ⬜ Create ESLint configuration `.eslintrc.cjs`
+- ✅ Create ESLint configuration `eslint.config.js`
   ```javascript
   module.exports = {
     root: true,
@@ -95,7 +95,7 @@ This task list is organized into **sprints** that deliver working software incre
   };
   ```
 
-- ⬜ Create Prettier configuration `.prettierrc`
+- ✅ Create Prettier configuration `.prettierrc`
   ```json
   {
     "semi": true,
@@ -106,7 +106,7 @@ This task list is organized into **sprints** that deliver working software incre
   }
   ```
 
-- ⬜ Add lint scripts to `package.json`
+- ✅ Add lint scripts to `package.json`
   ```json
   {
     "scripts": {
@@ -116,13 +116,13 @@ This task list is organized into **sprints** that deliver working software incre
   }
   ```
 
-- ⬜ Set up Husky for git hooks
+- ✅ Set up Husky for git hooks
   ```bash
   npx husky init
   echo "npm run lint-staged" > .husky/pre-commit
   ```
 
-- ⬜ Configure lint-staged in `package.json`
+- ✅ Configure lint-staged in `package.json`
   ```json
   {
     "lint-staged": {
@@ -140,7 +140,7 @@ This task list is organized into **sprints** that deliver working software incre
 **Note**: Git hooks automatically run linting and formatting before each commit to maintain code quality.
 
 ### Authentication Setup (Amplify Gen2)
-- ⬜ Set up Google OAuth credentials
+- ✅ Set up Google OAuth credentials
   - Go to [Google Cloud Console](https://console.cloud.google.com/)
   - Create a new project or use existing one
   - Enable Google+ API
@@ -148,7 +148,7 @@ This task list is organized into **sprints** that deliver working software incre
   - Add authorized redirect URIs (Amplify will provide these)
   - Save Client ID and Client Secret
 
-- ⬜ Configure Google OAuth in `amplify/auth/resource.ts`
+- ✅ Configure Google OAuth in `amplify/auth/resource.ts`
   ```typescript
   import { defineAuth } from '@aws-amplify/backend';
 
@@ -172,13 +172,13 @@ This task list is organized into **sprints** that deliver working software incre
   });
   ```
 
-- ⬜ Add Google credentials to environment
+- ✅ Add Google credentials to environment
   ```bash
   # For local development
   npx ampx sandbox secret set GOOGLE_CLIENT_ID
   npx ampx sandbox secret set GOOGLE_CLIENT_SECRET
   ```
-- ⬜ Update `amplify/backend.ts` to include auth
+- ✅ Update `amplify/backend.ts` to include auth
   ```typescript
   import { defineBackend } from '@aws-amplify/backend';
   import { auth } from './auth/resource';
@@ -187,7 +187,7 @@ This task list is organized into **sprints** that deliver working software incre
     auth
   });
   ```
-- ⬜ Configure Amplify client in frontend
+- ✅ Configure Amplify client in frontend
   ```typescript
   // In src/main.tsx
   import { Amplify } from 'aws-amplify';
@@ -196,7 +196,7 @@ This task list is organized into **sprints** that deliver working software incre
   Amplify.configure(outputs);
   ```
 
-- ⬜ Add Google OAuth sign-in to App.tsx
+- ✅ Add Google OAuth sign-in to App.tsx
   ```typescript
   import { Authenticator } from '@aws-amplify/ui-react';
   import '@aws-amplify/ui-react/styles.css';
@@ -217,24 +217,24 @@ This task list is organized into **sprints** that deliver working software incre
   ```
 
 ### Basic Frontend Structure
-- ⬜ Create main layout component with navigation
-- ⬜ Create empty Dashboard page
-- ⬜ Set up React Router v6 (already installed above)
-- ⬜ Implement authenticated routing wrapper
-- ⬜ Add logout functionality
+- ✅ Create main layout component with navigation
+- ✅ Create empty Dashboard page
+- ✅ Set up React Router v6 (already installed above)
+- ✅ Implement authenticated routing wrapper
+- ✅ Add logout functionality
 
 ### Deployment & Testing
-- ⬜ Start local sandbox environment
+- ✅ Start local sandbox environment
   ```bash
   npx ampx sandbox
   ```
-- ⬜ Test authentication flow locally
-- ⬜ Configure AWS credentials
+- ✅ Test authentication flow locally
+- ✅ Configure AWS credentials
   ```bash
   aws configure
   ```
-- ⬜ Deploy to Amplify Hosting
-- ⬜ Verify authentication works in deployed app
+- ✅ Deploy to Amplify Hosting
+- ✅ Verify authentication works in deployed app
 
 ### Documentation
 - ✅ Create README.md
