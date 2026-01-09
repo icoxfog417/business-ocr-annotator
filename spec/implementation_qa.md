@@ -4,7 +4,7 @@ This document records questions and answers discovered during sandbox verificati
 
 **Last Updated**: 2026-01-08
 **Total Questions**: 9
-**Total Verified**: 0 / 9
+**Total Verified**: 1 / 9
 
 ## Overview
 
@@ -27,7 +27,7 @@ These questions MUST be answered before Sprint 0 as they affect system architect
 
 **Priority**: 🔴 Critical (Sprint 0)
 **Affects Design**: ✅ Yes - Project structure and deployment pipeline
-**Status**: ⏳ Pending Verification
+**Status**: ✅ Verified
 
 **Question Details**:
 - How to create a React + TypeScript app with Vite?
@@ -36,15 +36,57 @@ These questions MUST be answered before Sprint 0 as they affect system architect
 - How to deploy to Amplify Hosting?
 - What is the project structure for Amplify Gen2?
 
-**Answer**: [To be documented after verification]
+**Answer**: Successfully verified React + Amplify Gen2 integration. The process involves creating a Vite React app, installing Amplify dependencies, creating backend configuration, and running sandbox deployment.
+
+**Code Sample**:
+```bash
+# 1. Create React + TypeScript app with Vite
+npm create vite@latest my-app -- --template react-ts
+cd my-app && npm install
+
+# 2. Install Amplify dependencies
+npm install aws-amplify @aws-amplify/backend @aws-amplify/backend-cli aws-cdk-lib constructs typescript tsx esbuild --save-dev
+
+# 3. Create amplify/backend.ts
+mkdir amplify
+```
+
+```typescript
+// amplify/backend.ts
+import { defineBackend } from '@aws-amplify/backend';
+
+const backend = defineBackend({
+  // Add your backend resources here
+});
+```
+
+```typescript
+// src/main.tsx - Configure Amplify
+import { Amplify } from 'aws-amplify'
+import outputs from '../amplify_outputs.json'
+
+Amplify.configure(outputs)
+```
+
+```bash
+# 4. Run sandbox
+npx ampx sandbox --once
+```
 
 **Verified in**: [`.sandbox/01-react-amplify-init/`](.sandbox/01-react-amplify-init/)
 
 **Key Findings**:
-- [To be documented]
+- Vite + React + TypeScript works seamlessly with Amplify Gen2
+- Manual dependency installation is more reliable than `npm create amplify`
+- Sandbox deployment creates `amplify_outputs.json` configuration file
+- Build process works correctly with Amplify integration
+- Project structure includes `amplify/` directory for backend code and `.amplify/` for generated artifacts
 
 **Gotchas**:
-- [To be documented]
+- `npm create amplify` can overwrite existing package.json - install dependencies manually instead
+- Must create `amplify/backend.ts` and `amplify/tsconfig.json` manually
+- Sandbox creates CloudFormation stack with auto-generated name
+- `amplify_outputs.json` is generated at project root and should be imported in main.tsx
 
 **References**:
 - [AWS Amplify Gen2 Documentation](https://docs.amplify.aws/gen2/)
