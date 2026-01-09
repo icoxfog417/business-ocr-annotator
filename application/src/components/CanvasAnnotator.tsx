@@ -24,98 +24,91 @@ export function CanvasAnnotator({
   selectedBoxId,
   onBoxSelect
 }: CanvasAnnotatorProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
+  const [currentBox, setCurrentBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
-  const zoomIn = () => setZoom(prev => Math.min(prev * 1.2, 5));
-  const zoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.1));
-  const zoomReset = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
-  const zoomFit = () => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    const image = imageRef.current;
-    if (!canvas || !container || !image) return;
-    
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-    const imageWidth = image.naturalWidth;
-    const imageHeight = image.naturalHeight;
-    
-    const scaleX = containerWidth / imageWidth;
-    const scaleY = containerHeight / imageHeight;
-    const scale = Math.min(scaleX, scaleY, 1);
-    
-    setZoom(scale);
-    setPan({ x: 0, y: 0 });
-  };
+  // Load image
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      setImage(img);
+      setCanvasSize({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = imageUrl;
+  }, [imageUrl]);
 
+  // Draw canvas
   useEffect(() => {
     const canvas = canvasRef.current;
-    const image = imageRef.current;
     if (!canvas || !image) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas
+    // Set canvas size
+    canvas.width = canvasSize.width;
+    canvas.height = canvasSize.height;
+
+    // Clear and draw image
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0);
 
-    // Apply zoom and pan transformations
-    ctx.save();
-    ctx.scale(zoom, zoom);
-    ctx.translate(pan.x, pan.y);
-
-    // Draw bounding boxes
+    // Draw existing bounding boxes
     boundingBoxes.forEach((box) => {
-      ctx.strokeStyle = box.id === selectedBoxId ? '#3b82f6' : '#ef4444';
-      ctx.lineWidth = 2 / zoom; // Adjust line width for zoom
+      const isSelected = box.id === selectedBoxId;
+      
+      // Fill with transparent color
+      ctx.fillStyle = isSelected ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+      ctx.fillRect(box.x, box.y, box.width, box.height);
+      
+      // Border
+      ctx.strokeStyle = isSelected ? '#3b82f6' : '#ef4444';
+      ctx.lineWidth = 3;
       ctx.strokeRect(box.x, box.y, box.width, box.height);
       
-      // Draw corner handles for selected box
-      if (box.id === selectedBoxId) {
+      // Corner handles for selected box
+      if (isSelected) {
         ctx.fillStyle = '#3b82f6';
-        const handleSize = 6 / zoom; // Adjust handle size for zoom
-        // Top-left
+        const handleSize = 8;
         ctx.fillRect(box.x - handleSize/2, box.y - handleSize/2, handleSize, handleSize);
-        // Top-right
         ctx.fillRect(box.x + box.width - handleSize/2, box.y - handleSize/2, handleSize, handleSize);
-        // Bottom-left
         ctx.fillRect(box.x - handleSize/2, box.y + box.height - handleSize/2, handleSize, handleSize);
-        // Bottom-right
         ctx.fillRect(box.x + box.width - handleSize/2, box.y + box.height - handleSize/2, handleSize, handleSize);
       }
     });
 
-    ctx.restore();
-  }, [boundingBoxes, selectedBoxId, zoom, pan]);
+    // Draw current box being created
+    if (currentBox) {
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
+      ctx.fillRect(currentBox.x, currentBox.y, currentBox.width, currentBox.height);
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(currentBox.x, currentBox.y, currentBox.width, currentBox.height);
+    }
+  }, [image, boundingBoxes, selectedBoxId, currentBox, canvasSize]);
 
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - pan.x * zoom) / zoom;
-    const y = (e.clientY - rect.top - pan.y * zoom) / zoom;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    
     return { x, y };
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasCoordinates(e);
-
-    // Check for pan mode (middle mouse or ctrl+click)
-    if (e.button === 1 || e.ctrlKey) {
-      setIsPanning(true);
-      setLastPanPoint({ x: e.clientX, y: e.clientY });
-      return;
-    }
 
     // Check if clicking on existing box
     const clickedBox = boundingBoxes.find(box => 
@@ -126,136 +119,121 @@ export function CanvasAnnotator({
     if (clickedBox) {
       onBoxSelect(clickedBox.id);
     } else {
-      // Start drawing new box
       setIsDrawing(true);
       setStartPoint({ x, y });
+      setCurrentBox({ x, y, width: 0, height: 0 });
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isPanning) {
-      const deltaX = e.clientX - lastPanPoint.x;
-      const deltaY = e.clientY - lastPanPoint.y;
-      setPan(prev => ({
-        x: prev.x + deltaX / zoom,
-        y: prev.y + deltaY / zoom
-      }));
-      setLastPanPoint({ x: e.clientX, y: e.clientY });
-      return;
-    }
-
     if (!isDrawing) return;
 
     const { x, y } = getCanvasCoordinates(e);
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Clear and redraw with current transformations
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    ctx.save();
-    ctx.scale(zoom, zoom);
-    ctx.translate(pan.x, pan.y);
-    
-    // Draw existing boxes
-    boundingBoxes.forEach((box) => {
-      ctx.strokeStyle = box.id === selectedBoxId ? '#3b82f6' : '#ef4444';
-      ctx.lineWidth = 2 / zoom;
-      ctx.strokeRect(box.x, box.y, box.width, box.height);
+    setCurrentBox({
+      x: Math.min(startPoint.x, x),
+      y: Math.min(startPoint.y, y),
+      width: Math.abs(x - startPoint.x),
+      height: Math.abs(y - startPoint.y)
     });
-
-    // Draw current box being drawn
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2 / zoom;
-    ctx.strokeRect(
-      Math.min(startPoint.x, x),
-      Math.min(startPoint.y, y),
-      Math.abs(x - startPoint.x),
-      Math.abs(y - startPoint.y)
-    );
-
-    ctx.restore();
   };
 
-  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isPanning) {
-      setIsPanning(false);
+  const handleMouseUp = () => {
+    if (!isDrawing || !currentBox) {
+      setIsDrawing(false);
       return;
     }
 
-    if (!isDrawing) return;
-
-    const { x, y } = getCanvasCoordinates(e);
-    const width = Math.abs(x - startPoint.x);
-    const height = Math.abs(y - startPoint.y);
-
     // Only create box if it's large enough
-    if (width > 10 && height > 10) {
+    if (currentBox.width > 10 && currentBox.height > 10) {
       const newBox: BoundingBox = {
         id: Date.now().toString(),
-        x: Math.min(startPoint.x, x),
-        y: Math.min(startPoint.y, y),
-        width,
-        height
+        ...currentBox
       };
-
       onBoundingBoxChange([...boundingBoxes, newBox]);
       onBoxSelect(newBox.id);
     }
 
     setIsDrawing(false);
+    setCurrentBox(null);
   };
 
-  const handleImageLoad = () => {
-    const canvas = canvasRef.current;
-    const image = imageRef.current;
-    if (!canvas || !image) return;
+  const deleteSelectedBox = () => {
+    if (selectedBoxId) {
+      onBoundingBoxChange(boundingBoxes.filter(box => box.id !== selectedBoxId));
+      onBoxSelect('');
+    }
+  };
 
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
+  const zoomIn = () => setZoom(prev => Math.min(prev * 1.2, 3));
+  const zoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.5));
+  const zoomReset = () => setZoom(1);
+  const zoomFit = () => {
+    const container = containerRef.current;
+    if (!container || !image) return;
+    const scale = Math.min(
+      (container.clientWidth - 40) / image.naturalWidth,
+      (container.clientHeight - 100) / image.naturalHeight,
+      1
+    );
+    setZoom(scale);
   };
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
-      <ZoomControls
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onZoomReset={zoomReset}
-        onZoomFit={zoomFit}
-        zoomLevel={zoom}
-      />
-      <img
-        ref={imageRef}
-        src={imageUrl}
-        alt="Annotation target"
-        onLoad={handleImageLoad}
-        style={{ 
-          maxWidth: '100%', 
-          height: 'auto', 
-          display: 'block',
-          transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-          transformOrigin: 'top left'
-        }}
-      />
-      <canvas
-        ref={canvasRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          cursor: isPanning ? 'grabbing' : isDrawing ? 'crosshair' : 'default',
-          maxWidth: '100%',
-          height: 'auto',
-          transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-          transformOrigin: 'top left'
-        }}
-      />
+    <div ref={containerRef} style={{ position: 'relative', height: '100%', overflow: 'auto' }}>
+      <div style={{ 
+        position: 'sticky', 
+        top: 0, 
+        zIndex: 10, 
+        background: 'rgba(255,255,255,0.95)',
+        padding: '0.5rem',
+        display: 'flex',
+        gap: '0.5rem',
+        alignItems: 'center',
+        borderBottom: '1px solid #e5e7eb'
+      }}>
+        <ZoomControls
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onZoomReset={zoomReset}
+          onZoomFit={zoomFit}
+          zoomLevel={zoom}
+        />
+        {selectedBoxId && (
+          <button
+            onClick={deleteSelectedBox}
+            style={{
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            Delete Selected Box
+          </button>
+        )}
+      </div>
+      
+      <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center' }}>
+        <canvas
+          ref={canvasRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          style={{
+            cursor: isDrawing ? 'crosshair' : 'default',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            maxWidth: '100%',
+            width: canvasSize.width * zoom,
+            height: canvasSize.height * zoom
+          }}
+        />
+      </div>
     </div>
   );
 }

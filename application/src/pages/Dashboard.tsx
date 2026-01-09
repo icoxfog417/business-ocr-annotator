@@ -1,7 +1,33 @@
+import { useState, useEffect } from 'react';
 import { signOut } from 'aws-amplify/auth';
 import { Link } from 'react-router-dom';
+import { generateClient } from 'aws-amplify/data';
+import type { Schema } from '../../amplify/data/resource';
+
+const client = generateClient<Schema>();
 
 export function Dashboard() {
+  const [stats, setStats] = useState({ images: 0, annotations: 0, datasets: 0 });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [imagesResult, annotationsResult] = await Promise.all([
+          client.models.Image.list(),
+          client.models.Annotation.list()
+        ]);
+        setStats({
+          images: imagesResult.data.length,
+          annotations: annotationsResult.data.length,
+          datasets: 0 // Datasets not implemented yet
+        });
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      }
+    };
+    fetchStats();
+  }, []);
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -282,9 +308,9 @@ export function Dashboard() {
                 </svg>
               </div>
             </div>
-            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>0</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{stats.images}</div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              No images uploaded yet
+              {stats.images === 0 ? 'No images uploaded yet' : 'Images in database'}
             </p>
           </div>
 
@@ -341,9 +367,9 @@ export function Dashboard() {
                 </svg>
               </div>
             </div>
-            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>0</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{stats.annotations}</div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              Ready to annotate
+              {stats.annotations === 0 ? 'Ready to annotate' : 'Annotations created'}
             </p>
           </div>
 
@@ -399,9 +425,9 @@ export function Dashboard() {
                 </svg>
               </div>
             </div>
-            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>0</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{stats.datasets}</div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              Export to Hugging Face
+              Coming in Sprint 3
             </p>
           </div>
         </div>

@@ -89,39 +89,73 @@ export function AnnotationWorkspace() {
   }, [fetchImageAndAnnotations]);
 
   const addAnnotation = async () => {
-    if (!newQuestion.trim() || !newAnswer.trim() || !imageId || !selectedBoxId) return;
+    console.log('Adding annotation:', { newQuestion, newAnswer, imageId, selectedBoxId, canvasBoxes });
+    
+    if (!newQuestion.trim() || !newAnswer.trim() || !imageId || !selectedBoxId) {
+      console.log('Validation failed:', { 
+        hasQuestion: !!newQuestion.trim(), 
+        hasAnswer: !!newAnswer.trim(), 
+        hasImageId: !!imageId, 
+        hasSelectedBox: !!selectedBoxId 
+      });
+      return;
+    }
 
     const selectedBox = canvasBoxes.find(box => box.id === selectedBoxId);
-    if (!selectedBox) return;
+    console.log('Selected box:', selectedBox);
+    
+    if (!selectedBox) {
+      console.log('No selected box found');
+      return;
+    }
 
     try {
       const newAnnotation = await client.models.Annotation.create({
         imageId,
         question: newQuestion,
         answer: newAnswer,
-        boundingBox: { 
-          x: selectedBox.x, 
-          y: selectedBox.y, 
-          width: selectedBox.width, 
-          height: selectedBox.height 
-        },
-        createdBy: 'current-user', // TODO: Get from auth
+        boundingBox: JSON.stringify({ 
+          x: Math.round(selectedBox.x), 
+          y: Math.round(selectedBox.y), 
+          width: Math.round(selectedBox.width), 
+          height: Math.round(selectedBox.height)
+        }),
+        createdBy: 'current-user',
         createdAt: new Date().toISOString()
       });
+
+      console.log('Annotation created:', newAnnotation);
+
+      if (newAnnotation.errors) {
+        console.error('Annotation errors:', newAnnotation.errors);
+        alert('Failed to save annotation: ' + newAnnotation.errors.map(e => e.message).join(', '));
+        return;
+      }
 
       if (newAnnotation.data) {
         const annotation = {
           id: newAnnotation.data.id,
           question: newAnnotation.data.question,
           answer: newAnnotation.data.answer,
-          boundingBox: newAnnotation.data.boundingBox as BoundingBox
+          boundingBox: typeof newAnnotation.data.boundingBox === 'string' 
+            ? JSON.parse(newAnnotation.data.boundingBox) 
+            : newAnnotation.data.boundingBox as BoundingBox
         };
         setAnnotations(prev => [...prev, annotation]);
+        
+        // Update canvas box ID to match annotation ID
+        setCanvasBoxes(prev => prev.map(box => 
+          box.id === selectedBoxId ? { ...box, id: newAnnotation.data!.id } : box
+        ));
+        setSelectedBoxId(newAnnotation.data.id);
+        
         setNewQuestion('');
         setNewAnswer('');
+        alert('Annotation saved!');
       }
     } catch (error) {
       console.error('Failed to create annotation:', error);
+      alert('Failed to create annotation: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
