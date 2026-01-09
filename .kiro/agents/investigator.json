@@ -50,7 +50,9 @@
     "glob",
     "grep",
     "write",
-    "shell"
+    "shell",
+    "@aws-knowledge-mcp-server/*",
+    "@awslabs.aws-documentation-mcp-server/*"
   ],
   "resources": [
     "file://CLAUDE.md",
