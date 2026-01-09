@@ -1,0 +1,102 @@
+{
+  "name": "investigator",
+  "description": "The investigator's mission is to answer implementation questions by examining the behavior of packages and libraries through simple sample code. You will work in investigation directories within the .sandbox folder. You are allowed to execute commands in this directory.",
+  "prompt": "You are an investigator agent specialized in answering implementation questions by testing packages and libraries with simple sample code. Your primary workspace is the .sandbox directory, where you create investigation directories for testing purposes. You are authorized to execute commands within this directory to verify behavior, test functionality, and provide concrete answers based on actual code execution rather than theoretical knowledge.",
+  "mcpServers": {
+    "aws-mcp": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["awslabs.aws-api-mcp-server@latest"],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
+    },
+    "aws-knowledge-mcp-server": {
+      "url": "https://knowledge-mcp.global.api.aws",
+      "type": "http",
+      "disabled": false
+    },
+    "awslabs.amazon-bedrock-agentcore-mcp-server": {
+      "command": "uvx",
+      "args": ["awslabs.amazon-bedrock-agentcore-mcp-server@latest"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      },
+      "disabled": false,
+      "autoApprove": []
+    },
+    "awslabs.aws-documentation-mcp-server": {
+      "command": "uvx",
+      "args": ["awslabs.aws-documentation-mcp-server@latest"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "AWS_DOCUMENTATION_PARTITION": "aws",
+        "MCP_USER_AGENT": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      },
+      "disabled": false,
+      "autoApprove": []
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    }
+  },
+  "tools": [
+    "*"
+  ],
+  "toolAliases": {},
+  "allowedTools": [
+    "read",
+    "glob",
+    "grep",
+    "write",
+    "shell",
+    "@aws-knowledge-mcp-server/*",
+    "@awslabs.aws-documentation-mcp-server/*"
+  ],
+  "resources": [
+    "file://CLAUDE.md",
+    "file://README.md"
+  ],
+  "hooks": {},
+  "toolsSettings": {
+    "write": {
+      "allowedPaths": [".sandbox/**"]
+    },
+    "shell": {
+      "allowedCommands": [
+        "cd .sandbox.*",
+        "npm .*",
+        "npx .*",
+        "node .*",
+        "pnpm .*",
+        "amplify .*",
+        "aws .*",
+        "git .*",
+        "ls .*",
+        "pwd",
+        "cat .*",
+        "mkdir .*",
+        "rm .*",
+        "cp .*",
+        "mv .*",
+        "chmod .*",
+        "tree .*",
+        "which .*",
+        "echo .*"
+      ],
+      "deniedCommands": [
+        "rm -rf /.*",
+        "rm -rf ~.*",
+        "sudo .*",
+        "su .*",
+        "kill .*",
+        "reboot",
+        "shutdown .*"
+      ],
+      "autoAllowReadonly": true
+    }
+  },
+  "useLegacyMcpJson": false,
+  "model": null
+}

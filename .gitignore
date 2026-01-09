@@ -142,3 +142,5 @@ vite.config.ts.timestamp-*
 .sandbox/*
 !.sandbox/.gitkeep
 !.sandbox/README.md
+google-auth-oauth-info.json
+*.zip
