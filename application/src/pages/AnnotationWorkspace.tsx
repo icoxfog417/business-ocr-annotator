@@ -1,0 +1,301 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { generateClient } from 'aws-amplify/data';
+import { getUrl } from 'aws-amplify/storage';
+import type { Schema } from '../../amplify/data/resource';
+import { CanvasAnnotator } from '../components/CanvasAnnotator';
+
+const client = generateClient<Schema>();
+
+interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface CanvasBoundingBox {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface Annotation {
+  id: string;
+  question: string;
+  answer: string;
+  boundingBox: BoundingBox;
+}
+
+interface ImageData {
+  id: string;
+  fileName: string;
+  s3Key: string;
+  uploadedAt: string;
+}
+
+export function AnnotationWorkspace() {
+  const { imageId } = useParams<{ imageId: string }>();
+  const [image, setImage] = useState<ImageData | null>(null);
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [canvasBoxes, setCanvasBoxes] = useState<CanvasBoundingBox[]>([]);
+  const [selectedBoxId, setSelectedBoxId] = useState<string>('');
+  const [newQuestion, setNewQuestion] = useState('');
+  const [newAnswer, setNewAnswer] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const fetchImageAndAnnotations = useCallback(async () => {
+    if (!imageId) return;
+    
+    try {
+      // Fetch image
+      const { data: imageData } = await client.models.Image.get({ id: imageId });
+      if (imageData) {
+        setImage(imageData);
+        const urlResult = await getUrl({ key: imageData.s3Key });
+        setImageUrl(urlResult.url.toString());
+      }
+
+      // Fetch annotations
+      const { data: annotationsData } = await client.models.Annotation.list({
+        filter: { imageId: { eq: imageId } }
+      });
+      const fetchedAnnotations = annotationsData.map(a => ({
+        id: a.id,
+        question: a.question,
+        answer: a.answer,
+        boundingBox: a.boundingBox as BoundingBox
+      }));
+      setAnnotations(fetchedAnnotations);
+      
+      // Convert to canvas boxes
+      const boxes = fetchedAnnotations.map(a => ({
+        id: a.id,
+        ...a.boundingBox
+      }));
+      setCanvasBoxes(boxes);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [imageId]);
+
+  useEffect(() => {
+    fetchImageAndAnnotations();
+  }, [fetchImageAndAnnotations]);
+
+  const addAnnotation = async () => {
+    if (!newQuestion.trim() || !newAnswer.trim() || !imageId || !selectedBoxId) return;
+
+    const selectedBox = canvasBoxes.find(box => box.id === selectedBoxId);
+    if (!selectedBox) return;
+
+    try {
+      const newAnnotation = await client.models.Annotation.create({
+        imageId,
+        question: newQuestion,
+        answer: newAnswer,
+        boundingBox: { 
+          x: selectedBox.x, 
+          y: selectedBox.y, 
+          width: selectedBox.width, 
+          height: selectedBox.height 
+        },
+        createdBy: 'current-user', // TODO: Get from auth
+        createdAt: new Date().toISOString()
+      });
+
+      if (newAnnotation.data) {
+        const annotation = {
+          id: newAnnotation.data.id,
+          question: newAnnotation.data.question,
+          answer: newAnnotation.data.answer,
+          boundingBox: newAnnotation.data.boundingBox as BoundingBox
+        };
+        setAnnotations(prev => [...prev, annotation]);
+        setNewQuestion('');
+        setNewAnswer('');
+      }
+    } catch (error) {
+      console.error('Failed to create annotation:', error);
+    }
+  };
+
+  const deleteAnnotation = async (annotationId: string) => {
+    try {
+      await client.models.Annotation.delete({ id: annotationId });
+      setAnnotations(prev => prev.filter(a => a.id !== annotationId));
+      setCanvasBoxes(prev => prev.filter(box => box.id !== annotationId));
+      if (selectedBoxId === annotationId) {
+        setSelectedBoxId('');
+      }
+    } catch (error) {
+      console.error('Failed to delete annotation:', error);
+    }
+  };
+
+  const handleCanvasBoxChange = (boxes: CanvasBoundingBox[]) => {
+    setCanvasBoxes(boxes);
+  };
+
+  const handleBoxSelect = (boxId: string) => {
+    setSelectedBoxId(boxId);
+    const annotation = annotations.find(a => a.id === boxId);
+    if (annotation) {
+      setNewQuestion(annotation.question);
+      setNewAnswer(annotation.answer);
+    }
+  };
+
+  if (loading) {
+    return <div style={{ padding: '2rem' }}>Loading...</div>;
+  }
+
+  if (!image) {
+    return <div style={{ padding: '2rem' }}>Image not found</div>;
+  }
+
+  return (
+    <div style={{ display: 'flex', height: '100vh' }}>
+      {/* Image Viewer */}
+      <div style={{ flex: 1, padding: '1rem', backgroundColor: '#f9fafb' }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            onClick={() => window.history.back()}
+            style={{
+              background: '#6b7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '0.5rem 1rem',
+              cursor: 'pointer'
+            }}
+          >
+            ← Back to Gallery
+          </button>
+        </div>
+        
+        <div style={{ textAlign: 'center' }}>
+          <h2>{image.fileName}</h2>
+          {imageUrl && (
+            <CanvasAnnotator
+              imageUrl={imageUrl}
+              boundingBoxes={canvasBoxes}
+              onBoundingBoxChange={handleCanvasBoxChange}
+              selectedBoxId={selectedBoxId}
+              onBoxSelect={handleBoxSelect}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Annotation Panel */}
+      <div style={{ width: '400px', padding: '1rem', borderLeft: '1px solid #e5e7eb', backgroundColor: 'white' }}>
+        <h3>Annotations ({annotations.length})</h3>
+        
+        {/* Add New Annotation */}
+        <div style={{ marginBottom: '2rem', padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+          <h4>Add Annotation</h4>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+              Question:
+            </label>
+            <input
+              type="text"
+              value={newQuestion}
+              onChange={(e) => setNewQuestion(e.target.value)}
+              placeholder="What is the total amount?"
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px'
+              }}
+            />
+          </div>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+              Answer:
+            </label>
+            <input
+              type="text"
+              value={newAnswer}
+              onChange={(e) => setNewAnswer(e.target.value)}
+              placeholder="¥1,234"
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px'
+              }}
+            />
+          </div>
+          <button
+            onClick={addAnnotation}
+            disabled={!newQuestion.trim() || !newAnswer.trim() || !selectedBoxId}
+            style={{
+              background: (!newQuestion.trim() || !newAnswer.trim() || !selectedBoxId) ? '#9ca3af' : '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '0.5rem 1rem',
+              cursor: (!newQuestion.trim() || !newAnswer.trim() || !selectedBoxId) ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Add Annotation
+          </button>
+          {!selectedBoxId && (
+            <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.5rem' }}>
+              Draw a bounding box on the image first
+            </div>
+          )}
+        </div>
+
+        {/* Existing Annotations */}
+        <div>
+          {annotations.map((annotation) => (
+            <div
+              key={annotation.id}
+              style={{
+                padding: '1rem',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                backgroundColor: 'white'
+              }}
+            >
+              <div style={{ fontWeight: '500', marginBottom: '0.5rem' }}>
+                Q: {annotation.question}
+              </div>
+              <div style={{ marginBottom: '0.5rem', color: '#374151' }}>
+                A: {annotation.answer}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                Box: ({annotation.boundingBox.x}, {annotation.boundingBox.y}) 
+                {annotation.boundingBox.width}×{annotation.boundingBox.height}
+              </div>
+              <button
+                onClick={() => deleteAnnotation(annotation.id)}
+                style={{
+                  background: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

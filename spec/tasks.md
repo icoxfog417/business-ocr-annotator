@@ -263,91 +263,69 @@ This task list is organized into **sprints** that deliver working software incre
 **Deliverable**: Working annotation tool with manual Q&A entry
 
 ### Storage Setup (Amplify Gen2)
-- ⬜ Create `amplify/storage/resource.ts`
-  ```typescript
-  import { defineStorage } from '@aws-amplify/backend';
-
-  export const storage = defineStorage({
-    name: 'businessOcrImages',
-    access: (allow) => ({
-      'images/*': [
-        allow.authenticated.to(['read', 'write', 'delete'])
-      ]
-    })
-  });
-  ```
-- ⬜ Update `amplify/backend.ts` to include storage
-  ```typescript
-  import { storage } from './storage/resource';
-
-  defineBackend({
-    auth,
-    storage
-  });
-  ```
-- ⬜ Test S3 upload functionality in sandbox
-  ```bash
-  npx ampx sandbox
-  ```
+- ✅ Create `amplify/storage/resource.ts`
+- ✅ Update `amplify/backend.ts` to include storage
+- ✅ Test S3 upload functionality in sandbox
 
 ### Data Model Setup (Amplify Gen2)
-- ⬜ Define minimal data schema in `amplify/data/resource.ts`
-  ```typescript
-  import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
-
-  const schema = a.schema({
-    Image: a.model({
-      fileName: a.string().required(),
-      s3Key: a.string().required(),
-      uploadedBy: a.string().required(),
-      uploadedAt: a.datetime().required(),
-      metadata: a.json()
-    }).authorization((allow) => [allow.authenticated()]),
-
-    Annotation: a.model({
-      imageId: a.id().required(),
-      question: a.string().required(),
-      answer: a.string().required(),
-      boundingBox: a.json(), // {x, y, width, height}
-      createdBy: a.string().required(),
-      createdAt: a.datetime().required()
-    }).authorization((allow) => [allow.authenticated()])
-  });
-
-  export type Schema = ClientSchema<typeof schema>;
-  export const data = defineData({
-    schema,
-    authorizationModes: {
-      defaultAuthorizationMode: 'userPool'
-    }
-  });
-  ```
-- ⬜ Update `amplify/backend.ts` to include data
-  ```typescript
-  import { data } from './data/resource';
-
-  defineBackend({
-    auth,
-    storage,
-    data
-  });
-  ```
-- ⬜ Generate GraphQL client types
-  ```bash
-  npx ampx generate graphql-client-code
-  ```
+- ✅ Define minimal data schema in `amplify/data/resource.ts`
+- ✅ Update `amplify/backend.ts` to include data
+- ✅ Generate GraphQL client types
+- ✅ Test data operations in sandbox
 
 ### Image Upload UI
-- ⬜ Create FileUpload page with native drag-and-drop
-  ```typescript
-  // Use native HTML5 drag-and-drop events (no external library needed)
-  // onDrop, onDragOver, onDragEnter, onDragLeave
-  // <input type="file" multiple accept="image/*" />
-  ```
-- ⬜ Implement file validation (type, size ≤20MB)
-- ⬜ Add image preview before upload using FileReader API
-- ⬜ Implement S3 upload using Amplify Storage
-  ```typescript
+- ✅ Create FileUpload page with native drag-and-drop
+- ✅ Implement file validation (type, size ≤20MB)
+- ✅ Add image preview before upload using FileReader API
+- ✅ Implement S3 upload using Amplify Storage
+- ✅ Save image metadata to DynamoDB via GraphQL
+- ✅ Show upload progress indicator
+- ✅ Handle upload errors with retry option
+
+### Image Gallery UI
+- ✅ Create ImageGallery page
+- ✅ Implement image grid with lazy loading
+- ✅ Fetch images from GraphQL API
+- ✅ Display image thumbnails using S3 presigned URLs
+- ✅ Add click to open annotation workspace
+- ✅ Implement basic filtering (date, uploaded by)
+- ✅ Add image deletion functionality
+
+### Manual Annotation Workspace
+- ✅ Create AnnotationWorkspace page with layout
+- ✅ Implement ImageViewer component
+  - ✅ Display full-size image from S3
+  - ✅ Add zoom controls (zoom in, out, reset, fit)
+  - ✅ Implement pan functionality
+- ✅ Create CanvasAnnotator for bounding boxes
+  - ✅ Render image with HTML5 canvas overlay
+  - ✅ Implement drag-to-create bounding box
+  - ⬜ Support drag corners/edges to resize box
+  - ⬜ Support drag box to move
+  - ✅ Implement box selection (click to select)
+  - ⬜ Add delete box functionality (Delete key)
+  - ✅ Store coordinates in pixels {x, y, width, height}
+- ✅ Create AnnotationForm component
+  - ✅ QuestionInput text field
+  - ✅ AnswerInput text field
+  - ✅ Associate annotation with selected bounding box
+  - ✅ Display bounding box coordinates
+- ✅ Create AnnotationList component
+  - ✅ Display all annotations for current image
+  - ✅ Click annotation to highlight its bounding box
+  - ✅ Edit/delete existing annotations
+- ✅ Implement save functionality (save to DynamoDB via GraphQL)
+- ⬜ Implement auto-save every 30 seconds
+- ⬜ Add keyboard shortcuts (desktop)
+  - ⬜ Delete: Remove selected box
+  - ⬜ Escape: Deselect box
+  - ⬜ Ctrl+S: Save
+
+### Dashboard Updates
+- ✅ Display total images count
+- ✅ Display total annotations count
+- ✅ Show recent uploads list
+- ✅ Add navigation to Upload and Gallery pages
   import { uploadData } from 'aws-amplify/storage';
   ```
 - ⬜ Save image metadata to DynamoDB via GraphQL
@@ -414,6 +392,9 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Annotations are saved and persisted
 - ✅ Users can view, edit, and delete annotations
 - ✅ Dashboard shows basic statistics
+- ✅ Zoom and pan controls work in annotation workspace
+- ✅ GraphQL types are generated and working
+- ✅ Sandbox deployment is successful
 
 ---
 

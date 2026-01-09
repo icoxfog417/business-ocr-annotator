@@ -1,4 +1,5 @@
 import { signOut } from 'aws-amplify/auth';
+import { Link } from 'react-router-dom';
 
 export function Dashboard() {
   const handleSignOut = async () => {
@@ -108,6 +109,114 @@ export function Dashboard() {
           <p style={{ color: '#64748b', fontSize: '1rem' }}>
             Manage your OCR annotation projects and datasets
           </p>
+        </div>
+
+        {/* Quick Actions */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '1rem',
+            marginBottom: '2.5rem',
+          }}
+        >
+          <Link
+            to="/upload"
+            style={{
+              textDecoration: 'none',
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+              e.currentTarget.style.borderColor = '#3b82f6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.borderColor = '#e5e7eb';
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                background: 'rgba(59, 130, 246, 0.1)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7,10 12,15 17,10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#0f172a', margin: 0 }}>
+                Upload Images
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.875rem', margin: '0.25rem 0 0 0' }}>
+                Add new business documents
+              </p>
+            </div>
+          </Link>
+
+          <Link
+            to="/gallery"
+            style={{
+              textDecoration: 'none',
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+              e.currentTarget.style.borderColor = '#6366f1';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.borderColor = '#e5e7eb';
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                background: 'rgba(99, 102, 241, 0.1)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <path d="M21 15l-5-5L5 21" />
+              </svg>
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#0f172a', margin: 0 }}>
+                Image Gallery
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.875rem', margin: '0.25rem 0 0 0' }}>
+                View and manage images
+              </p>
+            </div>
+          </Link>
         </div>
 
         {/* Metrics Grid */}
