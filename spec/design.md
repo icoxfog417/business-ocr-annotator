@@ -98,26 +98,56 @@ graph TB
 
 ### 2.1 Database Schema (DynamoDB)
 
-#### Image Table (Simplified)
+**Updated**: 2026-01-10 - Added Dataset model and relationships
+
+#### Dataset Table
+```typescript
+interface Dataset {
+  id: string;                    // Partition Key (UUID)
+  name: string;
+  description?: string;
+
+  // Status
+  status: DatasetStatus;         // ACTIVE, ARCHIVED
+
+  // User tracking
+  createdBy: string;             // Cognito user ID (owner)
+  createdAt: string;
+  updatedAt: string;
+
+  // Relationships
+  images: Image[];               // hasMany relationship
+}
+
+enum DatasetStatus {
+  ACTIVE = 'ACTIVE',
+  ARCHIVED = 'ARCHIVED'
+}
+
+// Authorization Rules:
+// - Anyone authenticated can read
+// - Owner (createdBy) can create, update, delete
+// - Curators and Admins have full access
+```
+
+#### Image Table
 ```typescript
 interface Image {
   id: string;                    // Partition Key (UUID)
-  datasetId: string;             // Sort Key (GSI)
+
+  // Dataset relationship
+  datasetId?: string;            // Foreign key to Dataset
+  dataset?: Dataset;             // belongsTo relationship
 
   // S3 Storage - Store KEYS not URLs for flexibility
-  s3KeyOriginal: string;         // Original high-res image (for export)
-  s3KeyCompressed: string;       // Model-optimized (≤4MB, for annotation)
-  s3KeyThumbnail: string;        // Gallery thumbnail (≤100KB)
+  s3Key: string;                 // S3 key (compressed image for annotation)
+  // Note: In future sprints, add s3KeyOriginal and s3KeyThumbnail
 
   // File metadata
   fileName: string;              // Original filename
-  mimeType: string;              // image/jpeg, image/png, image/webp
-  originalSize: number;          // Bytes
-  compressedSize: number;        // Bytes
-  compressionRatio: number;      // For analytics
 
-  // Image dimensions (original)
-  width: number;                 // Required for coordinate normalization
+  // Image dimensions (required for coordinate normalization)
+  width: number;
   height: number;
 
   // Document classification
@@ -126,14 +156,19 @@ interface Image {
 
   // Status tracking
   status: ImageStatus;
-  processingError?: string;
 
   // User tracking
-  uploadedBy: string;
+  uploadedBy: string;            // Cognito user ID (owner)
   uploadedAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
 
+  // Timestamps (auto-managed by DynamoDB)
   createdAt: string;
   updatedAt: string;
+
+  // Relationships
+  annotations: Annotation[];     // hasMany relationship
 }
 
 // Note: Presigned URLs generated on-demand via AppSync field resolvers
@@ -149,33 +184,49 @@ enum DocumentType {
   OTHER = 'OTHER'
 }
 
+// Note: Simplified status enum for MVP
+// UPLOADED: Initial state after upload
+// ANNOTATING: Currently being annotated
+// VALIDATED: Annotations have been validated
 enum ImageStatus {
   UPLOADED = 'UPLOADED',
-  PROCESSING = 'PROCESSING',
-  ANNOTATED = 'ANNOTATED',
-  VALIDATED = 'VALIDATED',
-  FAILED = 'FAILED'
+  ANNOTATING = 'ANNOTATING',
+  VALIDATED = 'VALIDATED'
 }
+
+// Authorization Rules:
+// - Anyone authenticated can read (for gallery view)
+// - Owner (uploadedBy) can create and delete
+// - Curators and Admins can update and delete all images
+
+// Secondary Indexes:
+// - imagesByUploader: Query images by uploadedBy
+// - imagesByStatus: Query images by status
+// - imagesByDocumentType: Query images by documentType
+// - imagesByDataset: Query images by datasetId
 ```
 
-#### Annotation Table (Simplified for Cost Efficiency)
+#### Annotation Table
 ```typescript
 interface Annotation {
   id: string;                    // Partition Key (UUID)
-  imageId: string;               // Sort Key (GSI)
-  datasetId: string;             // GSI
+
+  // Image relationship
+  imageId: string;               // Foreign key to Image (required)
+  image?: Image;                 // belongsTo relationship
 
   // Core Q&A data
   question: string;
   answer: string;
   language: string;              // ISO 639-1 code (ja, en, zh, ko)
 
-  // Evidence regions (single format - absolute pixels)
-  evidenceBoxes: BoundingBox[];  // Visual evidence for answer
+  // Bounding boxes - stored as JSON array in absolute pixel coordinates
+  // Format: [[x0, y0, x1, y1], [x0, y0, x1, y1], ...]
+  // Example: [[100, 200, 300, 250], [150, 300, 400, 350]]
+  boundingBoxes: number[][];     // Array of [x0, y0, x1, y1]
 
   // Classification (for academic compatibility)
   questionType: QuestionType;    // extractive, abstractive, etc.
-  answerType: AnswerType;        // span, free_form, yes_no, number
 
   // Validation
   validationStatus: ValidationStatus;
@@ -184,26 +235,18 @@ interface Annotation {
 
   // Generation metadata
   generatedBy: GenerationSource; // AI or Human
-  modelVersion?: string;         // Bedrock model ID (e.g., "qwen-vl-max")
+  modelVersion?: string;         // Bedrock model ID (e.g., "anthropic.claude-3-sonnet")
   confidence?: number;           // Model confidence (0-1)
 
+  // User tracking
+  createdBy: string;             // Cognito user ID (owner)
   createdAt: string;
-  updatedAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
 }
 
-// Single bounding box format - stored as absolute pixels
-// Converted to normalized coordinates on export
-interface BoundingBox {
-  x1: number;                    // Top-left x (absolute pixels)
-  y1: number;                    // Top-left y (absolute pixels)
-  x2: number;                    // Bottom-right x (absolute pixels)
-  y2: number;                    // Bottom-right y (absolute pixels)
-
-  // Optional metadata from vision model
-  text?: string;                 // Text content in this region
-  label?: string;                // Semantic label (e.g., "total_amount", "date")
-  confidence?: number;           // Detection confidence (0-1)
-}
+// Note: Bounding boxes are stored in absolute pixel coordinates
+// Converted to normalized coordinates (0-1 or 0-1000) on export
 
 enum QuestionType {
   EXTRACTIVE = 'EXTRACTIVE',      // Extract text from document
@@ -211,13 +254,6 @@ enum QuestionType {
   BOOLEAN = 'BOOLEAN',            // Yes/No questions
   COUNTING = 'COUNTING',          // Count items in document
   REASONING = 'REASONING'         // Multi-step reasoning required
-}
-
-enum AnswerType {
-  SPAN = 'SPAN',                 // Text span from document
-  FREE_FORM = 'FREE_FORM',       // Generated answer
-  YES_NO = 'YES_NO',             // Boolean answer
-  NUMBER = 'NUMBER'              // Numeric answer
 }
 
 enum GenerationSource {
@@ -232,13 +268,15 @@ enum ValidationStatus {
   FLAGGED = 'FLAGGED'
 }
 
-interface AnnotationEdit {
-  editedBy: string;              // User ID
-  editedAt: string;              // ISO timestamp
-  field: string;                 // What was edited
-  oldValue: any;
-  newValue: any;
-}
+// Authorization Rules:
+// - Anyone authenticated can read
+// - Owner (createdBy) can create, update, delete
+// - Curators and Admins have full access (for validation workflow)
+
+// Secondary Indexes:
+// - annotationsByImage: Query annotations by imageId
+// - annotationsByValidationStatus: Query annotations by validationStatus
+// - annotationsByCreator: Query annotations by createdBy
 ```
 
 #### Dataset Table

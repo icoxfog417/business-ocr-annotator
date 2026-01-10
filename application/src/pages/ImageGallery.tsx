@@ -1,0 +1,208 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { generateClient } from 'aws-amplify/data';
+import { getUrl } from 'aws-amplify/storage';
+import type { Schema } from '../../amplify/data/resource';
+
+const client = generateClient<Schema>();
+
+interface ImageWithUrl {
+  id: string;
+  fileName: string;
+  s3Key: string;
+  uploadedAt: string;
+  url?: string;
+}
+
+export function ImageGallery() {
+  const [images, setImages] = useState<ImageWithUrl[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchImages();
+  }, []);
+
+  const fetchImages = async () => {
+    try {
+      const { data } = await client.models.Image.list();
+      console.log('Fetched images from database:', data);
+      
+      const imagesWithUrls = await Promise.all(
+        data.map(async (image) => {
+          try {
+            console.log('Getting URL for s3Key:', image.s3Key);
+            const urlResult = await getUrl({ path: image.s3Key });
+            console.log('Generated URL:', urlResult.url.toString());
+            return {
+              ...image,
+              url: urlResult.url.toString()
+            };
+          } catch (error) {
+            console.error('Failed to get URL for image:', image.s3Key, error);
+            return image;
+          }
+        })
+      );
+      console.log('Images with URLs:', imagesWithUrls);
+      setImages(imagesWithUrls);
+    } catch (error) {
+      console.error('Failed to fetch images:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteImage = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this image?')) return;
+    
+    try {
+      await client.models.Image.delete({ id });
+      setImages(prev => prev.filter(img => img.id !== id));
+    } catch (error) {
+      console.error('Failed to delete image:', error);
+      alert('Failed to delete image');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div>Loading images...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '2rem' }}>
+      <div style={{ marginBottom: '2rem' }}>
+        <Link
+          to="/"
+          style={{
+            background: '#6b7280',
+            color: 'white',
+            textDecoration: 'none',
+            padding: '0.5rem 1rem',
+            borderRadius: '6px',
+            fontSize: '0.875rem',
+            marginRight: '1rem'
+          }}
+        >
+          ← Back to Dashboard
+        </Link>
+      </div>
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h1>Image Gallery ({images.length})</h1>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button
+            onClick={fetchImages}
+            style={{
+              background: '#6b7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.75rem 1.5rem',
+              fontSize: '1rem',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            Refresh
+          </button>
+          <Link
+            to="/upload"
+            style={{
+              background: '#3b82f6',
+              color: 'white',
+              textDecoration: 'none',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '6px',
+              fontSize: '1rem',
+              fontWeight: '500'
+            }}
+          >
+            Upload Images
+          </Link>
+        </div>
+      </div>
+
+      {images.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+          <div style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>No images uploaded yet</div>
+          <div>Upload some images to get started</div>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            gap: '1rem'
+          }}
+        >
+          {images.map((image) => (
+            <div
+              key={image.id}
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                backgroundColor: 'white'
+              }}
+            >
+              {image.url && (
+                <img
+                  src={image.url}
+                  alt={image.fileName}
+                  style={{
+                    width: '100%',
+                    height: '200px',
+                    objectFit: 'cover'
+                  }}
+                />
+              )}
+              <div style={{ padding: '1rem' }}>
+                <div style={{ fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                  {image.fileName}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '1rem' }}>
+                  {new Date(image.uploadedAt).toLocaleDateString()}
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    onClick={() => window.location.href = `/annotate/${image.id}`}
+                    style={{
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      flex: 1
+                    }}
+                  >
+                    Annotate
+                  </button>
+                  <button
+                    onClick={() => deleteImage(image.id)}
+                    style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

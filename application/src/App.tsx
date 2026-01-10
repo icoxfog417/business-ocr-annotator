@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { getCurrentUser } from 'aws-amplify/auth';
+import { getCurrentUser, type AuthUser } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 import './App.css';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
+import { FileUpload } from './pages/FileUpload';
+import { ImageGallery } from './pages/ImageGallery';
+import { AnnotationWorkspace } from './pages/AnnotationWorkspace';
 
 function App() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,7 +33,7 @@ function App() {
     try {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
-    } catch (error) {
+    } catch {
       setUser(null);
     } finally {
       setLoading(false);
@@ -96,12 +99,19 @@ function App() {
     <BrowserRouter>
       <Routes>
         {user ? (
+          // User is authenticated - show protected routes
           <>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/upload" element={<FileUpload />} />
+            <Route path="/gallery" element={<ImageGallery />} />
+            <Route path="/annotate/:imageId" element={<AnnotationWorkspace />} />
             <Route path="/callback" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (
+          // User is null - show login page
+          // Amplify Authenticator component in Login handles authentication flow
+          // No manual redirect needed - Amplify manages the auth state internally
           <>
             <Route path="/" element={<Login />} />
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -2,9 +2,9 @@
 
 This document records questions and answers discovered during sandbox verification of AWS Amplify Gen2 and related technologies for the Business OCR Annotator project.
 
-**Last Updated**: 2026-01-09
+**Last Updated**: 2026-01-10
 **Total Questions**: 9
-**Total Verified**: 8 / 9
+**Total Verified**: 9 / 9
 
 ## Overview
 
@@ -28,7 +28,7 @@ Each Q&A entry documents:
 | Q5 | Lambda functions | 🟠 High | 1-3 | ✅ Verified |
 | Q6 | Bedrock with image input | 🟠 High | 2 | ✅ Verified |
 | Q7 | Sharp image compression | 🟡 Medium | 4 | ✅ Verified |
-| Q8 | Hugging Face Hub API | 🟡 Medium | 6 | ⏳ Pending |
+| Q8 | Hugging Face Hub API | 🟡 Medium | 6 | ✅ Verified |
 | Q9 | Secrets management | 🟡 Medium | 0,6,7 | ✅ Verified |
 
 ---
@@ -725,33 +725,127 @@ async function generateThumbnail(inputBuffer, targetSizeBytes) {
 
 ---
 
-### Q8: How to integrate Hugging Face Hub API from Lambda?
+### Q8: How to integrate Hugging Face Hub API for dataset upload?
 
 **Priority**: 🟡 Medium (Sprint 6)
 **Affects Design**: ❌ No - External API integration
-**Status**: ⏳ Pending Verification
+**Status**: ✅ Verified
 
 **Question Details**:
-- How to install @huggingface/hub SDK in Lambda?
-- How to authenticate with HF API token?
-- How to create a dataset repository?
-- How to upload Parquet files?
-- How to generate dataset cards (README.md)?
-- How to handle API rate limits?
+- How to authenticate with Hugging Face API token?
+- What dataset format is compatible with LayoutLM and DocVQA standards?
+- How to define dataset schema with images and bounding boxes?
+- How to upload datasets programmatically?
+- How to create dataset cards (README.md)?
 
-**Answer**: [To be documented after verification]
+**Answer**: Successfully verified Hugging Face `datasets` library for creating and uploading VQA datasets with images and bounding boxes. The recommended format follows DocVQA and FUNSD standards, storing bounding boxes as `[x0, y0, x1, y1]` pixel coordinates.
 
-**Verified in**: [`.sandbox/08-huggingface-integration/`](.sandbox/08-huggingface-integration/)
+**Code Sample**:
+```python
+from datasets import Dataset, Features, Value, Sequence, Image
+from huggingface_hub import login
+
+# Authenticate
+login(token="hf_your_token_here")
+
+# Define schema (DocVQA/LayoutLM compatible)
+features = Features({
+    "question_id": Value("string"),
+    "image": Image(),
+    "question": Value("string"),
+    "answers": Sequence(Value("string")),
+    "answer_bbox": Sequence(Value("int32"), length=4),  # [x0, y0, x1, y1]
+    "document_type": Value("string"),
+    "question_type": Value("string"),
+    "data_split": Value("string")
+})
+
+# Create dataset from list
+data = [
+    {
+        "question_id": "q001",
+        "image": "/path/to/image.jpg",  # or PIL.Image object
+        "question": "What is the total amount?",
+        "answers": ["¥138", "138円"],
+        "answer_bbox": [450, 320, 520, 350],  # pixel coordinates
+        "document_type": "receipt",
+        "question_type": "extractive",
+        "data_split": "train"
+    }
+]
+
+dataset = Dataset.from_list(data, features=features)
+
+# Upload to Hub
+dataset.push_to_hub("username/dataset-name", private=False)
+```
+
+```python
+# Upload README/dataset card
+from huggingface_hub import HfApi
+
+api = HfApi()
+api.upload_file(
+    path_or_fileobj="README.md",
+    path_in_repo="README.md",
+    repo_id="username/dataset-name",
+    repo_type="dataset"
+)
+```
+
+```python
+# Verify uploaded dataset
+from datasets import load_dataset
+
+ds = load_dataset("username/dataset-name")
+print(ds["train"].features)
+print(ds["train"][0])
+```
+
+**Verified in**: [`.sandbox/hf-dataset-investigation/`](.sandbox/hf-dataset-investigation/)
 
 **Key Findings**:
-- [To be documented]
+- **Bounding Box Format**: `[x0, y0, x1, y1]` (position format) where (x0,y0) is upper-left, (x1,y1) is lower-right
+- **Why Position Format**: Industry standard (COCO, FUNSD, LayoutLM, DocVQA), simpler validation (`x0<x1`, `y0<y1`), no precision loss from width/height conversion, direct compatibility with ML pipelines
+- **Coordinate Storage**: Store raw pixel coordinates; normalize to 0-1000 scale at training time for LayoutLM
+- **Multiple Answers**: Use `Sequence(Value("string"))` to support multiple acceptable answers
+- **Image Handling**: `Image()` feature accepts file paths or PIL.Image objects
+- **Auto-Conversion**: Hugging Face automatically converts to Parquet format for dataset viewer
+- **Reference Datasets**: DocVQA uses similar schema; FUNSD stores word-level bboxes
+
+**Dataset Schema Rationale**:
+| Field | Type | Purpose |
+|-------|------|---------|
+| `question_id` | string | Unique identifier for tracking |
+| `image` | Image | Document image (auto-handled by HF) |
+| `question` | string | Question text |
+| `answers` | list[string] | Multiple acceptable answers |
+| `answer_bbox` | list[int] | Evidence location `[x0, y0, x1, y1]` |
+| `document_type` | string | receipt, invoice, form, etc. |
+| `question_type` | string | extractive, reasoning, etc. |
+| `data_split` | string | train/validation/test |
 
 **Gotchas**:
-- [To be documented]
+- Must install both `datasets` and `pillow` packages
+- Token needs write access for uploading (create at huggingface.co/settings/tokens)
+- `push_to_hub()` creates repo if it doesn't exist
+- Large datasets should use `push_to_hub(max_shard_size="500MB")` for chunking
+- Image paths must be absolute or relative to current working directory
+- Dataset viewer may take a few minutes to update after upload
+
+**License Recommendation**:
+- **CC BY-SA 4.0** - Compatible with DocVQA (Apache-2.0) and allows open research sharing
+
+**Test Dataset Created**:
+- Repository: `icoxfog417/biz-doc-vqa-test`
+- Contains 3 sample entries with placeholder images
+- Verified schema loads correctly with all features intact
 
 **References**:
-- [Hugging Face Hub API](https://huggingface.co/docs/huggingface_hub/)
-- [Datasets Documentation](https://huggingface.co/docs/datasets/)
+- [Hugging Face Datasets Documentation](https://huggingface.co/docs/datasets/)
+- [DocVQA Dataset](https://huggingface.co/datasets/lmms-lab/DocVQA)
+- [FUNSD Dataset](https://huggingface.co/datasets/nielsr/funsd)
+- [LayoutLM Documentation](https://huggingface.co/docs/transformers/model_doc/layoutlm)
 
 ---
 
@@ -867,8 +961,8 @@ export const handler = async () => {
 
 ### Extended Features (Verify as needed)
 - [x] **Q7**: Sharp image compression in Lambda
-- [ ] **Q8**: Hugging Face Hub API integration
-- [ ] **Q9**: Secrets and environment variable management
+- [x] **Q8**: Hugging Face Hub API integration
+- [x] **Q9**: Secrets and environment variable management
 
 ---
 
