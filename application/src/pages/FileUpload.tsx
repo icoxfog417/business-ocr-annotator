@@ -13,11 +13,22 @@ const LANGUAGES = [
   { code: 'ko', label: '한국어 (Korean)' },
 ];
 
+const DOCUMENT_TYPES = [
+  { code: 'RECEIPT', label: 'Receipt' },
+  { code: 'INVOICE', label: 'Invoice' },
+  { code: 'ORDER_FORM', label: 'Order Form' },
+  { code: 'TAX_FORM', label: 'Tax Form' },
+  { code: 'CONTRACT', label: 'Contract' },
+  { code: 'APPLICATION_FORM', label: 'Application Form' },
+  { code: 'OTHER', label: 'Other' },
+];
+
 export function FileUpload() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [language, setLanguage] = useState('ja');
+  const [documentType, setDocumentType] = useState('RECEIPT');
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -88,7 +99,7 @@ export function FileUpload() {
           s3Key: key,
           width: dimensions.width,
           height: dimensions.height,
-          documentType: 'OTHER',
+          documentType: documentType,
           language: language,
           status: 'UPLOADED',
           uploadedBy: 'current-user',
@@ -189,6 +200,30 @@ export function FileUpload() {
               {LANGUAGES.map((lang) => (
                 <option key={lang.code} value={lang.code}>
                   {lang.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          {/* Document Type Selection */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+              Document Type:
+            </label>
+            <select
+              value={documentType}
+              onChange={(e) => setDocumentType(e.target.value)}
+              style={{
+                padding: '0.5rem',
+                borderRadius: '4px',
+                border: '1px solid #d1d5db',
+                fontSize: '1rem',
+                minWidth: '200px'
+              }}
+            >
+              {DOCUMENT_TYPES.map((type) => (
+                <option key={type.code} value={type.code}>
+                  {type.label}
                 </option>
               ))}
             </select>
