@@ -52,10 +52,6 @@ const schema = a.schema({
     validatedBy: a.string(),
     validatedAt: a.datetime(),
     
-    // Generation metadata
-    generatedBy: a.enum(['AI', 'HUMAN']).required(),
-    confidence: a.float(),
-    
     // Tracking fields
     createdBy: a.string().required(),
     createdAt: a.datetime().required(),

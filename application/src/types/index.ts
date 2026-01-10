@@ -21,8 +21,6 @@ export type QuestionType =
 
 export type ValidationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
-export type GenerationSource = 'AI' | 'HUMAN';
-
 export type ImageStatus = 'UPLOADED' | 'PROCESSING' | 'ANNOTATED' | 'VALIDATED';
 
 // Language codes (ISO 639-1)
