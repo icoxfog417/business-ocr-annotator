@@ -99,6 +99,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         {user ? (
+          // User is authenticated - show protected routes
           <>
             <Route path="/" element={<Dashboard />} />
             <Route path="/upload" element={<FileUpload />} />
@@ -108,6 +109,9 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (
+          // User is null - show login page
+          // Amplify Authenticator component in Login handles authentication flow
+          // No manual redirect needed - Amplify manages the auth state internally
           <>
             <Route path="/" element={<Login />} />
             <Route path="*" element={<Navigate to="/" replace />} />

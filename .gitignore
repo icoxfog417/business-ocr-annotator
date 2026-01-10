@@ -143,4 +143,5 @@ vite.config.ts.timestamp-*
 !.sandbox/.gitkeep
 !.sandbox/README.md
 google-auth-oauth-info.json
+hugging-face-token.json
 *.zip

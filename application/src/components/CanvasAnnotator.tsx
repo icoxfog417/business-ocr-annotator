@@ -1,6 +1,21 @@
 import { useRef, useEffect, useState } from 'react';
 import { ZoomControls } from './ZoomControls';
 
+// Constants for bounding box styling
+const BOUNDING_BOX_STYLES = {
+  STROKE_WIDTH: 3,
+  FILL_ALPHA: 0.2,
+  CORNER_HANDLE_SIZE: 8,
+  MIN_BOX_SIZE: 10,
+} as const;
+
+const ZOOM_LEVELS = {
+  MIN: 0.5,
+  MAX: 3,
+  STEP: 1.2,
+  DEFAULT: 1,
+} as const;
+
 interface BoundingBox {
   id: string;
   x: number;
@@ -30,7 +45,7 @@ export function CanvasAnnotator({
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
   const [currentBox, setCurrentBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(ZOOM_LEVELS.DEFAULT);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
   // Load image
@@ -38,6 +53,8 @@ export function CanvasAnnotator({
     const img = new Image();
     img.onload = () => {
       setImage(img);
+      // naturalWidth and naturalHeight are the intrinsic dimensions of the image
+      // (actual pixel dimensions before any CSS scaling)
       setCanvasSize({ width: img.naturalWidth, height: img.naturalHeight });
     };
     img.src = imageUrl;
@@ -51,11 +68,11 @@ export function CanvasAnnotator({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
+    // Set canvas size to actual image dimensions (100% zoom = natural size)
     canvas.width = canvasSize.width;
     canvas.height = canvasSize.height;
 
-    // Clear and draw image
+    // Clear and draw image at actual size
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(image, 0, 0);
 
@@ -64,18 +81,20 @@ export function CanvasAnnotator({
       const isSelected = box.id === selectedBoxId;
       
       // Fill with transparent color
-      ctx.fillStyle = isSelected ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+      ctx.fillStyle = isSelected 
+        ? `rgba(59, 130, 246, ${BOUNDING_BOX_STYLES.FILL_ALPHA})` 
+        : `rgba(239, 68, 68, ${BOUNDING_BOX_STYLES.FILL_ALPHA})`;
       ctx.fillRect(box.x, box.y, box.width, box.height);
       
       // Border
       ctx.strokeStyle = isSelected ? '#3b82f6' : '#ef4444';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = BOUNDING_BOX_STYLES.STROKE_WIDTH;
       ctx.strokeRect(box.x, box.y, box.width, box.height);
       
       // Corner handles for selected box
       if (isSelected) {
         ctx.fillStyle = '#3b82f6';
-        const handleSize = 8;
+        const handleSize = BOUNDING_BOX_STYLES.CORNER_HANDLE_SIZE;
         ctx.fillRect(box.x - handleSize/2, box.y - handleSize/2, handleSize, handleSize);
         ctx.fillRect(box.x + box.width - handleSize/2, box.y - handleSize/2, handleSize, handleSize);
         ctx.fillRect(box.x - handleSize/2, box.y + box.height - handleSize/2, handleSize, handleSize);
@@ -85,28 +104,34 @@ export function CanvasAnnotator({
 
     // Draw current box being created
     if (currentBox) {
-      ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
+      ctx.fillStyle = `rgba(34, 197, 94, ${BOUNDING_BOX_STYLES.FILL_ALPHA})`;
       ctx.fillRect(currentBox.x, currentBox.y, currentBox.width, currentBox.height);
       ctx.strokeStyle = '#22c55e';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = BOUNDING_BOX_STYLES.STROKE_WIDTH;
       ctx.strokeRect(currentBox.x, currentBox.y, currentBox.width, currentBox.height);
     }
   }, [image, boundingBoxes, selectedBoxId, currentBox, canvasSize]);
 
+  // Transform canvas coordinates to image coordinates
+  // Account for canvas scaling to get actual pixel position
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
+    // Calculate scale factors between displayed size and actual canvas size
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     
+    // Convert mouse position to canvas coordinates
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
     
     return { x, y };
   };
 
+  // Mouse event handling for drawing bounding boxes
+  // Track mouse position and state to create/select boxes
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasCoordinates(e);
 
@@ -130,6 +155,7 @@ export function CanvasAnnotator({
 
     const { x, y } = getCanvasCoordinates(e);
     
+    // Calculate bounding box from start point to current position
     setCurrentBox({
       x: Math.min(startPoint.x, x),
       y: Math.min(startPoint.y, y),
@@ -144,8 +170,9 @@ export function CanvasAnnotator({
       return;
     }
 
-    // Only create box if it's large enough
-    if (currentBox.width > 10 && currentBox.height > 10) {
+    // Only create box if it's large enough (minimum size threshold)
+    if (currentBox.width > BOUNDING_BOX_STYLES.MIN_BOX_SIZE && 
+        currentBox.height > BOUNDING_BOX_STYLES.MIN_BOX_SIZE) {
       const newBox: BoundingBox = {
         id: Date.now().toString(),
         ...currentBox
@@ -165,16 +192,16 @@ export function CanvasAnnotator({
     }
   };
 
-  const zoomIn = () => setZoom(prev => Math.min(prev * 1.2, 3));
-  const zoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.5));
-  const zoomReset = () => setZoom(1);
+  const zoomIn = () => setZoom(prev => Math.min(prev * ZOOM_LEVELS.STEP, ZOOM_LEVELS.MAX));
+  const zoomOut = () => setZoom(prev => Math.max(prev / ZOOM_LEVELS.STEP, ZOOM_LEVELS.MIN));
+  const zoomReset = () => setZoom(ZOOM_LEVELS.DEFAULT);
   const zoomFit = () => {
     const container = containerRef.current;
     if (!container || !image) return;
     const scale = Math.min(
       (container.clientWidth - 40) / image.naturalWidth,
       (container.clientHeight - 100) / image.naturalHeight,
-      1
+      ZOOM_LEVELS.DEFAULT
     );
     setZoom(scale);
   };
