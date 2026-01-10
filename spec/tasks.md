@@ -302,7 +302,7 @@ This task list is organized into **sprints** that deliver working software incre
   - ✅ Render image with HTML5 canvas overlay
   - ✅ Implement drag-to-create bounding box
   - ✅ Implement box selection (click to select)
-  - ⬜ Add delete box functionality
+  - ✅ Add delete box functionality
   - ✅ Store coordinates in pixels {x, y, width, height}
 - ✅ Create AnnotationForm component
   - ✅ QuestionInput text field
