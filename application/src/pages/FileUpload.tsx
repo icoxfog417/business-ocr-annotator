@@ -6,10 +6,18 @@ import type { Schema } from '../../amplify/data/resource';
 
 const client = generateClient<Schema>();
 
+const LANGUAGES = [
+  { code: 'ja', label: '日本語 (Japanese)' },
+  { code: 'en', label: 'English' },
+  { code: 'zh', label: '中文 (Chinese)' },
+  { code: 'ko', label: '한국어 (Korean)' },
+];
+
 export function FileUpload() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [language, setLanguage] = useState('ja');
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -81,7 +89,7 @@ export function FileUpload() {
           width: dimensions.width,
           height: dimensions.height,
           documentType: 'OTHER',
-          language: 'en',
+          language: language,
           status: 'UPLOADED',
           uploadedBy: 'current-user',
           uploadedAt: new Date().toISOString()
@@ -161,6 +169,31 @@ export function FileUpload() {
       {files.length > 0 && (
         <div style={{ marginBottom: '1rem' }}>
           <h3>Selected Files ({files.length})</h3>
+          
+          {/* Language Selection */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+              Document Language:
+            </label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              style={{
+                padding: '0.5rem',
+                borderRadius: '4px',
+                border: '1px solid #d1d5db',
+                fontSize: '1rem',
+                minWidth: '200px'
+              }}
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          
           {files.map((file, index) => (
             <div
               key={index}

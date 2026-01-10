@@ -30,6 +30,13 @@ interface ImageData {
   uploadedAt: string;
 }
 
+const LANGUAGES = [
+  { code: 'ja', label: '日本語' },
+  { code: 'en', label: 'English' },
+  { code: 'zh', label: '中文' },
+  { code: 'ko', label: '한국어' },
+];
+
 export function AnnotationWorkspace() {
   const { imageId } = useParams<{ imageId: string }>();
   const [image, setImage] = useState<ImageData | null>(null);
@@ -39,6 +46,7 @@ export function AnnotationWorkspace() {
   const [selectedBoxId, setSelectedBoxId] = useState<string>('');
   const [newQuestion, setNewQuestion] = useState('');
   const [newAnswer, setNewAnswer] = useState('');
+  const [newLanguage, setNewLanguage] = useState('ja');
   const [loading, setLoading] = useState(true);
 
   const fetchImageAndAnnotations = useCallback(async () => {
@@ -124,7 +132,7 @@ export function AnnotationWorkspace() {
         imageId,
         question: newQuestion,
         answer: newAnswer,
-        language: 'en',
+        language: newLanguage,
         boundingBoxes: JSON.stringify([bbox]),
         questionType: 'EXTRACTIVE',
         validationStatus: 'PENDING',
@@ -275,6 +283,27 @@ export function AnnotationWorkspace() {
                 borderRadius: '4px'
               }}
             />
+          </div>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+              Language:
+            </label>
+            <select
+              value={newLanguage}
+              onChange={(e) => setNewLanguage(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px'
+              }}
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
           </div>
           <button
             onClick={addAnnotation}
