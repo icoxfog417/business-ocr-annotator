@@ -184,12 +184,14 @@ enum DocumentType {
   OTHER = 'OTHER'
 }
 
+// Note: Simplified status enum for MVP
+// UPLOADED: Initial state after upload
+// ANNOTATING: Currently being annotated
+// VALIDATED: Annotations have been validated
 enum ImageStatus {
   UPLOADED = 'UPLOADED',
-  PROCESSING = 'PROCESSING',
-  ANNOTATED = 'ANNOTATED',
-  VALIDATED = 'VALIDATED',
-  FAILED = 'FAILED'
+  ANNOTATING = 'ANNOTATING',
+  VALIDATED = 'VALIDATED'
 }
 
 // Authorization Rules:

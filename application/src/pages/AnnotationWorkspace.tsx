@@ -4,23 +4,20 @@ import { generateClient } from 'aws-amplify/data';
 import { getUrl } from 'aws-amplify/storage';
 import type { Schema } from '../../amplify/data/resource';
 import { CanvasAnnotator } from '../components/CanvasAnnotator';
-import type { BoundingBox } from '../types';
+import {
+  type BoundingBox,
+  type CanvasBoundingBox,
+  canvasToHuggingFace,
+  huggingFaceToCanvas,
+} from '../types';
 
 const client = generateClient<Schema>();
-
-interface CanvasBoundingBox {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 interface Annotation {
   id: string;
   question: string;
   answer: string;
-  boundingBoxes: BoundingBox[]; // Changed to array
+  boundingBoxes: BoundingBox[];
 }
 
 interface ImageData {
@@ -78,14 +75,10 @@ export function AnnotationWorkspace() {
       });
       setAnnotations(fetchedAnnotations);
       
-      // Convert to canvas boxes (use first bounding box for each annotation)
-      const boxes = fetchedAnnotations.map(a => ({
-        id: a.id,
-        x: a.boundingBoxes[0][0],
-        y: a.boundingBoxes[0][1],
-        width: a.boundingBoxes[0][2] - a.boundingBoxes[0][0],
-        height: a.boundingBoxes[0][3] - a.boundingBoxes[0][1]
-      }));
+      // Convert HuggingFace format to canvas format using utility function
+      const boxes = fetchedAnnotations.map(a => 
+        huggingFaceToCanvas(a.boundingBoxes[0], a.id)
+      );
       setCanvasBoxes(boxes);
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -120,13 +113,8 @@ export function AnnotationWorkspace() {
     }
 
     try {
-      // Convert canvas box to HuggingFace format [x0, y0, x1, y1]
-      const bbox: BoundingBox = [
-        Math.round(selectedBox.x),
-        Math.round(selectedBox.y),
-        Math.round(selectedBox.x + selectedBox.width),
-        Math.round(selectedBox.y + selectedBox.height)
-      ];
+      // Convert canvas box to HuggingFace format using utility function
+      const bbox = canvasToHuggingFace(selectedBox);
 
       const newAnnotation = await client.models.Annotation.create({
         imageId,

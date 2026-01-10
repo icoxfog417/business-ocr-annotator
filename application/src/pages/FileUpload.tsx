@@ -23,12 +23,14 @@ const DOCUMENT_TYPES = [
   { code: 'OTHER', label: 'Other' },
 ];
 
+type DocumentTypeValue = 'RECEIPT' | 'INVOICE' | 'ORDER_FORM' | 'TAX_FORM' | 'CONTRACT' | 'APPLICATION_FORM' | 'OTHER';
+
 export function FileUpload() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [language, setLanguage] = useState('ja');
-  const [documentType, setDocumentType] = useState('RECEIPT');
+  const [documentType, setDocumentType] = useState<DocumentTypeValue>('RECEIPT');
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -212,7 +214,7 @@ export function FileUpload() {
             </label>
             <select
               value={documentType}
-              onChange={(e) => setDocumentType(e.target.value)}
+              onChange={(e) => setDocumentType(e.target.value as DocumentTypeValue)}
               style={{
                 padding: '0.5rem',
                 borderRadius: '4px',

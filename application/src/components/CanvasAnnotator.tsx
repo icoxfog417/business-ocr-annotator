@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { ZoomControls } from './ZoomControls';
+import type { CanvasBoundingBox } from '../types';
 
 // Constants for bounding box styling
 const BOUNDING_BOX_STYLES = {
@@ -16,18 +17,10 @@ const ZOOM_LEVELS = {
   DEFAULT: 1,
 } as const;
 
-interface BoundingBox {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 interface CanvasAnnotatorProps {
   imageUrl: string;
-  boundingBoxes: BoundingBox[];
-  onBoundingBoxChange: (boxes: BoundingBox[]) => void;
+  boundingBoxes: CanvasBoundingBox[];
+  onBoundingBoxChange: (boxes: CanvasBoundingBox[]) => void;
   selectedBoxId?: string;
   onBoxSelect: (boxId: string) => void;
 }
@@ -173,7 +166,7 @@ export function CanvasAnnotator({
     // Only create box if it's large enough (minimum size threshold)
     if (currentBox.width > BOUNDING_BOX_STYLES.MIN_BOX_SIZE && 
         currentBox.height > BOUNDING_BOX_STYLES.MIN_BOX_SIZE) {
-      const newBox: BoundingBox = {
+      const newBox: CanvasBoundingBox = {
         id: Date.now().toString(),
         ...currentBox
       };
