@@ -75,11 +75,8 @@ export function AnnotationWorkspace() {
       });
       setAnnotations(fetchedAnnotations);
       
-      // Convert HuggingFace format to canvas format using utility function
-      const boxes = fetchedAnnotations.map(a => 
-        huggingFaceToCanvas(a.boundingBoxes[0], a.id)
-      );
-      setCanvasBoxes(boxes);
+      // Don't show existing annotation boxes by default - start with empty canvas
+      setCanvasBoxes([]);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -184,6 +181,19 @@ export function AnnotationWorkspace() {
     setSelectedBoxId(boxId);
     const annotation = annotations.find(a => a.id === boxId);
     if (annotation) {
+      setNewQuestion(annotation.question);
+      setNewAnswer(annotation.answer);
+    }
+  };
+
+  // Show annotation's bounding box on canvas when clicked from list
+  const showAnnotationBox = (annotationId: string) => {
+    const annotation = annotations.find(a => a.id === annotationId);
+    if (annotation) {
+      const box = huggingFaceToCanvas(annotation.boundingBoxes[0], annotation.id);
+      // Replace canvas boxes with just this annotation's box
+      setCanvasBoxes([box]);
+      setSelectedBoxId(annotation.id);
       setNewQuestion(annotation.question);
       setNewAnswer(annotation.answer);
     }
@@ -319,12 +329,14 @@ export function AnnotationWorkspace() {
           {annotations.map((annotation) => (
             <div
               key={annotation.id}
+              onClick={() => showAnnotationBox(annotation.id)}
               style={{
                 padding: '1rem',
-                border: '1px solid #e5e7eb',
+                border: selectedBoxId === annotation.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
                 borderRadius: '8px',
                 marginBottom: '1rem',
-                backgroundColor: 'white'
+                backgroundColor: selectedBoxId === annotation.id ? '#eff6ff' : 'white',
+                cursor: 'pointer'
               }}
             >
               <div style={{ fontWeight: '500', marginBottom: '0.5rem' }}>
@@ -337,7 +349,7 @@ export function AnnotationWorkspace() {
                 Box: [{annotation.boundingBoxes[0].join(', ')}]
               </div>
               <button
-                onClick={() => deleteAnnotation(annotation.id)}
+                onClick={(e) => { e.stopPropagation(); deleteAnnotation(annotation.id); }}
                 style={{
                   background: '#ef4444',
                   color: 'white',

@@ -45,12 +45,14 @@ export function CanvasAnnotator({
   // Calculate fit zoom based on container and image size
   const calculateFitZoom = useCallback((img: HTMLImageElement) => {
     const container = containerRef.current;
-    if (!container) return ZOOM_LEVELS.DEFAULT;
-    return Math.min(
+    if (!container || container.clientWidth === 0) return ZOOM_LEVELS.DEFAULT;
+    const fitZoom = Math.min(
       (container.clientWidth - 40) / img.naturalWidth,
       (container.clientHeight - 100) / img.naturalHeight,
       ZOOM_LEVELS.MAX
     );
+    // Ensure we don't return 0 or negative values
+    return fitZoom > 0 ? fitZoom : ZOOM_LEVELS.DEFAULT;
   }, []);
 
   // Load image and set initial fit zoom
