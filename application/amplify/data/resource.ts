@@ -28,11 +28,15 @@ const schema = a.schema({
     // UPLOADED: Just uploaded, no annotations yet
     // ANNOTATING: Has annotations being created/validated  
     // VALIDATED: All annotations approved
-    status: a.enum(['UPLOADED', 'ANNOTATING', 'VALIDATED']).default('UPLOADED')
+    status: a.enum(['UPLOADED', 'ANNOTATING', 'VALIDATED']).default('UPLOADED'),
+    
+    // Relationships
+    annotations: a.hasMany('Annotation', 'imageId')
   }).authorization((allow) => [allow.authenticated()]),
 
   Annotation: a.model({
     imageId: a.id().required(),
+    image: a.belongsTo('Image', 'imageId'),
     
     // Q&A fields
     question: a.string().required(),
