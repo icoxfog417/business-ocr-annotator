@@ -13,7 +13,7 @@ const schema = a.schema({
     documentType: a.enum([
       'RECEIPT', 'INVOICE', 'ORDER_FORM', 
       'TAX_FORM', 'CONTRACT', 'APPLICATION_FORM', 'OTHER'
-    ]).required(),
+    ]),
     
     // Language support (ISO 639-1 code: ja, en, zh, ko)
     language: a.string().required(),
@@ -24,7 +24,7 @@ const schema = a.schema({
     updatedBy: a.string(),
     updatedAt: a.datetime(),
     
-    status: a.enum(['UPLOADED', 'PROCESSING', 'ANNOTATED', 'VALIDATED']).required()
+    status: a.enum(['UPLOADED', 'PROCESSING', 'ANNOTATED', 'VALIDATED'])
   }).authorization((allow) => [allow.authenticated()]),
 
   Annotation: a.model({
@@ -45,10 +45,10 @@ const schema = a.schema({
     // Classification for academic compatibility
     questionType: a.enum([
       'EXTRACTIVE', 'ABSTRACTIVE', 'BOOLEAN', 'COUNTING', 'REASONING'
-    ]).required(),
+    ]),
     
     // Validation tracking
-    validationStatus: a.enum(['PENDING', 'APPROVED', 'REJECTED']).required(),
+    validationStatus: a.enum(['PENDING', 'APPROVED', 'REJECTED']),
     validatedBy: a.string(),
     validatedAt: a.datetime(),
     

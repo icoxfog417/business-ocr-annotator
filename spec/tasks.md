@@ -1,8 +1,8 @@
 # Implementation Tasks
 
 **Project**: Business OCR Annotator
-**Last Updated**: 2026-01-07
-**Status**: Planning Phase
+**Last Updated**: 2026-01-10
+**Status**: Sprint 1 (Data Schema Migration)
 **Approach**: Agile Incremental Development
 **Reference**: See [spec/proposals/20260107_reorganize_tasks_agile_approach.md](proposals/20260107_reorganize_tasks_agile_approach.md)
 
@@ -253,6 +253,237 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Authenticated users see a dashboard (even if empty)
 - ✅ Sandbox environment working locally
 - ✅ Google OAuth credentials configured securely
+
+---
+
+## 🔥 URGENT: Data Schema Migration & Authorization
+
+**Goal**: Fix critical security issues and improve data model
+**Duration**: 1-2 days
+**Priority**: CRITICAL - Must be completed before further frontend development
+**Deliverable**: Secure, well-structured data schema with proper authorization
+**Reference**: See [spec/proposals/20260110_improve_data_schema_authorization.md](proposals/20260110_improve_data_schema_authorization.md)
+
+### Why This is Urgent
+
+⚠️ **Current security issues:**
+1. Any authenticated user can delete other users' images
+2. Any authenticated user can modify other users' annotations
+3. No role-based access control (no curators/admins)
+4. No relationships between Image and Annotation models
+5. Missing Dataset model for organization
+
+### Phase 1: Authorization Improvements (CRITICAL)
+
+- ⬜ Create Cognito user groups
+  ```bash
+  # Create groups via AWS Console or CLI
+  aws cognito-idp create-group \
+    --group-name curators \
+    --user-pool-id <YOUR_USER_POOL_ID> \
+    --description "Curators can manage all content"
+
+  aws cognito-idp create-group \
+    --group-name admins \
+    --user-pool-id <YOUR_USER_POOL_ID> \
+    --description "Administrators have full access"
+  ```
+
+- ✅ Update `amplify/data/resource.ts` with improved authorization
+  - ✅ Add Dataset model with proper authorization
+  - ✅ Update Image model authorization rules
+  - ✅ Update Annotation model authorization rules
+  - ✅ Add relationship definitions (hasMany, belongsTo)
+  - ✅ Add secondary indexes for performance
+
+- ⬜ Deploy schema changes
+  ```bash
+  # In sandbox (development)
+  npx ampx sandbox
+
+  # For production (after testing)
+  npx ampx pipeline-deploy --branch main
+  ```
+
+- ⬜ Regenerate GraphQL types
+  ```bash
+  npx ampx generate graphql-client-code
+  ```
+
+- ⬜ Test authorization with different user roles
+  - ⬜ Test as regular user (owner permissions only)
+  - ⬜ Test as curator (can manage all content)
+  - ⬜ Test as admin (full access)
+  - ⬜ Verify users cannot delete others' images
+  - ⬜ Verify users cannot modify others' annotations
+
+### Phase 2: Relationship Testing
+
+- ⬜ Test hasMany relationship: Image.annotations
+  ```typescript
+  // Should automatically load annotations with image
+  const result = await client.graphql({
+    query: getImage,
+    variables: { id: imageId }
+  });
+  console.log(result.data.getImage.annotations);
+  ```
+
+- ⬜ Test belongsTo relationship: Annotation.image
+  ```typescript
+  // Should automatically load image with annotation
+  const result = await client.graphql({
+    query: getAnnotation,
+    variables: { id: annotationId }
+  });
+  console.log(result.data.getAnnotation.image);
+  ```
+
+- ⬜ Test Dataset relationships
+  - ⬜ Create a dataset
+  - ⬜ Associate images with dataset
+  - ⬜ Query images by dataset
+
+### Phase 3: Data Migration (If needed)
+
+- ⬜ Backup existing data
+  ```bash
+  # Export all images
+  aws dynamodb scan --table-name Image-xxx > backup-images.json
+
+  # Export all annotations
+  aws dynamodb scan --table-name Annotation-xxx > backup-annotations.json
+  ```
+
+- ⬜ Create default dataset for existing images
+  ```typescript
+  const defaultDataset = await client.graphql({
+    query: createDataset,
+    variables: {
+      input: {
+        name: 'Default Dataset',
+        description: 'Migrated from old schema',
+        status: 'ACTIVE',
+        createdBy: 'system',
+        createdAt: new Date().toISOString()
+      }
+    }
+  });
+  ```
+
+- ⬜ Update existing images with datasetId
+  ```typescript
+  // Script to migrate existing images
+  const images = await listAllImages();
+  for (const image of images) {
+    await client.graphql({
+      query: updateImage,
+      variables: {
+        input: {
+          id: image.id,
+          datasetId: defaultDataset.id
+        }
+      }
+    });
+  }
+  ```
+
+- ⬜ Verify migration completed successfully
+- ⬜ Test that all existing data is accessible
+
+### Phase 4: Secondary Index Testing
+
+- ⬜ Test imagesByUploader index
+  ```typescript
+  const result = await client.graphql({
+    query: imagesByUploader,
+    variables: {
+      uploadedBy: currentUserId
+    }
+  });
+  ```
+
+- ⬜ Test imagesByStatus index
+  ```typescript
+  const result = await client.graphql({
+    query: imagesByStatus,
+    variables: {
+      status: 'UPLOADED'
+    }
+  });
+  ```
+
+- ⬜ Test annotationsByImage index
+  ```typescript
+  const result = await client.graphql({
+    query: annotationsByImage,
+    variables: {
+      imageId: imageId
+    }
+  });
+  ```
+
+- ⬜ Measure query performance improvement
+
+### Phase 5: Frontend Updates
+
+- ⬜ Update frontend code to use new GraphQL types
+  - ⬜ Import new types from `graphql/API.ts`
+  - ⬜ Update Image type references
+  - ⬜ Update Annotation type references
+  - ⬜ Add Dataset type references
+
+- ⬜ Update queries to use relationships
+  ```typescript
+  // Before: Manual join
+  const image = await getImage(id);
+  const annotations = await listAnnotations({ filter: { imageId: { eq: id } } });
+
+  // After: Automatic relationship loading
+  const result = await client.graphql({ query: getImage, variables: { id } });
+  const { image, annotations } = result.data.getImage;
+  ```
+
+- ⬜ Add role-based UI controls
+  ```typescript
+  // Show delete button only for owners/curators/admins
+  const { user, isCurator, isAdmin } = useAuth();
+  const canDelete = image.uploadedBy === user.id || isCurator || isAdmin;
+  ```
+
+- ⬜ Test all existing pages still work
+  - ⬜ Dashboard
+  - ⬜ Image Gallery
+  - ⬜ File Upload
+  - ⬜ Annotation Workspace
+
+### Documentation Updates
+
+- ⬜ Update README.md with new authorization model
+- ⬜ Document Cognito group setup process
+- ⬜ Document relationship usage examples
+- ⬜ Update API documentation
+
+### Rollback Plan
+
+If issues occur:
+1. ⬜ Revert `amplify/data/resource.ts` to previous version
+2. ⬜ Run `npx ampx sandbox` to restore old schema
+3. ⬜ Restore data from backups if needed
+4. ⬜ Investigate and fix issues before retry
+
+### Acceptance Criteria
+
+- ✅ Users can only delete their own images (except curators/admins)
+- ✅ Curators can manage all images and annotations
+- ✅ Admins have full access to everything
+- ✅ Image → Annotation relationship works automatically
+- ✅ Dataset model is functional
+- ✅ All secondary indexes improve query performance
+- ✅ GraphQL types regenerated correctly
+- ✅ All existing data migrated successfully (if applicable)
+- ✅ Frontend uses new types and relationships
+- ✅ No security vulnerabilities remain
 
 ---
 
