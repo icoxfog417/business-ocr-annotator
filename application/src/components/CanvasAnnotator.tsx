@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { ZoomControls } from './ZoomControls';
 import type { CanvasBoundingBox } from '../types';
 
@@ -40,18 +40,34 @@ export function CanvasAnnotator({
   const [currentBox, setCurrentBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [zoom, setZoom] = useState<number>(ZOOM_LEVELS.DEFAULT);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const initialZoomSet = useRef(false);
 
-  // Load image
+  // Calculate fit zoom based on container and image size
+  const calculateFitZoom = useCallback((img: HTMLImageElement) => {
+    const container = containerRef.current;
+    if (!container) return ZOOM_LEVELS.DEFAULT;
+    return Math.min(
+      (container.clientWidth - 40) / img.naturalWidth,
+      (container.clientHeight - 100) / img.naturalHeight,
+      ZOOM_LEVELS.MAX
+    );
+  }, []);
+
+  // Load image and set initial fit zoom
   useEffect(() => {
+    initialZoomSet.current = false;
     const img = new Image();
     img.onload = () => {
       setImage(img);
-      // naturalWidth and naturalHeight are the intrinsic dimensions of the image
-      // (actual pixel dimensions before any CSS scaling)
       setCanvasSize({ width: img.naturalWidth, height: img.naturalHeight });
+      // Set initial zoom to fit on first load
+      if (!initialZoomSet.current) {
+        setZoom(calculateFitZoom(img));
+        initialZoomSet.current = true;
+      }
     };
     img.src = imageUrl;
-  }, [imageUrl]);
+  }, [imageUrl, calculateFitZoom]);
 
   // Draw canvas
   useEffect(() => {
@@ -189,14 +205,7 @@ export function CanvasAnnotator({
   const zoomOut = () => setZoom(prev => Math.max(prev / ZOOM_LEVELS.STEP, ZOOM_LEVELS.MIN));
   const zoomReset = () => setZoom(ZOOM_LEVELS.DEFAULT);
   const zoomFit = () => {
-    const container = containerRef.current;
-    if (!container || !image) return;
-    const scale = Math.min(
-      (container.clientWidth - 40) / image.naturalWidth,
-      (container.clientHeight - 100) / image.naturalHeight,
-      ZOOM_LEVELS.DEFAULT
-    );
-    setZoom(scale);
+    if (image) setZoom(calculateFitZoom(image));
   };
 
   return (
