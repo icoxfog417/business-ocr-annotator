@@ -98,26 +98,57 @@ graph TB
 
 ### 2.1 Database Schema (DynamoDB)
 
-#### Image Table (Simplified)
+**Updated**: 2026-01-10 - Added authorization rules, relationships, and secondary indexes
+**Reference**: See `spec/proposals/20260110_improve_data_schema_authorization.md`
+
+#### Dataset Table
+```typescript
+interface Dataset {
+  id: string;                    // Partition Key (UUID)
+  name: string;
+  description?: string;
+
+  // Status
+  status: DatasetStatus;         // ACTIVE, ARCHIVED
+
+  // User tracking
+  createdBy: string;             // Cognito user ID (owner)
+  createdAt: string;
+  updatedAt: string;
+
+  // Relationships
+  images: Image[];               // hasMany relationship
+}
+
+enum DatasetStatus {
+  ACTIVE = 'ACTIVE',
+  ARCHIVED = 'ARCHIVED'
+}
+
+// Authorization Rules:
+// - Anyone authenticated can read
+// - Owner (createdBy) can create, update, delete
+// - Curators and Admins have full access
+```
+
+#### Image Table
 ```typescript
 interface Image {
   id: string;                    // Partition Key (UUID)
-  datasetId: string;             // Sort Key (GSI)
+
+  // Dataset relationship
+  datasetId?: string;            // Foreign key to Dataset
+  dataset?: Dataset;             // belongsTo relationship
 
   // S3 Storage - Store KEYS not URLs for flexibility
-  s3KeyOriginal: string;         // Original high-res image (for export)
-  s3KeyCompressed: string;       // Model-optimized (≤4MB, for annotation)
-  s3KeyThumbnail: string;        // Gallery thumbnail (≤100KB)
+  s3Key: string;                 // S3 key (compressed image for annotation)
+  // Note: In future sprints, add s3KeyOriginal and s3KeyThumbnail
 
   // File metadata
   fileName: string;              // Original filename
-  mimeType: string;              // image/jpeg, image/png, image/webp
-  originalSize: number;          // Bytes
-  compressedSize: number;        // Bytes
-  compressionRatio: number;      // For analytics
 
-  // Image dimensions (original)
-  width: number;                 // Required for coordinate normalization
+  // Image dimensions (required for coordinate normalization)
+  width: number;
   height: number;
 
   // Document classification
@@ -126,14 +157,19 @@ interface Image {
 
   // Status tracking
   status: ImageStatus;
-  processingError?: string;
 
   // User tracking
-  uploadedBy: string;
+  uploadedBy: string;            // Cognito user ID (owner)
   uploadedAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
 
+  // Timestamps (auto-managed by DynamoDB)
   createdAt: string;
   updatedAt: string;
+
+  // Relationships
+  annotations: Annotation[];     // hasMany relationship
 }
 
 // Note: Presigned URLs generated on-demand via AppSync field resolvers
@@ -156,6 +192,17 @@ enum ImageStatus {
   VALIDATED = 'VALIDATED',
   FAILED = 'FAILED'
 }
+
+// Authorization Rules:
+// - Anyone authenticated can read (for gallery view)
+// - Owner (uploadedBy) can create and delete
+// - Curators and Admins can update and delete all images
+
+// Secondary Indexes:
+// - imagesByUploader: Query images by uploadedBy
+// - imagesByStatus: Query images by status
+// - imagesByDocumentType: Query images by documentType
+// - imagesByDataset: Query images by datasetId
 ```
 
 #### Annotation Table (Simplified for Cost Efficiency)

@@ -45,7 +45,7 @@ export function CanvasAnnotator({
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
   const [currentBox, setCurrentBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const [zoom, setZoom] = useState(ZOOM_LEVELS.DEFAULT);
+  const [zoom, setZoom] = useState<number>(ZOOM_LEVELS.DEFAULT);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
   // Load image
