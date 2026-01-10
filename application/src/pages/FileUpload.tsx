@@ -82,7 +82,7 @@ export function FileUpload() {
           height: dimensions.height,
           documentType: 'OTHER', // Default, user can change later
           language: 'en', // Default, user can change later
-          status: 'UPLOADED',
+          // status defaults to 'UPLOADED'
           uploadedBy: 'current-user',
           uploadedAt: new Date().toISOString()
         });

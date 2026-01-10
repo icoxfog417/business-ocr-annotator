@@ -24,7 +24,11 @@ const schema = a.schema({
     updatedBy: a.string(),
     updatedAt: a.datetime(),
     
-    status: a.enum(['UPLOADED', 'PROCESSING', 'ANNOTATED', 'VALIDATED'])
+    // Processing status - tracks overall image annotation state
+    // UPLOADED: Just uploaded, no annotations yet
+    // ANNOTATING: Has annotations being created/validated  
+    // VALIDATED: All annotations approved
+    status: a.enum(['UPLOADED', 'ANNOTATING', 'VALIDATED']).default('UPLOADED')
   }).authorization((allow) => [allow.authenticated()]),
 
   Annotation: a.model({
@@ -45,10 +49,13 @@ const schema = a.schema({
     // Classification for academic compatibility
     questionType: a.enum([
       'EXTRACTIVE', 'ABSTRACTIVE', 'BOOLEAN', 'COUNTING', 'REASONING'
-    ]),
+    ]).default('EXTRACTIVE'),
     
-    // Validation tracking
-    validationStatus: a.enum(['PENDING', 'APPROVED', 'REJECTED']),
+    // Validation tracking - individual annotation approval
+    // PENDING: Needs review
+    // APPROVED: Validated and approved
+    // REJECTED: Rejected, needs correction
+    validationStatus: a.enum(['PENDING', 'APPROVED', 'REJECTED']).default('PENDING'),
     validatedBy: a.string(),
     validatedAt: a.datetime(),
     

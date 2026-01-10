@@ -126,8 +126,8 @@ export function AnnotationWorkspace() {
         answer: newAnswer,
         language: 'en', // Default language
         boundingBoxes: JSON.stringify([bbox]), // Array of bounding boxes
-        questionType: 'EXTRACTIVE', // Default type
-        validationStatus: 'PENDING',
+        // questionType defaults to 'EXTRACTIVE'
+        // validationStatus defaults to 'PENDING'
         createdBy: 'current-user',
         createdAt: new Date().toISOString()
       });
