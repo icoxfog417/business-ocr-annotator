@@ -301,10 +301,8 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Create CanvasAnnotator for bounding boxes
   - ✅ Render image with HTML5 canvas overlay
   - ✅ Implement drag-to-create bounding box
-  - ⬜ Support drag corners/edges to resize box
-  - ⬜ Support drag box to move
   - ✅ Implement box selection (click to select)
-  - ⬜ Add delete box functionality (Delete key)
+  - ✅ Add delete box functionality
   - ✅ Store coordinates in pixels {x, y, width, height}
 - ✅ Create AnnotationForm component
   - ✅ QuestionInput text field
@@ -316,11 +314,6 @@ This task list is organized into **sprints** that deliver working software incre
   - ✅ Click annotation to highlight its bounding box
   - ✅ Edit/delete existing annotations
 - ✅ Implement save functionality (save to DynamoDB via GraphQL)
-- ⬜ Implement auto-save every 30 seconds
-- ⬜ Add keyboard shortcuts (desktop)
-  - ⬜ Delete: Remove selected box
-  - ⬜ Escape: Deselect box
-  - ⬜ Ctrl+S: Save
 
 ### Dashboard Updates
 - ✅ Display total images count
@@ -358,10 +351,8 @@ This task list is organized into **sprints** that deliver working software incre
 - ⬜ Create CanvasAnnotator for bounding boxes
   - ⬜ Render image with HTML5 canvas overlay
   - ⬜ Implement drag-to-create bounding box
-  - ⬜ Support drag corners/edges to resize box
-  - ⬜ Support drag box to move
   - ⬜ Implement box selection (click to select)
-  - ⬜ Add delete box functionality (Delete key)
+  - ⬜ Add delete box functionality
   - ⬜ Store coordinates in pixels {x, y, width, height}
 - ⬜ Create AnnotationForm component
   - ⬜ QuestionInput text field
@@ -373,11 +364,6 @@ This task list is organized into **sprints** that deliver working software incre
   - ⬜ Click annotation to highlight its bounding box
   - ⬜ Edit/delete existing annotations
 - ⬜ Implement save functionality (save to DynamoDB via GraphQL)
-- ⬜ Implement auto-save every 30 seconds
-- ⬜ Add keyboard shortcuts (desktop)
-  - ⬜ Delete: Remove selected box
-  - ⬜ Escape: Deselect box
-  - ⬜ Ctrl+S: Save
 
 ### Dashboard Updates
 - ⬜ Display total images count
