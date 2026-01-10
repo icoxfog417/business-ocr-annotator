@@ -227,7 +227,7 @@ export function AnnotationWorkspace() {
           </button>
         </div>
         
-        <div style={{ textAlign: 'center' }}>
+        <div style={{ textAlign: 'center', height: 'calc(100vh - 120px)' }}>
           <h2>{image.fileName}</h2>
           {imageUrl && (
             <CanvasAnnotator
