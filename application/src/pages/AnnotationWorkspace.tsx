@@ -124,10 +124,10 @@ export function AnnotationWorkspace() {
         imageId,
         question: newQuestion,
         answer: newAnswer,
-        language: 'en', // Default language
-        boundingBoxes: JSON.stringify([bbox]), // Array of bounding boxes
-        // questionType defaults to 'EXTRACTIVE'
-        // validationStatus defaults to 'PENDING'
+        language: 'en',
+        boundingBoxes: JSON.stringify([bbox]),
+        questionType: 'EXTRACTIVE',
+        validationStatus: 'PENDING',
         createdBy: 'current-user',
         createdAt: new Date().toISOString()
       });

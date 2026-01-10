@@ -24,11 +24,8 @@ const schema = a.schema({
     updatedBy: a.string(),
     updatedAt: a.datetime(),
     
-    // Processing status - tracks overall image annotation state
-    // UPLOADED: Just uploaded, no annotations yet
-    // ANNOTATING: Has annotations being created/validated  
-    // VALIDATED: All annotations approved
-    status: a.enum(['UPLOADED', 'ANNOTATING', 'VALIDATED']).default('UPLOADED'),
+    // Processing status
+    status: a.enum(['UPLOADED', 'ANNOTATING', 'VALIDATED']),
     
     // Relationships
     annotations: a.hasMany('Annotation', 'imageId')
@@ -47,19 +44,15 @@ const schema = a.schema({
     
     // Bounding boxes in HuggingFace standard format
     // Array of [x0, y0, x1, y1] in pixel coordinates (not normalized)
-    // Example: [[100, 200, 300, 250], [150, 300, 400, 350]]
     boundingBoxes: a.json().required(),
     
     // Classification for academic compatibility
     questionType: a.enum([
       'EXTRACTIVE', 'ABSTRACTIVE', 'BOOLEAN', 'COUNTING', 'REASONING'
-    ]).default('EXTRACTIVE'),
+    ]),
     
-    // Validation tracking - individual annotation approval
-    // PENDING: Needs review
-    // APPROVED: Validated and approved
-    // REJECTED: Rejected, needs correction
-    validationStatus: a.enum(['PENDING', 'APPROVED', 'REJECTED']).default('PENDING'),
+    // Validation tracking
+    validationStatus: a.enum(['PENDING', 'APPROVED', 'REJECTED']),
     validatedBy: a.string(),
     validatedAt: a.datetime(),
     

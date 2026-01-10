@@ -80,9 +80,9 @@ export function FileUpload() {
           s3Key: key,
           width: dimensions.width,
           height: dimensions.height,
-          documentType: 'OTHER', // Default, user can change later
-          language: 'en', // Default, user can change later
-          // status defaults to 'UPLOADED'
+          documentType: 'OTHER',
+          language: 'en',
+          status: 'UPLOADED',
           uploadedBy: 'current-user',
           uploadedAt: new Date().toISOString()
         });

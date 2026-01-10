@@ -98,8 +98,7 @@ graph TB
 
 ### 2.1 Database Schema (DynamoDB)
 
-**Updated**: 2026-01-10 - Added authorization rules, relationships, and secondary indexes
-**Reference**: See `spec/proposals/20260110_improve_data_schema_authorization.md`
+**Updated**: 2026-01-10 - Added Dataset model and relationships
 
 #### Dataset Table
 ```typescript
