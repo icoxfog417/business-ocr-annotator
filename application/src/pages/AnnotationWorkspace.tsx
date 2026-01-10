@@ -4,15 +4,9 @@ import { generateClient } from 'aws-amplify/data';
 import { getUrl } from 'aws-amplify/storage';
 import type { Schema } from '../../amplify/data/resource';
 import { CanvasAnnotator } from '../components/CanvasAnnotator';
+import type { BoundingBox } from '../types';
 
 const client = generateClient<Schema>();
-
-interface BoundingBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 interface CanvasBoundingBox {
   id: string;
@@ -26,7 +20,7 @@ interface Annotation {
   id: string;
   question: string;
   answer: string;
-  boundingBox: BoundingBox;
+  boundingBoxes: BoundingBox[]; // Changed to array
 }
 
 interface ImageData {
@@ -63,18 +57,26 @@ export function AnnotationWorkspace() {
       const { data: annotationsData } = await client.models.Annotation.list({
         filter: { imageId: { eq: imageId } }
       });
-      const fetchedAnnotations = annotationsData.map(a => ({
-        id: a.id,
-        question: a.question,
-        answer: a.answer,
-        boundingBox: a.boundingBox as BoundingBox
-      }));
+      const fetchedAnnotations = annotationsData.map(a => {
+        const boxes = typeof a.boundingBoxes === 'string' 
+          ? JSON.parse(a.boundingBoxes) 
+          : a.boundingBoxes as BoundingBox[];
+        return {
+          id: a.id,
+          question: a.question,
+          answer: a.answer,
+          boundingBoxes: boxes
+        };
+      });
       setAnnotations(fetchedAnnotations);
       
-      // Convert to canvas boxes
+      // Convert to canvas boxes (use first bounding box for each annotation)
       const boxes = fetchedAnnotations.map(a => ({
         id: a.id,
-        ...a.boundingBox
+        x: a.boundingBoxes[0][0],
+        y: a.boundingBoxes[0][1],
+        width: a.boundingBoxes[0][2] - a.boundingBoxes[0][0],
+        height: a.boundingBoxes[0][3] - a.boundingBoxes[0][1]
       }));
       setCanvasBoxes(boxes);
     } catch (error) {
@@ -110,16 +112,22 @@ export function AnnotationWorkspace() {
     }
 
     try {
+      // Convert canvas box to HuggingFace format [x0, y0, x1, y1]
+      const bbox: BoundingBox = [
+        Math.round(selectedBox.x),
+        Math.round(selectedBox.y),
+        Math.round(selectedBox.x + selectedBox.width),
+        Math.round(selectedBox.y + selectedBox.height)
+      ];
+
       const newAnnotation = await client.models.Annotation.create({
         imageId,
         question: newQuestion,
         answer: newAnswer,
-        boundingBox: JSON.stringify({ 
-          x: Math.round(selectedBox.x), 
-          y: Math.round(selectedBox.y), 
-          width: Math.round(selectedBox.width), 
-          height: Math.round(selectedBox.height)
-        }),
+        language: 'en', // Default language
+        boundingBoxes: JSON.stringify([bbox]), // Array of bounding boxes
+        questionType: 'EXTRACTIVE', // Default type
+        validationStatus: 'PENDING',
         createdBy: 'current-user',
         createdAt: new Date().toISOString()
       });
@@ -137,9 +145,9 @@ export function AnnotationWorkspace() {
           id: newAnnotation.data.id,
           question: newAnnotation.data.question,
           answer: newAnnotation.data.answer,
-          boundingBox: typeof newAnnotation.data.boundingBox === 'string' 
-            ? JSON.parse(newAnnotation.data.boundingBox) 
-            : newAnnotation.data.boundingBox as BoundingBox
+          boundingBoxes: typeof newAnnotation.data.boundingBoxes === 'string' 
+            ? JSON.parse(newAnnotation.data.boundingBoxes) 
+            : newAnnotation.data.boundingBoxes as BoundingBox[]
         };
         setAnnotations(prev => [...prev, annotation]);
         
@@ -309,8 +317,7 @@ export function AnnotationWorkspace() {
                 A: {annotation.answer}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                Box: ({annotation.boundingBox.x}, {annotation.boundingBox.y}) 
-                {annotation.boundingBox.width}×{annotation.boundingBox.height}
+                Box: [{annotation.boundingBoxes[0].join(', ')}]
               </div>
               <button
                 onClick={() => deleteAnnotation(annotation.id)}

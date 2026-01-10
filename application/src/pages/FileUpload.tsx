@@ -66,17 +66,25 @@ export function FileUpload() {
         
         console.log('Upload successful:', uploadResult);
 
-        // Save metadata to DynamoDB
+        // Get image dimensions
+        const img = new Image();
+        const dimensions = await new Promise<{width: number, height: number}>((resolve) => {
+          img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          img.src = URL.createObjectURL(file);
+        });
+
+        // Save metadata to DynamoDB with new required fields
         console.log('Saving to database...');
         const dbResult = await client.models.Image.create({
           fileName: file.name,
           s3Key: key,
+          width: dimensions.width,
+          height: dimensions.height,
+          documentType: 'OTHER', // Default, user can change later
+          language: 'en', // Default, user can change later
+          status: 'UPLOADED',
           uploadedBy: 'current-user',
-          uploadedAt: new Date().toISOString(),
-          metadata: JSON.stringify({
-            size: file.size,
-            type: file.type
-          })
+          uploadedAt: new Date().toISOString()
         });
         
         console.log('Database result:', dbResult);
