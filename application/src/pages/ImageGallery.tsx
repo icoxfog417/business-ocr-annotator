@@ -31,7 +31,7 @@ export function ImageGallery() {
         data.map(async (image) => {
           try {
             console.log('Getting URL for s3Key:', image.s3Key);
-            const urlResult = await getUrl({ key: image.s3Key });
+            const urlResult = await getUrl({ path: image.s3Key });
             console.log('Generated URL:', urlResult.url.toString());
             return {
               ...image,

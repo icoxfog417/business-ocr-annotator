@@ -57,7 +57,7 @@ export function AnnotationWorkspace() {
       const { data: imageData } = await client.models.Image.get({ id: imageId });
       if (imageData) {
         setImage(imageData);
-        const urlResult = await getUrl({ key: imageData.s3Key });
+        const urlResult = await getUrl({ path: imageData.s3Key });
         setImageUrl(urlResult.url.toString());
       }
 

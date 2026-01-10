@@ -70,13 +70,13 @@ export function FileUpload() {
     setUploading(true);
     try {
       for (const file of files) {
-        const key = `images/${Date.now()}-${file.name}`;
+        const path = `images/${Date.now()}-${file.name}`;
         
-        console.log('Uploading file:', file.name, 'to key:', key);
+        console.log('Uploading file:', file.name, 'to path:', path);
         
         // Upload to S3
         const uploadResult = await uploadData({
-          key,
+          path,
           data: file,
           options: {
             contentType: file.type
@@ -96,7 +96,7 @@ export function FileUpload() {
         console.log('Saving to database...');
         const dbResult = await client.models.Image.create({
           fileName: file.name,
-          s3Key: key,
+          s3Key: path,
           width: dimensions.width,
           height: dimensions.height,
           documentType: documentType,
