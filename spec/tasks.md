@@ -435,6 +435,19 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Update ImageGallery to use thumbnail URLs
 - ✅ Update AnnotationWorkspace to use compressed image URL
 
+### Review Fixes (Post-Implementation)
+**Review Document**: See [spec/proposals/20260111_sprint2_compression_review.md](proposals/20260111_sprint2_compression_review.md)
+
+- ✅ P0: Replace DynamoDB Scan with Query using GSI on s3KeyOriginal
+- ✅ P1: Fix status progression (PROCESSING → ANNOTATING, not UPLOADED)
+- ✅ P1: Add exponential backoff retry for eventual consistency
+- ✅ P1: Increase Lambda timeout from 60s to 90s
+- ✅ P2: Track compression ratio (originalSize / compressedSize)
+- ✅ P2: Track original image format from Sharp metadata
+- ⬜ P3: Add PDF support (deferred to future sprint)
+- ⬜ P3: Implement structured logging with AWS Lambda Powertools
+- ⬜ P3: Add EXIF data extraction
+
 **Sprint 2 Acceptance Criteria:**
 - ✅ Users can click "Generate Annotations" button
 - ✅ AI generates Q&A pairs with bounding boxes

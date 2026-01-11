@@ -3,8 +3,8 @@
 This document records questions and answers discovered during sandbox verification of AWS Amplify Gen2 and related technologies for the Business OCR Annotator project.
 
 **Last Updated**: 2026-01-11
-**Total Questions**: 11
-**Total Verified**: 11 / 11
+**Total Questions**: 12
+**Total Verified**: 12 / 12
 
 ## Overview
 
@@ -27,11 +27,12 @@ Each Q&A entry documents:
 | Q4 | S3 Storage for image uploads | 🟠 High | 1 | ✅ Verified |
 | Q5 | Lambda functions | 🟠 High | 1-3 | ✅ Verified |
 | Q6 | Bedrock with image input | 🟠 High | 2 | ✅ Verified |
-| Q7 | Sharp image compression | 🟡 Medium | 4 | ✅ Verified |
+| Q7 | Sharp image compression | 🟠 High | 2 | ✅ Verified |
 | Q8 | Hugging Face Hub API | 🟡 Medium | 6 | ✅ Verified |
 | Q9 | Secrets management | 🟡 Medium | 0,6,7 | ✅ Verified |
 | Q10 | Weights & Biases incremental data | 🟠 High | 3 | ✅ Verified |
 | Q11 | Weights & Biases incremental eval | 🟠 High | 3 | ✅ Verified |
+| Q12 | DynamoDB GSI for efficient lookups | 🟠 High | 2 | ✅ Verified |
 
 ---
 
@@ -1408,9 +1409,10 @@ wandb.summary["exact_match"] = em  # Only final value
 - [x] **Q6**: Bedrock integration with image input
 - [x] **Q10**: Weights & Biases incremental data storage
 - [x] **Q11**: Weights & Biases incremental evaluation
+- [x] **Q12**: DynamoDB GSI for efficient lookups
 
 ### Extended Features (Verify as needed)
-- [x] **Q7**: Sharp image compression in Lambda
+- [x] **Q7**: Sharp image compression in Lambda (moved to Sprint 2)
 - [x] **Q8**: Hugging Face Hub API integration
 - [x] **Q9**: Secrets and environment variable management
 

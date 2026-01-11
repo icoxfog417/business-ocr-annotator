@@ -132,7 +132,7 @@ enum DatasetStatus {
 
 #### Image Table
 
-**Updated**: 2026-01-11 - Added 3-tier storage keys and file sizes
+**Updated**: 2026-01-11 - Added 3-tier storage keys, file sizes, compression metadata, and GSI
 
 ```typescript
 interface Image {
@@ -143,7 +143,7 @@ interface Image {
   dataset?: Dataset;             // belongsTo relationship
 
   // S3 Storage - 3-tier storage for optimization
-  s3KeyOriginal: string;         // Original upload (images/original/{id}.{ext})
+  s3KeyOriginal: string;         // Original upload (images/original/{id}.{ext}) - GSI partition key
   s3KeyCompressed?: string;      // Compressed ≤4MB (images/compressed/{id}.jpg)
   s3KeyThumbnail?: string;       // Thumbnail ≤100KB (images/thumbnail/{id}.jpg)
 
@@ -154,6 +154,10 @@ interface Image {
   originalSize?: number;
   compressedSize?: number;
   thumbnailSize?: number;
+
+  // Compression metadata
+  compressionRatio?: number;     // originalSize / compressedSize
+  originalFormat?: string;       // Original image format (jpeg, png, webp, etc.)
 
   // Image dimensions (required for coordinate normalization)
   width: number;
@@ -193,10 +197,13 @@ enum DocumentType {
   OTHER = 'OTHER'
 }
 
-// Note: Simplified status enum for MVP
-// UPLOADED: Initial state after upload
-// ANNOTATING: Currently being annotated
+// Note: Status enum for image processing pipeline
+// UPLOADED: Initial state after upload (brief state before processing starts)
+// PROCESSING: Image compression in progress
+// ANNOTATING: Ready for annotation (compression complete)
 // VALIDATED: Annotations have been validated (finalized by annotator)
+//
+// Status Flow: UPLOADED → PROCESSING → ANNOTATING → VALIDATED
 //
 // Status Synchronization:
 // - Image.status = VALIDATED corresponds to all Annotation.validationStatus = APPROVED
@@ -204,6 +211,7 @@ enum DocumentType {
 // - When annotator re-opens, Image.status changes back to ANNOTATING
 enum ImageStatus {
   UPLOADED = 'UPLOADED',
+  PROCESSING = 'PROCESSING',
   ANNOTATING = 'ANNOTATING',
   VALIDATED = 'VALIDATED'
 }
@@ -214,6 +222,7 @@ enum ImageStatus {
 // - Curators and Admins can update and delete all images
 
 // Secondary Indexes:
+// - imagesByS3KeyOriginal: Query images by s3KeyOriginal (used by process-image Lambda)
 // - imagesByUploader: Query images by uploadedBy
 // - imagesByStatus: Query images by status
 // - imagesByDocumentType: Query images by documentType
