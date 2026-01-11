@@ -187,7 +187,12 @@ enum DocumentType {
 // Note: Simplified status enum for MVP
 // UPLOADED: Initial state after upload
 // ANNOTATING: Currently being annotated
-// VALIDATED: Annotations have been validated
+// VALIDATED: Annotations have been validated (finalized by annotator)
+//
+// Status Synchronization:
+// - Image.status = VALIDATED corresponds to all Annotation.validationStatus = APPROVED
+// - When annotator finalizes, Image.status changes to VALIDATED
+// - When annotator re-opens, Image.status changes back to ANNOTATING
 enum ImageStatus {
   UPLOADED = 'UPLOADED',
   ANNOTATING = 'ANNOTATING',
@@ -304,6 +309,9 @@ interface DefaultQuestion {
 
 // Note: DefaultQuestion.documentType uses the same DocumentType enum as Image.documentType
 // This allows querying default questions by the image's document category
+
+// Note: DefaultQuestion.questionType uses the same QuestionType enum as Annotation.questionType
+// DefaultQuestion is limited to EXTRACTIVE only, but shares the enum for consistency
 
 // Authorization Rules:
 // - Anyone authenticated can read
