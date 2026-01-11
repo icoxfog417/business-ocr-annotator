@@ -1,7 +1,7 @@
 import type { Handler, S3Event } from 'aws-lambda';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import sharp from 'sharp';
 
 const s3Client = new S3Client({});
@@ -112,14 +112,16 @@ async function generateThumbnail(inputBuffer: Buffer): Promise<Buffer> {
 }
 
 /**
- * Find Image record by s3KeyOriginal
+ * Find Image record by s3KeyOriginal using GSI
+ * Uses Query instead of Scan for O(1) performance
  */
-async function findImageByS3Key(tableName: string, s3KeyOriginal: string): Promise<{ id: string } | null> {
-  console.log(`Searching for image with s3KeyOriginal: ${s3KeyOriginal}`);
+async function findImageByS3Key(tableName: string, indexName: string, s3KeyOriginal: string): Promise<{ id: string } | null> {
+  console.log(`Querying GSI for image with s3KeyOriginal: ${s3KeyOriginal}`);
 
-  const result = await docClient.send(new ScanCommand({
+  const result = await docClient.send(new QueryCommand({
     TableName: tableName,
-    FilterExpression: 's3KeyOriginal = :s3Key',
+    IndexName: indexName,
+    KeyConditionExpression: 's3KeyOriginal = :s3Key',
     ExpressionAttributeValues: {
       ':s3Key': s3KeyOriginal,
     },
@@ -156,6 +158,11 @@ async function processImage(
     const originalSize = originalBuffer.length;
     console.log(`Original image size: ${(originalSize / 1024 / 1024).toFixed(2)} MB`);
 
+    // Get original format from metadata
+    const metadata = await sharp(originalBuffer).metadata();
+    const originalFormat = metadata.format || 'unknown';
+    console.log(`Original format: ${originalFormat}`);
+
     // 2. Generate compressed version (≤4MB)
     console.log('Generating compressed version...');
     const compressedBuffer = await compressToTargetSize(
@@ -165,6 +172,10 @@ async function processImage(
     );
     const compressedSize = compressedBuffer.length;
     console.log(`Compressed image size: ${(compressedSize / 1024).toFixed(2)} KB`);
+
+    // Calculate compression ratio
+    const compressionRatio = compressedSize > 0 ? originalSize / compressedSize : 1;
+    console.log(`Compression ratio: ${compressionRatio.toFixed(2)}x`);
 
     // 3. Generate thumbnail (≤100KB)
     console.log('Generating thumbnail...');
@@ -195,11 +206,12 @@ async function processImage(
     }));
 
     // 6. Update DynamoDB Image record
+    // Status changes: PROCESSING → ANNOTATING (ready for annotation)
     console.log(`Updating DynamoDB record for image ${imageId}`);
     await docClient.send(new UpdateCommand({
       TableName: tableName,
       Key: { id: imageId },
-      UpdateExpression: 'SET s3KeyCompressed = :compressed, s3KeyThumbnail = :thumbnail, originalSize = :origSize, compressedSize = :compSize, thumbnailSize = :thumbSize, #status = :status, updatedAt = :updatedAt',
+      UpdateExpression: 'SET s3KeyCompressed = :compressed, s3KeyThumbnail = :thumbnail, originalSize = :origSize, compressedSize = :compSize, thumbnailSize = :thumbSize, compressionRatio = :ratio, originalFormat = :format, #status = :status, updatedAt = :updatedAt',
       ExpressionAttributeNames: {
         '#status': 'status',
       },
@@ -209,7 +221,9 @@ async function processImage(
         ':origSize': originalSize,
         ':compSize': compressedSize,
         ':thumbSize': thumbnailSize,
-        ':status': 'UPLOADED',
+        ':ratio': compressionRatio,
+        ':format': originalFormat,
+        ':status': 'ANNOTATING',
         ':updatedAt': new Date().toISOString(),
       },
     }));
@@ -247,6 +261,7 @@ export const handler: Handler<S3Event, ProcessImageResult[]> = async (event) => 
 
   const bucketName = process.env.STORAGE_BUCKET_NAME;
   const tableName = process.env.IMAGE_TABLE_NAME;
+  const indexName = process.env.IMAGE_TABLE_INDEX_NAME || 'imagesByS3KeyOriginal';
 
   if (!bucketName) {
     console.error('STORAGE_BUCKET_NAME environment variable not set');
@@ -278,30 +293,32 @@ export const handler: Handler<S3Event, ProcessImageResult[]> = async (event) => 
       continue;
     }
 
-    // Find the Image record in DynamoDB
-    const imageRecord = await findImageByS3Key(tableName, s3KeyOriginal);
+    // Find the Image record in DynamoDB using GSI with exponential backoff
+    let imageRecord = await findImageByS3Key(tableName, indexName, s3KeyOriginal);
+    let retryAttempt = 0;
+    const maxRetries = 5;
+    const initialBackoffMs = 500;
+
+    while (!imageRecord && retryAttempt < maxRetries) {
+      const backoffMs = initialBackoffMs * Math.pow(2, retryAttempt);
+      console.log(`Image record not found, retry ${retryAttempt + 1}/${maxRetries} after ${backoffMs}ms...`);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+      imageRecord = await findImageByS3Key(tableName, indexName, s3KeyOriginal);
+      retryAttempt++;
+    }
 
     if (!imageRecord) {
-      console.log(`Image record not found for ${s3KeyOriginal}, waiting for DB sync...`);
-      // Wait a bit for DynamoDB to sync (eventual consistency)
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const retryRecord = await findImageByS3Key(tableName, s3KeyOriginal);
-      if (!retryRecord) {
-        results.push({
-          success: false,
-          s3KeyOriginal,
-          error: 'Image record not found in database',
-        });
-        continue;
-      }
-
-      const result = await processImage(bucketName, tableName, s3KeyOriginal, retryRecord.id);
-      results.push(result);
-    } else {
-      const result = await processImage(bucketName, tableName, s3KeyOriginal, imageRecord.id);
-      results.push(result);
+      console.error(`Image record not found after ${maxRetries} retries for ${s3KeyOriginal}`);
+      results.push({
+        success: false,
+        s3KeyOriginal,
+        error: `Image record not found in database after ${maxRetries} retries`,
+      });
+      continue;
     }
+
+    const result = await processImage(bucketName, tableName, s3KeyOriginal, imageRecord.id);
+    results.push(result);
   }
 
   console.log('Processing complete. Results:', JSON.stringify(results, null, 2));

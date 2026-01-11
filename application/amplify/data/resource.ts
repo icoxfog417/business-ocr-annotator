@@ -19,6 +19,10 @@ const schema = a.schema({
       compressedSize: a.integer(),
       thumbnailSize: a.integer(),
 
+      // Compression metadata
+      compressionRatio: a.float(),
+      originalFormat: a.string(),
+
       // Document classification
       documentType: a.enum([
         'RECEIPT',
@@ -45,6 +49,7 @@ const schema = a.schema({
       // Relationships
       annotations: a.hasMany('Annotation', 'imageId'),
     })
+    .secondaryIndexes((index) => [index('s3KeyOriginal')])
     .authorization((allow) => [allow.authenticated()]),
 
   Annotation: a

@@ -60,6 +60,8 @@ const processImageCfnFunction = backend.processImage.resources.cfnResources
   .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
 processImageCfnFunction.addPropertyOverride('Environment.Variables.STORAGE_BUCKET_NAME', storageBucket.bucketName);
 processImageCfnFunction.addPropertyOverride('Environment.Variables.IMAGE_TABLE_NAME', imageTable.tableName);
+// GSI name follows Amplify Gen2 convention: {model}ByS{field}
+processImageCfnFunction.addPropertyOverride('Environment.Variables.IMAGE_TABLE_INDEX_NAME', 'imagesByS3KeyOriginal');
 
 // Add S3 event trigger for processImage Lambda
 // Triggers when objects are created in images/original/ folder
@@ -69,10 +71,10 @@ storageBucket.addEventNotification(
   { prefix: 'images/original/' }
 );
 
-// Grant processImage Lambda permission to scan DynamoDB (needed to find Image by s3Key)
+// Grant processImage Lambda permission to query DynamoDB GSI (for finding Image by s3KeyOriginal)
 backend.processImage.resources.lambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ['dynamodb:Scan', 'dynamodb:Query'],
-    resources: [imageTable.tableArn, `${imageTable.tableArn}/index/*`],
+    actions: ['dynamodb:Query'],
+    resources: [`${imageTable.tableArn}/index/*`],
   })
 );
