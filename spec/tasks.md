@@ -408,6 +408,32 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Display AI vs Human annotation counts
 - ✅ Display approved vs pending annotation counts
 
+### Image Compression (Moved from Sprint 4)
+**Proposal**: See [spec/proposals/20260111_move_compression_to_sprint2.md](proposals/20260111_move_compression_to_sprint2.md)
+
+- ⬜ Update data schema with 3-tier storage keys
+  - ⬜ Replace `s3Key` with `s3KeyOriginal`, `s3KeyCompressed`, `s3KeyThumbnail`
+  - ⬜ Add `originalSize`, `compressedSize`, `thumbnailSize` fields
+  - ⬜ Add `PROCESSING` status to ImageStatus enum
+- ⬜ Update storage structure for 3-tier folders
+  - ⬜ `images/original/*` - Original uploads
+  - ⬜ `images/compressed/*` - ≤4MB for AI processing
+  - ⬜ `images/thumbnail/*` - ≤100KB for gallery
+- ⬜ Create `amplify/functions/process-image/` directory
+- ⬜ Create `amplify/functions/process-image/resource.ts`
+- ⬜ Implement handler with Sharp library
+  - ⬜ Smart compression to ≤4MB target
+  - ⬜ Thumbnail generation ≤100KB
+  - ⬜ Upload to S3 compressed/ and thumbnail/ folders
+  - ⬜ Update Image record with new keys and sizes
+- ⬜ Update `amplify/backend.ts` with process-image function
+- ⬜ Update FileUpload page
+  - ⬜ Upload to `images/original/` folder
+  - ⬜ Call process-image Lambda after upload
+  - ⬜ Show processing status
+- ⬜ Update ImageGallery to use thumbnail URLs
+- ⬜ Update AnnotationWorkspace to use compressed image URL
+
 **Sprint 2 Acceptance Criteria:**
 - ✅ Users can click "Generate Annotations" button
 - ✅ AI generates Q&A pairs with bounding boxes
@@ -758,38 +784,6 @@ This task list is organized into **sprints** that deliver working software incre
   - ⬜ Qwen-VL (new)
 - ⬜ Add model configuration to settings
 
-### Image Compression Lambda
-- ⬜ Create `amplify/functions/image-processor/` directory
-- ⬜ Create `amplify/functions/image-processor/resource.ts`
-  ```typescript
-  import { defineFunction } from '@aws-amplify/backend';
-
-  export const imageProcessor = defineFunction({
-    name: 'imageProcessor',
-    runtime: 20,
-    timeoutSeconds: 300,
-    memoryMB: 1536
-  });
-  ```
-- ⬜ Install Sharp library
-  ```bash
-  cd amplify/functions/image-processor
-  npm install sharp
-  ```
-- ⬜ Implement handler
-  - ⬜ Extract image metadata (width, height, size)
-  - ⬜ Implement smart compression (≤4MB target)
-    - ⬜ Dynamic quality adjustment
-    - ⬜ Max dimension 2048px
-    - ⬜ Maintain aspect ratio
-  - ⬜ Generate thumbnail (≤100KB, 200x200px)
-  - ⬜ Upload compressed and thumbnail to S3
-  - ⬜ Update Image record with all versions
-- ⬜ Configure S3 trigger for original/ folder
-- ⬜ Add S3 folder structure: `original/`, `compressed/`, `thumbnail/`
-- ⬜ Update `amplify/storage/resource.ts` for folder access
-- ⬜ Update `amplify/backend.ts` to include function
-
 ### Frontend Updates
 - ⬜ Create ProgressiveImageLoader component
   - ⬜ Load thumbnail first
@@ -798,7 +792,6 @@ This task list is organized into **sprints** that deliver working software incre
   - ⬜ Show loading progress
 - ⬜ Update ImageViewer to use ProgressiveImageLoader
 - ⬜ Display compression statistics in image metadata
-- ⬜ Use thumbnails in gallery for performance
 
 ### Settings Page
 - ⬜ Create Settings page layout
@@ -813,10 +806,10 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Images can be filtered by language
 - ✅ Bedrock prompts use appropriate language
 - ✅ Multiple Bedrock models are supported
-- ✅ Images are automatically compressed on upload
-- ✅ Thumbnails are generated for gallery view
 - ✅ Progressive image loading works
 - ✅ Settings page allows model configuration
+
+Note: Image compression tasks moved to Sprint 2. See [spec/proposals/20260111_move_compression_to_sprint2.md](proposals/20260111_move_compression_to_sprint2.md)
 
 ---
 

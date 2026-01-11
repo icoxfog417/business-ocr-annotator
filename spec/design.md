@@ -131,6 +131,9 @@ enum DatasetStatus {
 ```
 
 #### Image Table
+
+**Updated**: 2026-01-11 - Added 3-tier storage keys and file sizes
+
 ```typescript
 interface Image {
   id: string;                    // Partition Key (UUID)
@@ -139,12 +142,18 @@ interface Image {
   datasetId?: string;            // Foreign key to Dataset
   dataset?: Dataset;             // belongsTo relationship
 
-  // S3 Storage - Store KEYS not URLs for flexibility
-  s3Key: string;                 // S3 key (compressed image for annotation)
-  // Note: In future sprints, add s3KeyOriginal and s3KeyThumbnail
+  // S3 Storage - 3-tier storage for optimization
+  s3KeyOriginal: string;         // Original upload (images/original/{id}.{ext})
+  s3KeyCompressed?: string;      // Compressed ≤4MB (images/compressed/{id}.jpg)
+  s3KeyThumbnail?: string;       // Thumbnail ≤100KB (images/thumbnail/{id}.jpg)
 
   // File metadata
   fileName: string;              // Original filename
+
+  // File sizes in bytes
+  originalSize?: number;
+  compressedSize?: number;
+  thumbnailSize?: number;
 
   // Image dimensions (required for coordinate normalization)
   width: number;
