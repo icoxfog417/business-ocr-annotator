@@ -4,39 +4,27 @@ import { EventType } from 'aws-cdk-lib/aws-s3';
 import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
 import { auth } from './auth/resource';
 import { storage } from './storage/resource';
-import { data } from './data/resource';
-import { generateAnnotation } from './functions/generate-annotation/resource';
+import { data, generateAnnotationHandler } from './data/resource';
 import { processImage } from './functions/process-image/resource';
 
 const backend = defineBackend({
   auth,
   storage,
   data,
-  generateAnnotation,
+  generateAnnotationHandler,
   processImage,
 });
 
-// Grant Lambda permission to access S3 bucket
-const storageBucket = backend.storage.resources.bucket;
-backend.generateAnnotation.resources.lambda.addToRolePolicy(
-  new PolicyStatement({
-    actions: ['s3:GetObject'],
-    resources: [`${storageBucket.bucketArn}/*`],
-  })
-);
-
-// Grant Lambda permission to invoke Bedrock
-backend.generateAnnotation.resources.lambda.addToRolePolicy(
+// Grant generateAnnotation Lambda permission to invoke Bedrock
+backend.generateAnnotationHandler.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['bedrock:InvokeModel'],
     resources: ['arn:aws:bedrock:*::foundation-model/*'],
   })
 );
 
-// Add environment variables using CDK
-const cfnFunction = backend.generateAnnotation.resources.cfnResources
-  .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
-cfnFunction.addPropertyOverride('Environment.Variables.STORAGE_BUCKET_NAME', storageBucket.bucketName);
+// Get storage bucket reference
+const storageBucket = backend.storage.resources.bucket;
 
 // Grant processImage Lambda permission to read/write S3 bucket
 backend.processImage.resources.lambda.addToRolePolicy(
@@ -46,20 +34,25 @@ backend.processImage.resources.lambda.addToRolePolicy(
   })
 );
 
-// Grant processImage Lambda permission to update DynamoDB
-const imageTable = backend.data.resources.tables['Image'];
+// Grant processImage Lambda permission to DynamoDB (wildcard to avoid cross-stack cycle)
 backend.processImage.resources.lambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ['dynamodb:UpdateItem'],
-    resources: [imageTable.tableArn],
+    actions: ['dynamodb:ListTables'],
+    resources: ['*'],
+  })
+);
+backend.processImage.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:UpdateItem', 'dynamodb:Query'],
+    resources: ['arn:aws:dynamodb:*:*:table/Image-*', 'arn:aws:dynamodb:*:*:table/Image-*/index/*'],
   })
 );
 
 // Add environment variables for processImage Lambda
+// Note: IMAGE_TABLE_NAME uses pattern matching in handler since we can't reference data stack
 const processImageCfnFunction = backend.processImage.resources.cfnResources
   .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
 processImageCfnFunction.addPropertyOverride('Environment.Variables.STORAGE_BUCKET_NAME', storageBucket.bucketName);
-processImageCfnFunction.addPropertyOverride('Environment.Variables.IMAGE_TABLE_NAME', imageTable.tableName);
 processImageCfnFunction.addPropertyOverride('Environment.Variables.IMAGE_TABLE_INDEX_NAME', 'imagesByS3KeyOriginal');
 
 // Add S3 event trigger for processImage Lambda
@@ -67,12 +60,4 @@ storageBucket.addEventNotification(
   EventType.OBJECT_CREATED,
   new LambdaDestination(backend.processImage.resources.lambda),
   { prefix: 'images/original/' }
-);
-
-// Grant processImage Lambda permission to query DynamoDB GSI
-backend.processImage.resources.lambda.addToRolePolicy(
-  new PolicyStatement({
-    actions: ['dynamodb:Query'],
-    resources: [`${imageTable.tableArn}/index/*`],
-  })
 );

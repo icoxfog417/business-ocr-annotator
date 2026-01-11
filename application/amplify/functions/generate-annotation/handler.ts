@@ -1,17 +1,14 @@
-import {
-  BedrockRuntimeClient,
-  ConverseCommand,
-  type ImageFormat,
-} from '@aws-sdk/client-bedrock-runtime';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 
 interface GenerateAnnotationEvent {
   imageId: string;
-  s3Key: string;
+  imageBase64: string; // Base64 encoded image data
+  imageFormat: 'jpeg' | 'png' | 'gif' | 'webp';
   language: string;
   documentType: string;
   width: number;
   height: number;
+  question?: string; // Optional: specific question to answer
 }
 
 interface AnnotationResult {
@@ -104,74 +101,90 @@ JSON 형식으로 반환:
 }`,
 };
 
-function getImageFormat(s3Key: string): ImageFormat {
-  const ext = s3Key.toLowerCase().split('.').pop();
-  switch (ext) {
-    case 'png':
-      return 'png';
-    case 'gif':
-      return 'gif';
-    case 'webp':
-      return 'webp';
-    default:
-      return 'jpeg';
-  }
-}
+// Single question prompts - for answering a specific question
+const SINGLE_QUESTION_PROMPTS: Record<string, string> = {
+  ja: `この画像を見て、以下の質問に答えてください。
+
+質問: {{QUESTION}}
+
+回答と、回答が見つかる位置のバウンディングボックス座標をJSON形式で返してください。
+座標は必ず0から1の間の小数で指定してください（例: x0=0.1は画像幅の10%の位置）。
+
+{"answer": "回答", "boundingBox": {"x0": 0.1, "y0": 0.2, "x1": 0.3, "y1": 0.25}, "confidence": 0.95}`,
+  en: `Look at this image and answer the following question.
+
+Question: {{QUESTION}}
+
+Return the answer and bounding box coordinates in JSON format.
+Coordinates MUST be decimal values between 0 and 1 (e.g., x0=0.1 means 10% from left edge).
+
+{"answer": "your answer", "boundingBox": {"x0": 0.1, "y0": 0.2, "x1": 0.3, "y1": 0.25}, "confidence": 0.95}`,
+  zh: `查看这张图片并回答以下问题。
+
+问题: {{QUESTION}}
+
+返回答案和边界框坐标（百分比0-1）的JSON格式:
+{"answer": "答案", "boundingBox": {"x0": 0.1, "y0": 0.2, "x1": 0.3, "y1": 0.25}, "confidence": 0.95}`,
+  ko: `이 이미지를 보고 다음 질문에 답하세요.
+
+질문: {{QUESTION}}
+
+답변과 경계 상자 좌표(백분율 0-1)를 JSON 형식으로 반환:
+{"answer": "답변", "boundingBox": {"x0": 0.1, "y0": 0.2, "x1": 0.3, "y1": 0.25}, "confidence": 0.95}`,
+};
 
 function convertToPixelCoordinates(
   bbox: { x0: number; y0: number; x1: number; y1: number },
   width: number,
   height: number
 ): [number, number, number, number] {
+  // Normalize coordinates if model returned pixel values instead of 0-1
+  let { x0, y0, x1, y1 } = bbox;
+  if (x0 > 1) x0 = x0 / width;
+  if (y0 > 1) y0 = y0 / height;
+  if (x1 > 1) x1 = x1 / width;
+  if (y1 > 1) y1 = y1 / height;
+
   return [
-    Math.round(bbox.x0 * width),
-    Math.round(bbox.y0 * height),
-    Math.round(bbox.x1 * width),
-    Math.round(bbox.y1 * height),
+    Math.round(x0 * width),
+    Math.round(y0 * height),
+    Math.round(x1 * width),
+    Math.round(y1 * height),
   ];
 }
 
 export const handler = async (
-  event: GenerateAnnotationEvent
+  event: GenerateAnnotationEvent | { arguments: GenerateAnnotationEvent }
 ): Promise<GenerateAnnotationResponse> => {
   const modelId = process.env.MODEL_ID || 'nvidia.nemotron-nano-12b-v2';
   const region = process.env.AWS_REGION || 'us-east-1';
 
-  const s3Client = new S3Client({ region });
   const bedrockClient = new BedrockRuntimeClient({ region });
 
+  // AppSync wraps arguments - extract them
+  const args = 'arguments' in event ? event.arguments : event;
+
   try {
-    console.log('Event:', JSON.stringify(event, null, 2));
+    console.log('Event received for imageId:', args.imageId);
 
-    const { imageId, s3Key, language, width, height } = event;
+    const { imageId, imageBase64, imageFormat, language, width, height, question } = args;
 
-    if (!imageId || !s3Key) {
-      throw new Error('imageId and s3Key are required');
+    if (!imageId || !imageBase64) {
+      throw new Error('imageId and imageBase64 are required');
     }
 
-    // Get image from S3
-    const bucketName = process.env.STORAGE_BUCKET_NAME;
-    if (!bucketName) {
-      throw new Error('STORAGE_BUCKET_NAME environment variable not set');
-    }
-
-    console.log('Fetching image from S3:', s3Key);
-    const s3Response = await s3Client.send(
-      new GetObjectCommand({ Bucket: bucketName, Key: s3Key })
-    );
-
-    const chunks: Uint8Array[] = [];
-    if (s3Response.Body) {
-      const stream = s3Response.Body as AsyncIterable<Uint8Array>;
-      for await (const chunk of stream) {
-        chunks.push(chunk);
-      }
-    }
-    const imageBuffer = Buffer.concat(chunks);
-    const imageFormat = getImageFormat(s3Key);
+    const imageBuffer = Buffer.from(imageBase64, 'base64');
 
     // Get prompt for language
-    const prompt = PROMPTS[language] || PROMPTS['en'];
+    let prompt: string;
+    if (question) {
+      // Single question mode - answer specific question
+      prompt = SINGLE_QUESTION_PROMPTS[language] || SINGLE_QUESTION_PROMPTS['en'];
+      prompt = prompt.replace('{{QUESTION}}', question);
+    } else {
+      // Multi-question mode - generate multiple Q&A pairs
+      prompt = PROMPTS[language] || PROMPTS['en'];
+    }
 
     // Call Bedrock Converse API
     console.log('Calling Bedrock with model:', modelId);
@@ -206,18 +219,27 @@ export const handler = async (
 
     // Parse JSON response
     interface ParsedAnnotation {
-      question: string;
+      question?: string;
       answer: string;
       boundingBox: { x0: number; y0: number; x1: number; y1: number };
       confidence?: number;
     }
 
-    let parsedResponse: { annotations: ParsedAnnotation[] };
+    let parsedAnnotations: ParsedAnnotation[];
 
     try {
       const jsonMatch = responseText?.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        parsedResponse = JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
+        // Handle both single-question format and multi-question format
+        if (parsed.annotations) {
+          parsedAnnotations = parsed.annotations;
+        } else if (parsed.answer) {
+          // Single question response - wrap in array
+          parsedAnnotations = [{ ...parsed, question: question || '' }];
+        } else {
+          throw new Error('Unexpected response format');
+        }
       } else {
         throw new Error('No JSON found in response');
       }
@@ -232,8 +254,8 @@ export const handler = async (
     }
 
     // Convert bounding boxes to pixel coordinates
-    const annotations: AnnotationResult[] = parsedResponse.annotations.map((ann) => ({
-      question: ann.question,
+    const annotations: AnnotationResult[] = parsedAnnotations.map((ann) => ({
+      question: ann.question || question || '',
       answer: ann.answer,
       boundingBox: convertToPixelCoordinates(ann.boundingBox, width, height),
       confidence: ann.confidence,
@@ -249,7 +271,7 @@ export const handler = async (
     console.error('Error:', error);
     return {
       success: false,
-      imageId: event.imageId,
+      imageId: args.imageId,
       modelVersion: modelId,
       error: error instanceof Error ? error.message : 'Unknown error',
     };

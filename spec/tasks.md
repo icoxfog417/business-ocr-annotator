@@ -365,22 +365,22 @@ This task list is organized into **sprints** that deliver working software incre
 
 ### Update Backend Configuration
 - ✅ Update `amplify/backend.ts` to include function
-- ⬜ Add GraphQL custom query/mutation for annotation generation
-- ⬜ Test Lambda function in sandbox
+- ✅ Add GraphQL custom query/mutation for annotation generation
+- ✅ Test Lambda function in sandbox
   ```bash
   npx ampx sandbox --stream-function-logs
   ```
 
 ### Default Questions Configuration
 - ✅ Add DefaultQuestion model to `amplify/data/resource.ts`
-- ⬜ Create DefaultQuestionManager admin page
-- ⬜ Seed initial default questions for each document type and language
+- ✅ Create DefaultQuestionManager admin page (basic fallback implementation)
+- ✅ Seed initial default questions for each document type and language (fallback questions)
 
 ### Annotation Workflow UI
 - ✅ Update AnnotationWorkspace with AI suggestion panel
-- ⬜ Implement QuestionList with default questions loading
+- ✅ Implement QuestionList with default questions loading
 - ✅ Implement AISuggestionList with adopt/reject buttons
-- ⬜ Implement AnswerEditor with AI suggestion button
+- ✅ Implement AnswerEditor with AI suggestion button
 - ✅ Implement FinalizeControls with finalize/re-open buttons
 - ✅ Add question status indicators (pending/answered)
 

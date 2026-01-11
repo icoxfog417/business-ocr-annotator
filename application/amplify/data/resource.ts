@@ -1,4 +1,11 @@
-import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { type ClientSchema, a, defineData, defineFunction } from '@aws-amplify/backend';
+
+// Define the function inline to avoid circular dependency
+const generateAnnotationHandler = defineFunction({
+  entry: '../functions/generate-annotation/handler.ts',
+  timeoutSeconds: 60,
+  memoryMB: 512,
+});
 
 const schema = a.schema({
   Image: a
@@ -110,9 +117,28 @@ const schema = a.schema({
       updatedAt: a.datetime(),
     })
     .authorization((allow) => [allow.authenticated()]),
+
+  // Custom query for AI annotation generation
+  generateAnnotation: a
+    .query()
+    .arguments({
+      imageId: a.string().required(),
+      imageBase64: a.string().required(),
+      imageFormat: a.string().required(),
+      language: a.string().required(),
+      documentType: a.string().required(),
+      width: a.integer().required(),
+      height: a.integer().required(),
+      question: a.string(),
+    })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(generateAnnotationHandler)),
 });
 
 export type Schema = ClientSchema<typeof schema>;
+
+export { generateAnnotationHandler };
 export const data = defineData({
   schema,
   authorizationModes: {

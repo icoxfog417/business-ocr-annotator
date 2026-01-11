@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { generateClient } from 'aws-amplify/data';
-import { getUrl } from 'aws-amplify/storage';
+import { getUrl, downloadData } from 'aws-amplify/storage';
 import type { Schema } from '../../amplify/data/resource';
 import { CanvasAnnotator } from '../components/CanvasAnnotator';
 import {
@@ -63,13 +63,47 @@ export function AnnotationWorkspace() {
     'ALL'
   );
   const [finalizing, setFinalizing] = useState(false);
+  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
+  const [defaultQuestions, setDefaultQuestions] = useState<string[]>([]);
+
+  // Debug: Show imageId immediately
+  console.log('AnnotationWorkspace rendered with imageId:', imageId);
+
+  const getFallbackQuestions = useCallback((documentType: string, language: string): string[] => {
+    const questions: Record<string, Record<string, string[]>> = {
+      RECEIPT: {
+        ja: ['店名は何ですか？', '合計金額はいくらですか？', '日付はいつですか？'],
+        en: ['What is the store name?', 'What is the total amount?', 'What is the date?'],
+        zh: ['店名是什么？', '总金额是多少？', '日期是什么时候？'],
+        ko: ['상점 이름은 무엇입니까?', '총 금액은 얼마입니까?', '날짜는 언제입니까?'],
+      },
+      INVOICE: {
+        ja: ['請求書番号は何ですか？', '請求金額はいくらですか？', '支払期限はいつですか？'],
+        en: ['What is the invoice number?', 'What is the invoice amount?', 'When is the due date?'],
+        zh: ['发票号码是什么？', '发票金额是多少？', '到期日是什么时候？'],
+        ko: ['송장 번호는 무엇입니까?', '송장 금액은 얼마입니까?', '만료일은 언제입니까?'],
+      },
+    };
+    return questions[documentType]?.[language] || questions.RECEIPT[language] || questions.RECEIPT.en;
+  }, []);
 
   const fetchImageAndAnnotations = useCallback(async () => {
-    if (!imageId) return;
+    if (!imageId) {
+      console.error('No imageId provided');
+      setLoading(false);
+      return;
+    }
 
+    console.log('Fetching image and annotations for:', imageId);
     try {
-      const { data: imageData } = await client.models.Image.get({ id: imageId });
+      const { data: imageData, errors: imageErrors } = await client.models.Image.get({ id: imageId });
+      
+      if (imageErrors) {
+        console.error('Image fetch errors:', imageErrors);
+      }
+      
       if (imageData) {
+        console.log('Image data loaded:', imageData.fileName);
         setImage({
           id: imageData.id,
           fileName: imageData.fileName,
@@ -84,10 +118,27 @@ export function AnnotationWorkspace() {
           status: imageData.status ?? undefined,
         });
         setNewLanguage(imageData.language);
+        
         // Use compressed image for annotation workspace if available, otherwise use original
         const imageKey = imageData.s3KeyCompressed || imageData.s3KeyOriginal;
-        const urlResult = await getUrl({ path: imageKey });
-        setImageUrl(urlResult.url.toString());
+        try {
+          const urlResult = await getUrl({ path: imageKey });
+          setImageUrl(urlResult.url.toString());
+        } catch (urlError) {
+          console.error('Failed to get image URL:', urlError);
+          // Try with original key if compressed fails
+          if (imageData.s3KeyCompressed && imageKey === imageData.s3KeyCompressed) {
+            try {
+              const originalUrlResult = await getUrl({ path: imageData.s3KeyOriginal });
+              setImageUrl(originalUrlResult.url.toString());
+            } catch (originalError) {
+              console.error('Failed to get original image URL:', originalError);
+            }
+          }
+        }
+      } else {
+        console.error('Image not found:', imageId);
+        return;
       }
 
       const { data: annotationsData } = await client.models.Annotation.list({
@@ -109,87 +160,116 @@ export function AnnotationWorkspace() {
         };
       });
       setAnnotations(fetchedAnnotations);
-      setCanvasBoxes([]);
+      
+      // Convert all annotation bounding boxes to canvas format
+      const allCanvasBoxes: CanvasBoundingBox[] = [];
+      fetchedAnnotations.forEach((annotation) => {
+        annotation.boundingBoxes.forEach((bbox, index) => {
+          allCanvasBoxes.push(huggingFaceToCanvas(bbox, `${annotation.id}-${index}`));
+        });
+      });
+      setCanvasBoxes(allCanvasBoxes);
+      
+      // Load default questions inline (non-blocking)
+      if (imageData) {
+        const docType = imageData.documentType || 'OTHER';
+        const lang = imageData.language;
+        client.models.DefaultQuestion.list({
+          filter: {
+            documentType: { eq: docType as 'RECEIPT' | 'INVOICE' | 'ORDER_FORM' | 'TAX_FORM' | 'CONTRACT' | 'APPLICATION_FORM' | 'OTHER' },
+            language: { eq: lang },
+          },
+        }).then(({ data }) => {
+          const questions = data
+            .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+            .map(q => q.questionText);
+          setDefaultQuestions(questions.length > 0 ? questions : getFallbackQuestions(docType, lang));
+        }).catch(() => {
+          setDefaultQuestions(getFallbackQuestions(docType, lang));
+        });
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
     }
-  }, [imageId]);
+  }, [imageId, getFallbackQuestions]);
 
   useEffect(() => {
     fetchImageAndAnnotations();
   }, [fetchImageAndAnnotations]);
 
-  const generateAnnotations = async () => {
-    if (!image || !imageId) return;
+  const getAIAnswer = async () => {
+    if (!image || !imageId || !newQuestion.trim()) return;
 
     setGenerating(true);
-    setAiSuggestions([]);
 
     try {
-      // Call Lambda function via fetch (using Lambda function URL or API Gateway)
-      // For now, we'll use the Amplify client to invoke the function
-      // Use compressed image for AI processing if available, otherwise use original
-      const s3KeyForProcessing = image.s3KeyCompressed || image.s3KeyOriginal;
-      const response = await fetch(
-        `${window.location.origin}/api/generate-annotation`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageId,
-            s3Key: s3KeyForProcessing,
-            language: image.language,
-            documentType: image.documentType || 'OTHER',
-            width: image.width,
-            height: image.height,
-          }),
-        }
-      );
+      // Download image using Amplify Storage (avoids CORS issues)
+      const imageKey = image.s3KeyCompressed || image.s3KeyOriginal;
+      const { body } = await downloadData({ path: imageKey }).result;
+      const blob = await body.blob();
+      
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]); // Remove data:image/...;base64, prefix
+        };
+        reader.readAsDataURL(blob);
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to generate annotations');
+      // Determine image format from blob type or file extension
+      const formatMap: Record<string, string> = {
+        'image/jpeg': 'jpeg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+      };
+      const imageFormat = formatMap[blob.type] || 'jpeg';
+
+      // Call Lambda via GraphQL custom query
+      const result = await client.queries.generateAnnotation({
+        imageId,
+        imageBase64: base64,
+        imageFormat,
+        language: image.language,
+        documentType: image.documentType || 'OTHER',
+        width: image.width,
+        height: image.height,
+        question: newQuestion,
+      });
+
+      console.log('GraphQL result:', result);
+      
+      // Parse JSON if returned as string
+      let data = result.data as { success?: boolean; annotations?: AIAnnotationResult[]; error?: string } | string | null;
+      if (typeof data === 'string') {
+        data = JSON.parse(data);
       }
-
-      const result = await response.json();
-
-      if (result.success && result.annotations) {
-        setAiSuggestions(result.annotations);
+      
+      if (data && typeof data === 'object' && data.success && data.annotations?.length) {
+        const annotation = data.annotations[0];
+        setNewAnswer(annotation.answer);
+        if (annotation.boundingBox) {
+          const boxId = editingAnnotationId || `ai-${Date.now()}`;
+          const canvasBox = huggingFaceToCanvas(annotation.boundingBox, boxId);
+          setCanvasBoxes((prev) => {
+            // Remove any existing box with same ID or previous AI boxes
+            const filtered = prev.filter(
+              (b) => b.id !== boxId && !b.id.startsWith('ai-')
+            );
+            return [...filtered, canvasBox];
+          });
+          setSelectedBoxId(boxId);
+        }
       } else {
-        alert('Failed to generate annotations: ' + (result.error || 'Unknown error'));
+        const errorMsg = (data && typeof data === 'object') ? data.error : 'Unknown error';
+        alert('AI could not generate answer: ' + (errorMsg || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Failed to generate annotations:', error);
-      // For demo/development: generate mock suggestions
-      const mockSuggestions: AIAnnotationResult[] = [
-        {
-          question: 'What is the total amount?',
-          answer: '¥1,234',
-          boundingBox: [
-            Math.round(image.width * 0.6),
-            Math.round(image.height * 0.8),
-            Math.round(image.width * 0.9),
-            Math.round(image.height * 0.85),
-          ],
-          confidence: 0.95,
-        },
-        {
-          question: 'What is the date?',
-          answer: '2026-01-11',
-          boundingBox: [
-            Math.round(image.width * 0.1),
-            Math.round(image.height * 0.1),
-            Math.round(image.width * 0.4),
-            Math.round(image.height * 0.15),
-          ],
-          confidence: 0.88,
-        },
-      ];
-      setAiSuggestions(mockSuggestions);
-      alert(
-        'Using mock data (Lambda not available). In production, this will call the AI model.'
-      );
+      console.error('Failed to get AI answer:', error);
+      alert('Failed to call AI. Check console for details.');
     } finally {
       setGenerating(false);
     }
@@ -228,6 +308,13 @@ export function AnnotationWorkspace() {
           confidence: newAnnotation.data.confidence ?? undefined,
         };
         setAnnotations((prev) => [...prev, annotation]);
+        
+        // Add to canvas boxes
+        annotation.boundingBoxes.forEach((bbox, index) => {
+          const canvasBox = huggingFaceToCanvas(bbox, `${annotation.id}-${index}`);
+          setCanvasBoxes((prev) => [...prev, canvasBox]);
+        });
+        
         setAiSuggestions((prev) => prev.filter((s) => s !== suggestion));
       }
     } catch (error) {
@@ -286,16 +373,13 @@ export function AnnotationWorkspace() {
         };
         setAnnotations((prev) => [...prev, annotation]);
 
-        setCanvasBoxes((prev) =>
-          prev.map((box) =>
-            box.id === selectedBoxId ? { ...box, id: newAnnotation.data!.id } : box
-          )
-        );
-        setSelectedBoxId(newAnnotation.data.id);
+        // Remove the temporary box (AI or manually drawn) after saving
+        setCanvasBoxes((prev) => prev.filter((box) => box.id !== selectedBoxId));
 
+        // Clear form for next annotation
         setNewQuestion('');
         setNewAnswer('');
-        alert('Annotation saved!');
+        setSelectedBoxId('');
       }
     } catch (error) {
       console.error('Failed to create annotation:', error);
@@ -306,33 +390,66 @@ export function AnnotationWorkspace() {
     }
   };
 
-  const updateValidationStatus = async (
-    annotationId: string,
-    status: 'APPROVED' | 'REJECTED'
-  ) => {
+  const updateAnnotation = async () => {
+    if (!editingAnnotationId || !newQuestion.trim() || !newAnswer.trim()) return;
+
+    const selectedBox = canvasBoxes.find((box) => box.id === editingAnnotationId);
+    if (!selectedBox) return;
+
     try {
+      const bbox = canvasToHuggingFace(selectedBox);
+
       await client.models.Annotation.update({
-        id: annotationId,
-        validationStatus: status,
-        validatedBy: 'current-user',
-        validatedAt: new Date().toISOString(),
+        id: editingAnnotationId,
+        question: newQuestion,
+        answer: newAnswer,
+        boundingBoxes: JSON.stringify([bbox]),
+        updatedAt: new Date().toISOString(),
       });
 
       setAnnotations((prev) =>
-        prev.map((a) => (a.id === annotationId ? { ...a, validationStatus: status } : a))
+        prev.map((a) =>
+          a.id === editingAnnotationId
+            ? { ...a, question: newQuestion, answer: newAnswer, boundingBoxes: [bbox] }
+            : a
+        )
       );
+
+      // Remove the editing box from canvas and clear form
+      setCanvasBoxes((prev) => prev.filter((box) => box.id !== editingAnnotationId));
+      setNewQuestion('');
+      setNewAnswer('');
+      setSelectedBoxId('');
+      setEditingAnnotationId(null);
     } catch (error) {
-      console.error('Failed to update validation status:', error);
+      console.error('Failed to update annotation:', error);
+      alert('Failed to update annotation');
     }
+  };
+
+  const cancelEdit = () => {
+    // Remove the editing box from canvas
+    if (editingAnnotationId) {
+      setCanvasBoxes((prev) => prev.filter((box) => box.id !== editingAnnotationId));
+    }
+    setNewQuestion('');
+    setNewAnswer('');
+    setSelectedBoxId('');
+    setEditingAnnotationId(null);
   };
 
   const deleteAnnotation = async (annotationId: string) => {
     try {
       await client.models.Annotation.delete({ id: annotationId });
       setAnnotations((prev) => prev.filter((a) => a.id !== annotationId));
+      // Remove any box associated with this annotation
       setCanvasBoxes((prev) => prev.filter((box) => box.id !== annotationId));
-      if (selectedBoxId === annotationId) {
+      // Clear form if we were editing this annotation
+      if (editingAnnotationId === annotationId) {
+        setNewQuestion('');
+        setNewAnswer('');
         setSelectedBoxId('');
+        setEditingAnnotationId(null);
       }
     } catch (error) {
       console.error('Failed to delete annotation:', error);
@@ -356,10 +473,15 @@ export function AnnotationWorkspace() {
     const annotation = annotations.find((a) => a.id === annotationId);
     if (annotation) {
       const box = huggingFaceToCanvas(annotation.boundingBoxes[0], annotation.id);
-      setCanvasBoxes([box]);
+      setCanvasBoxes((prev) => {
+        // Keep existing boxes but ensure this one is included
+        const others = prev.filter((b) => b.id !== annotation.id);
+        return [...others, box];
+      });
       setSelectedBoxId(annotation.id);
       setNewQuestion(annotation.question);
       setNewAnswer(annotation.answer);
+      setEditingAnnotationId(annotation.id);
     }
   };
 
@@ -419,23 +541,6 @@ export function AnnotationWorkspace() {
   };
 
   // Re-open annotations (mark image as ANNOTATING)
-  const reopenAnnotations = async () => {
-    if (!imageId || !image) return;
-
-    try {
-      await client.models.Image.update({
-        id: imageId,
-        status: 'ANNOTATING',
-        updatedAt: new Date().toISOString(),
-      });
-      setImage((prev) => (prev ? { ...prev, status: 'ANNOTATING' } : null));
-      alert('Annotations re-opened for editing');
-    } catch (error) {
-      console.error('Failed to re-open:', error);
-      alert('Failed to re-open annotations');
-    }
-  };
-
   // Filter annotations based on status
   const filteredAnnotations =
     statusFilter === 'ALL'
@@ -453,7 +558,22 @@ export function AnnotationWorkspace() {
   };
 
   if (loading) {
-    return <div style={{ padding: '2rem' }}>Loading...</div>;
+    return (
+      <div style={{ padding: '2rem' }}>
+        <p>Loading image: {imageId}</p>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!image) {
+    return (
+      <div style={{ padding: '2rem' }}>
+        <h2>Image not found</h2>
+        <p>The image with ID {imageId} could not be loaded.</p>
+        <button onClick={() => window.history.back()}>Go Back</button>
+      </div>
+    );
   }
 
   if (!image) {
@@ -486,77 +606,30 @@ export function AnnotationWorkspace() {
             ← Back to Gallery
           </button>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {/* Status indicator */}
+            {image.status === 'VALIDATED' && (
+              <span style={{ fontSize: '0.875rem', color: '#065f46' }}>
+                ✓ Finalized
+              </span>
+            )}
+            {/* Finalize Button - always available */}
             <button
-              onClick={generateAnnotations}
-              disabled={generating || image.status === 'VALIDATED'}
+              onClick={finalizeAnnotations}
+              disabled={finalizing || annotations.length === 0}
               style={{
                 background:
-                  generating || image.status === 'VALIDATED' ? '#9ca3af' : '#8b5cf6',
+                  finalizing || annotations.length === 0 ? '#9ca3af' : '#10b981',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
                 padding: '0.5rem 1rem',
                 cursor:
-                  generating || image.status === 'VALIDATED' ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
+                  finalizing || annotations.length === 0 ? 'not-allowed' : 'pointer',
               }}
             >
-              {generating ? (
-                <>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: '16px',
-                      height: '16px',
-                      border: '2px solid #fff',
-                      borderTopColor: 'transparent',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite',
-                    }}
-                  />
-                  Generating...
-                </>
-              ) : (
-                <>🤖 Generate AI Annotations</>
-              )}
+              {finalizing ? 'Finalizing...' : image.status === 'VALIDATED' ? 'Re-finalize' : 'Finalize Annotations'}
             </button>
-
-            {/* Finalize / Re-open Button */}
-            {image.status === 'VALIDATED' ? (
-              <button
-                onClick={reopenAnnotations}
-                style={{
-                  background: '#f59e0b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '0.5rem 1rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Re-open for Editing
-              </button>
-            ) : (
-              <button
-                onClick={finalizeAnnotations}
-                disabled={finalizing || annotations.length === 0}
-                style={{
-                  background:
-                    finalizing || annotations.length === 0 ? '#9ca3af' : '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '0.5rem 1rem',
-                  cursor:
-                    finalizing || annotations.length === 0 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {finalizing ? 'Finalizing...' : 'Finalize Annotations'}
-              </button>
-            )}
           </div>
         </div>
 
@@ -774,6 +847,55 @@ export function AnnotationWorkspace() {
           </span>
         </div>
 
+        {/* Default Questions */}
+        {defaultQuestions.length > 0 && (
+          <div
+            style={{
+              marginBottom: '2rem',
+              padding: '1rem',
+              backgroundColor: '#f0f9ff',
+              borderRadius: '8px',
+              border: '1px solid #0ea5e9',
+            }}
+          >
+            <h4 style={{ color: '#0369a1', marginBottom: '1rem' }}>
+              📋 Default Questions for {image?.documentType || 'Document'}
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {defaultQuestions.map((question, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.5rem',
+                    backgroundColor: 'white',
+                    borderRadius: '4px',
+                    border: '1px solid #e0f2fe',
+                  }}
+                >
+                  <span style={{ fontSize: '0.875rem' }}>{question}</span>
+                  <button
+                    onClick={() => setNewQuestion(question)}
+                    style={{
+                      background: '#0ea5e9',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.25rem 0.75rem',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Use Question
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Add New Annotation */}
         <div
           style={{
@@ -809,18 +931,35 @@ export function AnnotationWorkspace() {
             >
               Answer:
             </label>
-            <input
-              type="text"
-              value={newAnswer}
-              onChange={(e) => setNewAnswer(e.target.value)}
-              placeholder="¥1,234"
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-              }}
-            />
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                value={newAnswer}
+                onChange={(e) => setNewAnswer(e.target.value)}
+                placeholder="¥1,234"
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                }}
+              />
+              <button
+                onClick={getAIAnswer}
+                disabled={!newQuestion.trim() || generating}
+                style={{
+                  background: !newQuestion.trim() || generating ? '#9ca3af' : '#8b5cf6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '0.5rem 0.75rem',
+                  cursor: !newQuestion.trim() || generating ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {generating ? '...' : '🤖 Get AI Answer'}
+              </button>
+            </div>
           </div>
           <div style={{ marginBottom: '1rem' }}>
             <label
@@ -845,27 +984,63 @@ export function AnnotationWorkspace() {
               ))}
             </select>
           </div>
-          <button
-            onClick={addAnnotation}
-            disabled={!newQuestion.trim() || !newAnswer.trim() || !selectedBoxId}
-            style={{
-              background:
-                !newQuestion.trim() || !newAnswer.trim() || !selectedBoxId
-                  ? '#9ca3af'
-                  : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '0.5rem 1rem',
-              cursor:
-                !newQuestion.trim() || !newAnswer.trim() || !selectedBoxId
-                  ? 'not-allowed'
-                  : 'pointer',
-            }}
-          >
-            Add Annotation
-          </button>
-          {!selectedBoxId && (
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {editingAnnotationId ? (
+              <>
+                <button
+                  onClick={updateAnnotation}
+                  disabled={!newQuestion.trim() || !newAnswer.trim()}
+                  style={{
+                    background:
+                      !newQuestion.trim() || !newAnswer.trim() ? '#9ca3af' : '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '0.5rem 1rem',
+                    cursor:
+                      !newQuestion.trim() || !newAnswer.trim() ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Update Annotation
+                </button>
+                <button
+                  onClick={cancelEdit}
+                  style={{
+                    background: '#6b7280',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '0.5rem 1rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={addAnnotation}
+                disabled={!newQuestion.trim() || !newAnswer.trim() || !selectedBoxId}
+                style={{
+                  background:
+                    !newQuestion.trim() || !newAnswer.trim() || !selectedBoxId
+                      ? '#9ca3af'
+                      : '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '0.5rem 1rem',
+                  cursor:
+                    !newQuestion.trim() || !newAnswer.trim() || !selectedBoxId
+                      ? 'not-allowed'
+                      : 'pointer',
+                }}
+              >
+                Add Annotation
+              </button>
+            )}
+          </div>
+          {!selectedBoxId && !editingAnnotationId && (
             <div
               style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.5rem' }}
             >
@@ -929,83 +1104,18 @@ export function AnnotationWorkspace() {
                 Box: [{annotation.boundingBoxes[0].join(', ')}]
               </div>
 
-              {/* Validation Status */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  marginBottom: '0.5rem',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '0.125rem 0.5rem',
-                    borderRadius: '4px',
-                    backgroundColor:
-                      annotation.validationStatus === 'APPROVED'
-                        ? '#d1fae5'
-                        : annotation.validationStatus === 'REJECTED'
-                          ? '#fee2e2'
-                          : '#fef3c7',
-                    color:
-                      annotation.validationStatus === 'APPROVED'
-                        ? '#065f46'
-                        : annotation.validationStatus === 'REJECTED'
-                          ? '#991b1b'
-                          : '#92400e',
-                  }}
-                >
-                  {annotation.validationStatus || 'PENDING'}
-                </span>
-                {annotation.confidence && (
-                  <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                    {Math.round(annotation.confidence * 100)}% conf
-                  </span>
-                )}
-              </div>
+              {/* Confidence */}
+              {annotation.confidence && (
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                  {Math.round(annotation.confidence * 100)}% confidence
+                </div>
+              )}
 
-              {/* Action Buttons */}
+              {/* Action Buttons - Only Delete, click to edit */}
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {annotation.validationStatus !== 'APPROVED' && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      updateValidationStatus(annotation.id, 'APPROVED');
-                    }}
-                    style={{
-                      background: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '0.25rem 0.5rem',
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ✓ Approve
-                  </button>
-                )}
-                {annotation.validationStatus !== 'REJECTED' && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      updateValidationStatus(annotation.id, 'REJECTED');
-                    }}
-                    style={{
-                      background: '#f59e0b',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '0.25rem 0.5rem',
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ✗ Reject
-                  </button>
-                )}
+                <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  Click to edit
+                </span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

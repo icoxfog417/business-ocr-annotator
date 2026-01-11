@@ -6,4 +6,7 @@ export const processImage = defineFunction({
   timeoutSeconds: 90,
   memoryMB: 1024,
   resourceGroupName: 'storage',
+  layers: {
+    sharp: 'arn:aws:lambda:us-east-1:872515288562:layer:sharp-layer:1',
+  },
 });
