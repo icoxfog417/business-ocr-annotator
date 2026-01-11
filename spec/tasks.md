@@ -381,8 +381,8 @@ This task list is organized into **sprints** that deliver working software incre
 - ⬜ Implement QuestionList with default questions loading
 - ✅ Implement AISuggestionList with adopt/reject buttons
 - ⬜ Implement AnswerEditor with AI suggestion button
-- ⬜ Implement FinalizeControls with finalize/re-open buttons
-- ⬜ Add question status indicators (pending/answered)
+- ✅ Implement FinalizeControls with finalize/re-open buttons
+- ✅ Add question status indicators (pending/answered)
 
 ### Frontend Integration
 - ✅ Add "Generate Annotations" button to AnnotationWorkspace
@@ -401,7 +401,7 @@ This task list is organized into **sprints** that deliver working software incre
   - ✅ Delete button
 - ✅ Track annotation status (pending, approved, rejected)
 - ✅ Update data model to include status field (generatedBy, modelVersion, confidence)
-- ⬜ Filter annotations by status in AnnotationList
+- ✅ Filter annotations by status in AnnotationList
 
 ### Contribution Tracking
 - ✅ Add ContributionStats component to Dashboard
@@ -411,28 +411,29 @@ This task list is organized into **sprints** that deliver working software incre
 ### Image Compression (Moved from Sprint 4)
 **Proposal**: See [spec/proposals/20260111_move_compression_to_sprint2.md](proposals/20260111_move_compression_to_sprint2.md)
 
-- ⬜ Update data schema with 3-tier storage keys
-  - ⬜ Replace `s3Key` with `s3KeyOriginal`, `s3KeyCompressed`, `s3KeyThumbnail`
-  - ⬜ Add `originalSize`, `compressedSize`, `thumbnailSize` fields
-  - ⬜ Add `PROCESSING` status to ImageStatus enum
-- ⬜ Update storage structure for 3-tier folders
-  - ⬜ `images/original/*` - Original uploads
-  - ⬜ `images/compressed/*` - ≤4MB for AI processing
-  - ⬜ `images/thumbnail/*` - ≤100KB for gallery
-- ⬜ Create `amplify/functions/process-image/` directory
-- ⬜ Create `amplify/functions/process-image/resource.ts`
-- ⬜ Implement handler with Sharp library
-  - ⬜ Smart compression to ≤4MB target
-  - ⬜ Thumbnail generation ≤100KB
-  - ⬜ Upload to S3 compressed/ and thumbnail/ folders
-  - ⬜ Update Image record with new keys and sizes
-- ⬜ Update `amplify/backend.ts` with process-image function
-- ⬜ Update FileUpload page
-  - ⬜ Upload to `images/original/` folder
-  - ⬜ Call process-image Lambda after upload
-  - ⬜ Show processing status
-- ⬜ Update ImageGallery to use thumbnail URLs
-- ⬜ Update AnnotationWorkspace to use compressed image URL
+- ✅ Update data schema with 3-tier storage keys
+  - ✅ Replace `s3Key` with `s3KeyOriginal`, `s3KeyCompressed`, `s3KeyThumbnail`
+  - ✅ Add `originalSize`, `compressedSize`, `thumbnailSize` fields
+  - ✅ Add `PROCESSING` status to ImageStatus enum
+- ✅ Update storage structure for 3-tier folders
+  - ✅ `images/original/*` - Original uploads
+  - ✅ `images/compressed/*` - ≤4MB for AI processing
+  - ✅ `images/thumbnail/*` - ≤100KB for gallery
+- ✅ Create `amplify/functions/process-image/` directory
+- ✅ Create `amplify/functions/process-image/resource.ts`
+- ✅ Implement handler with Sharp library
+  - ✅ Smart compression to ≤4MB target
+  - ✅ Thumbnail generation ≤100KB
+  - ✅ Upload to S3 compressed/ and thumbnail/ folders
+  - ✅ Update Image record with new keys and sizes
+- ✅ Update `amplify/backend.ts` with process-image function
+- ✅ Update FileUpload page
+  - ✅ Upload to `images/original/` folder
+  - ✅ Set status to PROCESSING on upload
+  - ✅ Show processing status
+- ✅ Set up S3 event trigger for automatic processing
+- ✅ Update ImageGallery to use thumbnail URLs
+- ✅ Update AnnotationWorkspace to use compressed image URL
 
 **Sprint 2 Acceptance Criteria:**
 - ✅ Users can click "Generate Annotations" button
@@ -441,6 +442,9 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Users can approve, reject, or edit AI annotations
 - ✅ Annotation status is tracked and persisted
 - ✅ Error handling works for AI model failures
+- ✅ Images are compressed to 3-tier storage (original, compressed ≤4MB, thumbnail ≤100KB)
+- ✅ Gallery uses thumbnails for fast loading
+- ✅ Annotation workspace uses compressed images for AI processing
 
 ---
 
