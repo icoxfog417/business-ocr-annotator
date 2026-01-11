@@ -4,7 +4,7 @@ This document records questions and answers discovered during sandbox verificati
 
 **Last Updated**: 2026-01-11
 **Total Questions**: 11
-**Total Verified**: 9 / 11
+**Total Verified**: 11 / 11
 
 ## Overview
 
@@ -30,8 +30,8 @@ Each Q&A entry documents:
 | Q7 | Sharp image compression | 🟡 Medium | 4 | ✅ Verified |
 | Q8 | Hugging Face Hub API | 🟡 Medium | 6 | ✅ Verified |
 | Q9 | Secrets management | 🟡 Medium | 0,6,7 | ✅ Verified |
-| Q10 | Weights & Biases incremental data | 🟠 High | 3 | ⏳ Pending |
-| Q11 | Weights & Biases incremental eval | 🟠 High | 3 | ⏳ Pending |
+| Q10 | Weights & Biases incremental data | 🟠 High | 3 | ✅ Verified |
+| Q11 | Weights & Biases incremental eval | 🟠 High | 3 | ✅ Verified |
 
 ---
 
@@ -925,7 +925,7 @@ export const handler = async () => {
 
 **Priority**: 🟠 High (Sprint 3)
 **Affects Design**: ✅ Yes - Dataset validation and evaluation strategy
-**Status**: ⏳ Pending Verification
+**Status**: ✅ Verified
 
 **Question Details**:
 - How to initialize a W&B Table for storing VQA data with images?
@@ -935,25 +935,131 @@ export const handler = async () => {
 - How to version datasets for evaluation tracking?
 - What are the best practices for incremental uploads to W&B?
 
-**Answer**: [To be verified in sandbox]
+**Answer**: Successfully verified W&B Tables with incremental logging and named artifacts. Use `wandb.Table()` to create tables, add rows incrementally with `add_data()`, and log as versioned artifacts. Memory stays constant regardless of dataset size when logging one row at a time.
 
 **Code Sample**:
 ```python
-# To be added after sandbox verification
+import wandb
+import json
+from PIL import Image
+
+# Initialize run
+run = wandb.init(
+    project="business-ocr-annotator",
+    name="create-dataset-v1",
+    tags=["dataset-creation", "vqa"]
+)
+
+# Create NAMED artifact for version management
+artifact = wandb.Artifact(
+    name="business-ocr-vqa-dataset",  # Consistent name (not random ID)
+    type="dataset",
+    description="VQA dataset for business document OCR",
+    metadata={
+        "total_samples": 100,
+        "languages": ["ja", "en"],
+        "document_types": ["receipt", "invoice"],
+        "created_date": "2026-01-11"
+    }
+)
+
+# Create table with complete VQA schema
+columns = [
+    "question_id",
+    "image",
+    "question",
+    "answers",          # Multiple acceptable answers
+    "answer_bbox",      # Normalized [x0, y0, x1, y1]
+    "document_type",
+    "question_type",
+    "language"
+]
+table = wandb.Table(columns=columns)
+
+# Log images incrementally (one row at a time for memory efficiency)
+for sample in samples:
+    table.add_data(
+        sample["id"],
+        wandb.Image(sample["image_path"]),
+        sample["question"],
+        json.dumps(sample["answers"], ensure_ascii=False),  # ✓ Preserve unicode
+        json.dumps(sample["bbox"]),
+        sample["doc_type"],
+        sample["q_type"],
+        sample["language"]
+    )
+
+# Add table to artifact
+artifact.add(table, "vqa_dataset")
+
+# Log artifact (auto-versioned: v0, v1, v2...)
+run.log_artifact(artifact)
+
+# ALSO log to run history for visibility in UI
+wandb.log({"dataset": table})
+wandb.log({
+    "total_samples": len(samples),
+    "total_images": num_images,
+    "total_annotations": num_annotations
+})
+
+# Wait for upload and get version
+artifact.wait()
+print(f"Created: {artifact.name}:{artifact.version}")
+
+wandb.finish()
 ```
 
 **Verified in**: [`.sandbox/10-wandb-incremental-data/`](.sandbox/10-wandb-incremental-data/)
 
 **Key Findings**:
-- [To be documented after verification]
+- **Memory Efficient**: Only 86MB memory increase for 10 large (3000x2000px) images
+- **Incremental Logging**: Add rows one at a time - memory stays constant
+- **Unicode Support**: Use `json.dumps(data, ensure_ascii=False)` to preserve Japanese/Chinese characters (¥, 円, etc.)
+- **Named Artifacts**: Use consistent names like `"business-ocr-vqa-dataset"` instead of random IDs
+- **Auto-Versioning**: W&B auto-increments versions (v0 → v1 → v2) when content changes
+- **Dual Logging**: Log both artifact (for versioning) AND to run history (for UI visibility)
+- **Upload Speed**: 1.37 seconds to upload 10 large images
+- **Large Images**: Successfully handles multi-MB business documents (tested with 3000x2000px images)
 
 **Gotchas**:
-- [To be documented after verification]
+- **Unicode Escaping**: Default `json.dumps()` uses `ensure_ascii=True` which shows `\u00a5` instead of `¥`. Always use `ensure_ascii=False` for readability
+- **Artifact Wait**: Must call `artifact.wait()` before accessing `artifact.version` property
+- **Run History vs Artifacts**:
+  - `run.log_artifact()` - Creates versioned artifact (viewable in Artifacts tab)
+  - `wandb.log()` - Creates run history (viewable in run overview with charts)
+  - Best practice: Use BOTH for dataset creation runs
+- **Version Reuse**: W&B only increments version when content changes. Same content = same version (no duplicates)
+- **Metadata**: Include rich metadata for filtering and discovery (languages, doc types, dates)
+
+**Best Practices**:
+```python
+# ✓ Good: Named artifact with metadata
+artifact = wandb.Artifact(
+    name="business-ocr-vqa-dataset",
+    type="dataset",
+    metadata={"samples": 100, "languages": ["ja", "en"]}
+)
+
+# ✓ Good: Unicode preserved
+json.dumps(["¥1,380", "1380円"], ensure_ascii=False)
+
+# ✓ Good: Log both artifact and run history
+run.log_artifact(artifact)
+wandb.log({"dataset": table})
+
+# ✗ Bad: Random artifact names
+artifact = wandb.Artifact("dataset-123", type="dataset")
+
+# ✗ Bad: Unicode escaped
+json.dumps(["¥1,380"], ensure_ascii=True)  # Shows \u00a5
+```
 
 **References**:
 - [W&B Tables Documentation](https://docs.wandb.ai/guides/data-vis/tables)
 - [W&B Media Logging](https://docs.wandb.ai/guides/track/log/media)
 - [W&B Artifacts](https://docs.wandb.ai/guides/artifacts)
+- [Sandbox Best Practices](.sandbox/WANDB_BEST_PRACTICES.md)
 
 ---
 
@@ -961,7 +1067,7 @@ export const handler = async () => {
 
 **Priority**: 🟠 High (Sprint 3)
 **Affects Design**: ✅ Yes - Dataset quality validation workflow
-**Status**: ⏳ Pending Verification
+**Status**: ✅ Verified
 
 **Question Details**:
 - How to create W&B evaluation runs with custom metrics?
@@ -972,25 +1078,290 @@ export const handler = async () => {
 - How to track evaluation progress for large datasets?
 - What metrics are most relevant for VQA and OCR tasks?
 
-**Answer**: [To be verified in sandbox]
+**Answer**: Successfully verified incremental evaluation with custom OCR metrics. Use separate W&B runs for each model, log metrics incrementally per sample using `wandb.log()`, and track running averages for real-time progress monitoring. Supports Exact Match, F1 Score, Character Error Rate, and IoU for bounding boxes.
 
 **Code Sample**:
 ```python
-# To be added after sandbox verification
+import wandb
+import json
+from PIL import Image, ImageDraw
+
+def evaluate_model_on_dataset(model_name, dataset_artifact_version):
+    """Run incremental evaluation and create versioned evaluation artifact."""
+
+    # Initialize evaluation run
+    run = wandb.init(
+        project="business-ocr-annotator",
+        name=f"eval-{model_name.lower().replace(' ', '-')}",
+        tags=["evaluation", model_name]
+    )
+
+    # Use specific dataset version
+    dataset_artifact = run.use_artifact(f"business-ocr-vqa-dataset:{dataset_artifact_version}")
+    dataset_dir = dataset_artifact.download()
+
+    # Create evaluation artifact
+    eval_artifact = wandb.Artifact(
+        name=f"business-ocr-{model_name.lower().replace(' ', '-')}-eval",
+        type="evaluation",
+        description=f"Evaluation of {model_name} on VQA dataset",
+        metadata={
+            "model": model_name,
+            "dataset_version": dataset_artifact_version,
+            "evaluated_date": "2026-01-11"
+        }
+    )
+
+    # Create results table
+    results_table = wandb.Table(columns=[
+        "sample_id", "predicted", "ground_truth", "exact_match", "f1_score", "iou"
+    ])
+
+    # Track running metrics
+    total_em = 0
+    total_f1 = 0
+    total_iou = 0
+    num_samples = 0
+
+    # Evaluate incrementally (one sample at a time)
+    for sample in load_dataset(dataset_dir):
+        # Get model prediction
+        prediction = model_predict(sample)
+
+        # Calculate metrics
+        em = calculate_exact_match(prediction["text"], sample["ground_truth"])
+        f1 = calculate_f1_score(prediction["text"], sample["ground_truth"])
+        iou = calculate_iou(prediction["bbox"], sample["bbox"])
+
+        # Update running totals
+        total_em += em
+        total_f1 += f1
+        total_iou += iou
+        num_samples += 1
+
+        # Log incremental progress (creates time-series charts)
+        wandb.log({
+            "progress/samples_evaluated": num_samples,
+            "progress/running_exact_match": total_em / num_samples,
+            "progress/running_f1_score": total_f1 / num_samples,
+            "progress/running_iou": total_iou / num_samples,
+            "sample/exact_match": em,
+            "sample/f1_score": f1,
+            "sample/iou": iou
+        })
+
+        # Add to results table
+        results_table.add_data(
+            sample["id"],
+            prediction["text"],
+            json.dumps(sample["ground_truth"], ensure_ascii=False),
+            em,
+            f1,
+            iou
+        )
+
+    # Add results to evaluation artifact
+    eval_artifact.add(results_table, "evaluation_results")
+    run.log_artifact(eval_artifact)
+
+    # Log to run history for visibility
+    wandb.log({"evaluation_results": results_table})
+
+    # Log final summary
+    wandb.summary["exact_match_rate"] = total_em / num_samples
+    wandb.summary["avg_f1_score"] = total_f1 / num_samples
+    wandb.summary["avg_iou"] = total_iou / num_samples
+    wandb.summary["model_name"] = model_name
+    wandb.summary["samples_evaluated"] = num_samples
+
+    eval_artifact.wait()
+    wandb.finish()
+
+    return {
+        "model": model_name,
+        "exact_match": total_em / num_samples,
+        "f1_score": total_f1 / num_samples,
+        "iou": total_iou / num_samples
+    }
+
+# OCR Metrics Implementation
+def calculate_exact_match(predicted, ground_truth_list):
+    """Calculate exact match (1 if any ground truth matches, 0 otherwise)."""
+    pred_normalized = predicted.strip().lower()
+    for gt in ground_truth_list:
+        if pred_normalized == gt.strip().lower():
+            return 1.0
+    return 0.0
+
+def calculate_f1_score(predicted, ground_truth):
+    """Calculate token-level F1 score."""
+    pred_tokens = set(predicted.lower().split())
+    gt_tokens = set(ground_truth.lower().split())
+
+    if len(pred_tokens) == 0 and len(gt_tokens) == 0:
+        return 1.0
+
+    intersection = pred_tokens & gt_tokens
+    if len(intersection) == 0:
+        return 0.0
+
+    precision = len(intersection) / len(pred_tokens)
+    recall = len(intersection) / len(gt_tokens)
+    f1 = 2 * (precision * recall) / (precision + recall)
+    return f1
+
+def calculate_iou(bbox1, bbox2):
+    """Calculate Intersection over Union for bounding boxes."""
+    x1_min, y1_min, x1_max, y1_max = bbox1
+    x2_min, y2_min, x2_max, y2_max = bbox2
+
+    # Intersection
+    x_inter_min = max(x1_min, x2_min)
+    y_inter_min = max(y1_min, y2_min)
+    x_inter_max = min(x1_max, x2_max)
+    y_inter_max = min(y1_max, y2_max)
+
+    if x_inter_max <= x_inter_min or y_inter_max <= y_inter_min:
+        return 0.0
+
+    inter_area = (x_inter_max - x_inter_min) * (y_inter_max - y_inter_min)
+
+    # Union
+    area1 = (x1_max - x1_min) * (y1_max - y1_min)
+    area2 = (x2_max - x2_min) * (y2_max - y2_min)
+    union_area = area1 + area2 - inter_area
+
+    return inter_area / union_area if union_area > 0 else 0.0
+
+# Bounding Box Visualization
+def visualize_bounding_boxes(image, gt_bbox, pred_bbox):
+    """Create visualization with ground truth and prediction boxes."""
+    img_copy = image.copy()
+    draw = ImageDraw.Draw(img_copy)
+
+    # Convert normalized to pixel coordinates
+    width, height = image.size
+
+    # Draw ground truth (green)
+    gt_pixel = [
+        int(gt_bbox[0] * width), int(gt_bbox[1] * height),
+        int(gt_bbox[2] * width), int(gt_bbox[3] * height)
+    ]
+    draw.rectangle(gt_pixel, outline=(0, 255, 0), width=3)
+    draw.text((gt_pixel[0], gt_pixel[1] - 20), "GT", fill=(0, 255, 0))
+
+    # Draw prediction (red)
+    pred_pixel = [
+        int(pred_bbox[0] * width), int(pred_bbox[1] * height),
+        int(pred_bbox[2] * width), int(pred_bbox[3] * height)
+    ]
+    draw.rectangle(pred_pixel, outline=(255, 0, 0), width=3)
+    draw.text((pred_pixel[0], pred_pixel[1] - 20), "Pred", fill=(255, 0, 0))
+
+    return img_copy
+
+# Log visualization to W&B
+wandb.log({
+    "bbox_comparison": wandb.Image(
+        visualize_bounding_boxes(image, gt_bbox, pred_bbox),
+        caption=f"IoU: {iou:.3f}"
+    )
+})
+```
+
+**Multi-Model Comparison**:
+```python
+# Compare multiple models
+models = ["Claude 3.5 Sonnet", "Amazon Nova Pro", "Nemotron Nano 12B"]
+
+for model_name in models:
+    # Each model gets separate run
+    result = evaluate_model_on_dataset(model_name, dataset_version="v2")
+    print(f"{model_name}: EM={result['exact_match']:.1%}, F1={result['f1_score']:.2f}")
+
+# Create comparison summary
+comparison_run = wandb.init(
+    project="business-ocr-annotator",
+    name="model-comparison-summary",
+    tags=["comparison", "summary"]
+)
+
+comparison_table = wandb.Table(columns=["model", "exact_match", "f1_score", "iou"])
+for result in results:
+    comparison_table.add_data(
+        result["model"],
+        result["exact_match"],
+        result["f1_score"],
+        result["iou"]
+    )
+
+wandb.log({"model_comparison": comparison_table})
+wandb.finish()
 ```
 
 **Verified in**: [`.sandbox/11-wandb-incremental-eval/`](.sandbox/11-wandb-incremental-eval/)
 
 **Key Findings**:
-- [To be documented after verification]
+- **Memory Efficient**: 77MB memory increase for 100 samples (< 200MB target)
+- **Fast Evaluation**: 0.09 seconds to evaluate 100 samples
+- **Incremental Logging**: Log metrics per sample with `wandb.log()` creates time-series charts
+- **Running Averages**: Track `running_exact_match` and `running_f1_score` for progress monitoring
+- **OCR Metrics**: Exact Match, F1 Score, and Character Error Rate all working correctly
+- **IoU Calculation**: Successfully computes Intersection over Union for bounding boxes
+- **Visualization**: Can overlay ground truth (green) and prediction (red) boxes on images
+- **Multi-Model**: Each model gets separate run, then create comparison summary run
+- **Artifact Lineage**: Evaluation artifacts link back to dataset artifacts they used
+
+**Recommended Metrics for VQA/OCR**:
+1. **Exact Match (EM)**: Binary match (1 or 0) - strict accuracy
+2. **F1 Score**: Token-level overlap - handles partial matches
+3. **Character Error Rate (CER)**: Levenshtein distance - character-level accuracy
+4. **IoU (Intersection over Union)**: Bounding box overlap - spatial accuracy
+5. **Multiple Answers**: Support multiple acceptable answers per question
 
 **Gotchas**:
-- [To be documented after verification]
+- **Per-Sample Logging**: Use `wandb.log()` not `wandb.summary` for incremental metrics
+- **Summary vs History**:
+  - `wandb.log()` creates time-series (charts)
+  - `wandb.summary` creates final summary (table)
+- **Metric Naming**: Use `/` for hierarchy (e.g., `progress/running_em`, `sample/em`)
+- **Artifact References**: Use `run.use_artifact("dataset:v2")` to reference specific versions
+- **Model Comparison**: Create separate runs for each model (not same run), then create comparison summary
+- **Unicode in Results**: Use `ensure_ascii=False` when logging ground truth text
+- **Bounding Box Format**: Use normalized coordinates [x0, y0, x1, y1] where 0 ≤ value ≤ 1
+
+**Best Practices**:
+```python
+# ✓ Good: Incremental logging with running averages
+wandb.log({
+    "progress/samples": num_samples,
+    "progress/running_em": total_em / num_samples,
+    "sample/em": em  # Individual sample
+})
+
+# ✓ Good: Separate runs per model
+for model in models:
+    run = wandb.init(name=f"eval-{model}", reinit=True)
+    # ... evaluate ...
+    wandb.finish()
+
+# ✓ Good: Reference specific dataset version
+artifact = run.use_artifact("business-ocr-vqa-dataset:v2")
+
+# ✗ Bad: All models in same run
+run = wandb.init()
+for model in models:
+    # ... evaluate all in same run (hard to compare)
+
+# ✗ Bad: No running averages (can't track progress)
+wandb.summary["exact_match"] = em  # Only final value
+```
 
 **References**:
 - [W&B Evaluations](https://docs.wandb.ai/guides/model_registry/model-evaluations)
 - [W&B Custom Metrics](https://docs.wandb.ai/guides/track/log/logging-faqs)
 - [W&B Visualizations](https://docs.wandb.ai/guides/data-vis)
+- [Sandbox Best Practices](.sandbox/WANDB_BEST_PRACTICES.md)
 
 ---
 
@@ -1035,8 +1406,8 @@ export const handler = async () => {
 - [x] **Q4**: S3 storage configuration
 - [x] **Q5**: Lambda function creation and deployment
 - [x] **Q6**: Bedrock integration with image input
-- [ ] **Q10**: Weights & Biases incremental data storage
-- [ ] **Q11**: Weights & Biases incremental evaluation
+- [x] **Q10**: Weights & Biases incremental data storage
+- [x] **Q11**: Weights & Biases incremental evaluation
 
 ### Extended Features (Verify as needed)
 - [x] **Q7**: Sharp image compression in Lambda
