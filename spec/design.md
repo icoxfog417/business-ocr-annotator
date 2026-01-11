@@ -23,7 +23,7 @@ graph TB
 
     subgraph "Lambda Functions - Node.js 20.x"
         ImageProc[ImageProcessor<br/>Sharp-based compression]
-        AnnotGen[AnnotationGenerator<br/>Nemotron integration]
+        AnnotGen[AnnotationGenerator<br/>Bedrock integration]
         DatasetExp[DatasetExporter<br/>JSON/JSONL/Parquet]
         PIIRedact[PIIRedactor<br/>Multi-language PII]
     end
@@ -33,7 +33,7 @@ graph TB
     end
 
     subgraph "AI Services"
-        Nemotron[NVIDIA Nemotron Nano 12B<br/>Vision-Language Model<br/>Multi-language]
+        Bedrock[Amazon Bedrock<br/>Nemotron Nano 12B]
     end
 
     subgraph "External"
@@ -50,14 +50,14 @@ graph TB
 
     ImageProc --> S3Store
     ImageProc --> DynamoDB
-    AnnotGen --> Nemotron
+    AnnotGen --> Bedrock
     AnnotGen --> DynamoDB
     DatasetExp --> S3Store
     DatasetExp --> DynamoDB
     DatasetExp --> HF
     PIIRedact --> S3Store
 
-    style Nemotron fill:#ff9900
+    style Bedrock fill:#ff9900
     style DynamoDB fill:#527FFF
     style S3Store fill:#569A31
     style AppSync fill:#945DF2
@@ -284,8 +284,8 @@ enum ValidationStatus {
 interface DefaultQuestion {
   id: string;                    // Partition Key (UUID)
   
-  // Classification
-  documentType: DocumentType;    // RECEIPT, INVOICE, etc.
+  // Classification - links to Image.documentType
+  documentType: DocumentType;    // RECEIPT, INVOICE, etc. (same enum as Image)
   language: string;              // ISO 639-1 code (ja, en, zh, ko)
   
   // Question content
@@ -295,15 +295,15 @@ interface DefaultQuestion {
   // Ordering
   displayOrder: number;          // Sort order within category+language
   
-  // Status
-  isActive: boolean;             // Can be disabled without deletion
-  
   // User tracking
   createdBy: string;             // Admin who created
   createdAt: string;
   updatedBy?: string;
   updatedAt?: string;
 }
+
+// Note: DefaultQuestion.documentType uses the same DocumentType enum as Image.documentType
+// This allows querying default questions by the image's document category
 
 // Authorization Rules:
 // - Anyone authenticated can read

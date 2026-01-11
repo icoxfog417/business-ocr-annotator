@@ -82,8 +82,8 @@ Add after Annotation Table section in **2.1 Database Schema**:
 interface DefaultQuestion {
   id: string;                    // Partition Key (UUID)
   
-  // Classification
-  documentType: DocumentType;    // RECEIPT, INVOICE, etc.
+  // Classification - links to Image.documentType
+  documentType: DocumentType;    // RECEIPT, INVOICE, etc. (same enum as Image)
   language: string;              // ISO 639-1 code (ja, en, zh, ko)
   
   // Question content
@@ -93,15 +93,15 @@ interface DefaultQuestion {
   // Ordering
   displayOrder: number;          // Sort order within category+language
   
-  // Status
-  isActive: boolean;             // Can be disabled without deletion
-  
   // User tracking
   createdBy: string;             // Admin who created
   createdAt: string;
   updatedBy?: string;
   updatedAt?: string;
 }
+
+// Note: DefaultQuestion.documentType uses the same DocumentType enum as Image.documentType
+// This allows querying default questions by the image's document category
 
 // Authorization Rules:
 // - Anyone authenticated can read

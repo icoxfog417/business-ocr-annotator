@@ -417,7 +417,6 @@ This task list is organized into **sprints** that deliver working software incre
     questionText: a.string().required(),
     questionType: a.enum(['EXTRACTIVE']),
     displayOrder: a.integer().required(),
-    isActive: a.boolean().default(true),
     createdBy: a.string().required(),
   }).authorization((allow) => [
     allow.authenticated().to(['read']),
