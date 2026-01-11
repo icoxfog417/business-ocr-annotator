@@ -8,6 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+**/node_modules
 dist
 dist-ssr
 *.local
@@ -27,3 +28,8 @@ dist-ssr
 amplify_outputs.json
 .amplify
 amplify/backend-config.json
+
+# Lambda function dependencies (to reduce file watcher noise)
+amplify/functions/**/node_modules
+amplify/functions/**/package-lock.json
+layers

@@ -9,7 +9,9 @@
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "preview": "vite preview",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "npm run install:functions",
+    "install:functions": "find amplify/functions -name 'package.json' -execdir npm install \\;"
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.13.2",
