@@ -6,20 +6,53 @@ import type { Schema } from '../../amplify/data/resource';
 
 const client = generateClient<Schema>();
 
+interface Stats {
+  images: number;
+  annotations: number;
+  datasets: number;
+  aiAnnotations: number;
+  humanAnnotations: number;
+  approvedAnnotations: number;
+  pendingAnnotations: number;
+}
+
 export function Dashboard() {
-  const [stats, setStats] = useState({ images: 0, annotations: 0, datasets: 0 });
+  const [stats, setStats] = useState<Stats>({
+    images: 0,
+    annotations: 0,
+    datasets: 0,
+    aiAnnotations: 0,
+    humanAnnotations: 0,
+    approvedAnnotations: 0,
+    pendingAnnotations: 0,
+  });
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const [imagesResult, annotationsResult] = await Promise.all([
           client.models.Image.list(),
-          client.models.Annotation.list()
+          client.models.Annotation.list(),
         ]);
+
+        const annotations = annotationsResult.data;
+        const aiAnnotations = annotations.filter((a) => a.generatedBy === 'AI').length;
+        const humanAnnotations = annotations.filter((a) => a.generatedBy === 'HUMAN').length;
+        const approvedAnnotations = annotations.filter(
+          (a) => a.validationStatus === 'APPROVED'
+        ).length;
+        const pendingAnnotations = annotations.filter(
+          (a) => a.validationStatus === 'PENDING' || !a.validationStatus
+        ).length;
+
         setStats({
           images: imagesResult.data.length,
-          annotations: annotationsResult.data.length,
-          datasets: 0 // Datasets not implemented yet
+          annotations: annotations.length,
+          datasets: 0,
+          aiAnnotations,
+          humanAnnotations,
+          approvedAnnotations,
+          pendingAnnotations,
         });
       } catch (error) {
         console.error('Failed to fetch stats:', error);
@@ -429,6 +462,80 @@ export function Dashboard() {
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
               Coming in Sprint 3
             </p>
+          </div>
+        </div>
+
+        {/* AI Annotation Stats */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+            marginBottom: '2.5rem',
+          }}
+        >
+          {/* AI Annotations */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              color: 'white',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '1.5rem' }}>🤖</span>
+              <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>AI Generated</span>
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{stats.aiAnnotations}</div>
+          </div>
+
+          {/* Human Annotations */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              color: 'white',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '1.5rem' }}>✍️</span>
+              <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Human Created</span>
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{stats.humanAnnotations}</div>
+          </div>
+
+          {/* Approved */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              color: 'white',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '1.5rem' }}>✓</span>
+              <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Approved</span>
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{stats.approvedAnnotations}</div>
+          </div>
+
+          {/* Pending */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              color: 'white',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '1.5rem' }}>⏳</span>
+              <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Pending Review</span>
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{stats.pendingAnnotations}</div>
           </div>
         </div>
 

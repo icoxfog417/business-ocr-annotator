@@ -9,8 +9,11 @@ const client = generateClient<Schema>();
 interface ImageWithUrl {
   id: string;
   fileName: string;
-  s3Key: string;
+  s3KeyOriginal: string;
+  s3KeyThumbnail?: string;
+  s3KeyCompressed?: string;
   uploadedAt: string;
+  status?: string;
   url?: string;
 }
 
@@ -26,20 +29,36 @@ export function ImageGallery() {
     try {
       const { data } = await client.models.Image.list();
       console.log('Fetched images from database:', data);
-      
+
       const imagesWithUrls = await Promise.all(
         data.map(async (image) => {
           try {
-            console.log('Getting URL for s3Key:', image.s3Key);
-            const urlResult = await getUrl({ path: image.s3Key });
+            // Prefer thumbnail for gallery view, fall back to original
+            const s3Key = image.s3KeyThumbnail || image.s3KeyOriginal;
+            console.log('Getting URL for s3Key:', s3Key);
+            const urlResult = await getUrl({ path: s3Key });
             console.log('Generated URL:', urlResult.url.toString());
             return {
-              ...image,
+              id: image.id,
+              fileName: image.fileName,
+              s3KeyOriginal: image.s3KeyOriginal,
+              s3KeyThumbnail: image.s3KeyThumbnail ?? undefined,
+              s3KeyCompressed: image.s3KeyCompressed ?? undefined,
+              uploadedAt: image.uploadedAt,
+              status: image.status ?? undefined,
               url: urlResult.url.toString()
             };
           } catch (error) {
-            console.error('Failed to get URL for image:', image.s3Key, error);
-            return image;
+            console.error('Failed to get URL for image:', image.s3KeyOriginal, error);
+            return {
+              id: image.id,
+              fileName: image.fileName,
+              s3KeyOriginal: image.s3KeyOriginal,
+              s3KeyThumbnail: image.s3KeyThumbnail ?? undefined,
+              s3KeyCompressed: image.s3KeyCompressed ?? undefined,
+              uploadedAt: image.uploadedAt,
+              status: image.status ?? undefined
+            };
           }
         })
       );
@@ -146,38 +165,109 @@ export function ImageGallery() {
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
                 overflow: 'hidden',
-                backgroundColor: 'white'
+                backgroundColor: 'white',
+                position: 'relative'
               }}
             >
-              {image.url && (
+              {image.url ? (
                 <img
                   src={image.url}
                   alt={image.fileName}
                   style={{
                     width: '100%',
                     height: '200px',
-                    objectFit: 'cover'
+                    objectFit: 'cover',
+                    opacity: image.status === 'PROCESSING' ? 0.6 : 1
                   }}
                 />
+              ) : (
+                <div
+                  style={{
+                    width: '100%',
+                    height: '200px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#f3f4f6',
+                    color: '#6b7280'
+                  }}
+                >
+                  No preview
+                </div>
+              )}
+              {image.status === 'PROCESSING' && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    background: 'rgba(0,0,0,0.7)',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '12px',
+                      height: '12px',
+                      border: '2px solid #fff',
+                      borderTopColor: 'transparent',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }}
+                  />
+                  Processing...
+                </div>
               )}
               <div style={{ padding: '1rem' }}>
                 <div style={{ fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
                   {image.fileName}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '1rem' }}>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>
                   {new Date(image.uploadedAt).toLocaleDateString()}
                 </div>
+                {image.status && (
+                  <div
+                    style={{
+                      fontSize: '0.625rem',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '4px',
+                      display: 'inline-block',
+                      marginBottom: '0.5rem',
+                      backgroundColor:
+                        image.status === 'PROCESSING' ? '#fef3c7' :
+                        image.status === 'UPLOADED' ? '#d1fae5' :
+                        image.status === 'ANNOTATING' ? '#dbeafe' :
+                        '#f3f4f6',
+                      color:
+                        image.status === 'PROCESSING' ? '#92400e' :
+                        image.status === 'UPLOADED' ? '#065f46' :
+                        image.status === 'ANNOTATING' ? '#1e40af' :
+                        '#374151'
+                    }}
+                  >
+                    {image.status}
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button
                     onClick={() => window.location.href = `/annotate/${image.id}`}
+                    disabled={image.status === 'PROCESSING'}
                     style={{
-                      background: '#10b981',
+                      background: image.status === 'PROCESSING' ? '#9ca3af' : '#10b981',
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
                       padding: '0.5rem 1rem',
                       fontSize: '0.875rem',
-                      cursor: 'pointer',
+                      cursor: image.status === 'PROCESSING' ? 'not-allowed' : 'pointer',
                       flex: 1
                     }}
                   >
@@ -203,6 +293,13 @@ export function ImageGallery() {
           ))}
         </div>
       )}
+
+      {/* CSS for spinner animation */}
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
