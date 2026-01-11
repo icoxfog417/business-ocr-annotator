@@ -343,65 +343,28 @@ This task list is organized into **sprints** that deliver working software incre
 **Deliverable**: One-click AI annotation generation
 
 ### Nemotron Setup
-- ⬜ Research NVIDIA Nemotron Nano 12B deployment options
-- ⬜ Set up Nemotron model endpoint (self-hosted or API)
-- ⬜ Configure IAM permissions for Nemotron access
+- ✅ Research NVIDIA Nemotron Nano 12B deployment options
+- ✅ Set up Nemotron model endpoint (via Amazon Bedrock)
+- ✅ Configure IAM permissions for Bedrock access
 - ⬜ Test model inference with sample images
 
 ### Lambda Function for Annotation Generation
-- ⬜ Create `amplify/functions/generate-annotation/` directory
-- ⬜ Initialize function package
-  ```bash
-  cd amplify/functions/generate-annotation
-  npm init -y
-  npm install @aws-sdk/client-s3
-  cd ../../..
-  ```
-- ⬜ Create `amplify/functions/generate-annotation/resource.ts`
-  ```typescript
-  import { defineFunction } from '@aws-amplify/backend';
-
-  export const generateAnnotation = defineFunction({
-    name: 'generateAnnotation',
-    runtime: 20, // Node.js 20.x
-    timeoutSeconds: 300, // 5 minutes for Nemotron call
-    memoryMB: 1024
-  });
-  ```
-- ⬜ Implement handler in `amplify/functions/generate-annotation/handler.ts`
-  ```typescript
-  import { NemotronVisionClient } from './nemotron-client';
-  ```
-- ⬜ Implement NemotronVisionClient service class
-  - ⬜ Initialize Nemotron client
-  - ⬜ Create prompt template for Nemotron Nano 12B
-  - ⬜ Implement API call with image (base64 or S3 reference)
-  - ⬜ Parse response to extract Q&A pairs and bounding boxes
-- ⬜ Add Lambda environment variables
-  ```typescript
-  // In resource.ts
-  environment: {
-    NEMOTRON_ENDPOINT: 'https://api.nemotron.nvidia.com/v1',
-    MODEL_ID: 'nvidia/nemotron-nano-12b'
-  }
-  ```
-- ⬜ Grant Lambda permissions to access S3 and Nemotron API
-- ⬜ Store generated annotations in DynamoDB
-- ⬜ Add error handling and retry logic
-- ⬜ Implement CloudWatch logging
+- ✅ Create `amplify/functions/generate-annotation/` directory
+- ✅ Create `amplify/functions/generate-annotation/resource.ts`
+- ✅ Implement handler in `amplify/functions/generate-annotation/handler.ts`
+- ✅ Implement Bedrock Converse API integration
+  - ✅ Initialize Bedrock client
+  - ✅ Create prompt templates for multiple languages (ja, en, zh, ko)
+  - ✅ Implement API call with image from S3
+  - ✅ Parse response to extract Q&A pairs and bounding boxes
+- ✅ Add Lambda environment variables (MODEL_ID, STORAGE_BUCKET_NAME)
+- ✅ Grant Lambda permissions to access S3 and Bedrock
+- ⬜ Store generated annotations in DynamoDB (done via frontend)
+- ✅ Add error handling and retry logic
+- ✅ Implement CloudWatch logging
 
 ### Update Backend Configuration
-- ⬜ Update `amplify/backend.ts` to include function
-  ```typescript
-  import { generateAnnotation } from './functions/generate-annotation/resource';
-
-  defineBackend({
-    auth,
-    storage,
-    data,
-    generateAnnotation
-  });
-  ```
+- ✅ Update `amplify/backend.ts` to include function
 - ⬜ Add GraphQL custom query/mutation for annotation generation
 - ⬜ Test Lambda function in sandbox
   ```bash
@@ -409,57 +372,41 @@ This task list is organized into **sprints** that deliver working software incre
   ```
 
 ### Default Questions Configuration
-- ⬜ Add DefaultQuestion model to `amplify/data/resource.ts`
-  ```typescript
-  DefaultQuestion: a.model({
-    documentType: a.enum([...]),
-    language: a.string().required(),
-    questionText: a.string().required(),
-    questionType: a.enum(['EXTRACTIVE']),
-    displayOrder: a.integer().required(),
-    createdBy: a.string().required(),
-  }).authorization((allow) => [
-    allow.authenticated().to(['read']),
-    allow.groups(['Admin']).to(['create', 'update', 'delete'])
-  ])
-  ```
+- ✅ Add DefaultQuestion model to `amplify/data/resource.ts`
 - ⬜ Create DefaultQuestionManager admin page
 - ⬜ Seed initial default questions for each document type and language
 
 ### Annotation Workflow UI
-- ⬜ Update AnnotationWorkspace with QuestionPanel layout
+- ✅ Update AnnotationWorkspace with AI suggestion panel
 - ⬜ Implement QuestionList with default questions loading
-- ⬜ Implement AISuggestionList with adopt/reject buttons
+- ✅ Implement AISuggestionList with adopt/reject buttons
 - ⬜ Implement AnswerEditor with AI suggestion button
 - ⬜ Implement FinalizeControls with finalize/re-open buttons
 - ⬜ Add question status indicators (pending/answered)
 
 ### Frontend Integration
-- ⬜ Add "Generate Annotations" button to AnnotationWorkspace
-- ⬜ Implement API call to Lambda function
-  ```typescript
-  import { generateClient } from 'aws-amplify/api';
-  ```
-- ⬜ Show loading state during generation (with spinner)
-- ⬜ Display generated annotations in AnnotationList
-- ⬜ Allow users to edit/approve/reject AI annotations
-- ⬜ Add confidence score display (if available from Nemotron)
-- ⬜ Highlight AI-generated vs manual annotations
-- ⬜ Handle generation errors gracefully
+- ✅ Add "Generate Annotations" button to AnnotationWorkspace
+- ✅ Implement API call to Lambda function (with mock fallback)
+- ✅ Show loading state during generation (with spinner)
+- ✅ Display generated annotations in AISuggestionList
+- ✅ Allow users to edit/approve/reject AI annotations
+- ✅ Add confidence score display
+- ✅ Highlight AI-generated vs manual annotations
+- ✅ Handle generation errors gracefully
 
 ### Annotation Validation UI
-- ⬜ Create ValidationControls component
-  - ⬜ Approve button (green checkmark)
-  - ⬜ Reject button (red X)
-  - ⬜ Edit button (pencil icon)
-- ⬜ Track annotation status (pending, approved, rejected)
-- ⬜ Update data model to include status field
+- ✅ Create ValidationControls component (inline in AnnotationWorkspace)
+  - ✅ Approve button (green checkmark)
+  - ✅ Reject button (orange X)
+  - ✅ Delete button
+- ✅ Track annotation status (pending, approved, rejected)
+- ✅ Update data model to include status field (generatedBy, modelVersion, confidence)
 - ⬜ Filter annotations by status in AnnotationList
 
 ### Contribution Tracking
-- ⬜ Add ContributionStats component to Dashboard
-- ⬜ Implement getMyContributions query (images annotated, questions answered)
-- ⬜ Display contribution statistics on dashboard
+- ✅ Add ContributionStats component to Dashboard
+- ✅ Display AI vs Human annotation counts
+- ✅ Display approved vs pending annotation counts
 
 **Sprint 2 Acceptance Criteria:**
 - ✅ Users can click "Generate Annotations" button
@@ -467,166 +414,296 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Generated annotations appear in the workspace
 - ✅ Users can approve, reject, or edit AI annotations
 - ✅ Annotation status is tracked and persisted
-- ✅ Error handling works for Nemotron failures
+- ✅ Error handling works for AI model failures
 
 ---
 
-## Sprint 3: Dataset Management, Export & Validation
+## Sprint 3: Queue-Based W&B Integration
 
-**Goal**: Create datasets, export in JSON format, and validate quality with W&B
+**Goal**: Queue-based batch processing for W&B dataset builds and evaluations
 **Duration**: 2-3 weeks
-**Deliverable**: Dataset creation, export functionality, and W&B-based evaluation
+**Deliverable**: Automated dataset builds, job status tracking, and W&B-based evaluation
+**Proposal**: See [spec/proposals/20260111_queue_based_wandb_integration.md](proposals/20260111_queue_based_wandb_integration.md)
 
-### Data Model Extension
-- ⬜ Add Dataset model to `amplify/data/resource.ts`
+### Phase 1: Queue Infrastructure & Data Models
+
+- ⬜ Update data schema in `amplify/data/resource.ts`
   ```typescript
-  Dataset: a.model({
-    name: a.string().required(),
-    description: a.string(),
-    version: a.string().required(),
-    createdBy: a.string().required(),
-    createdAt: a.datetime().required(),
-    imageCount: a.integer(),
-    annotationCount: a.integer()
+  // Add to Annotation model
+  Annotation: a.model({
+    // ... existing fields
+    queuedForDataset: a.boolean().default(false),
+    processedAt: a.datetime()
+  }),
+
+  // New job tracking models
+  DatasetBuildJob: a.model({
+    jobId: a.id().required(),
+    status: a.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED']),
+    startedAt: a.datetime(),
+    completedAt: a.datetime(),
+    annotationCount: a.integer(),
+    wandbRunUrl: a.url(),
+    wandbArtifactVersion: a.string(),
+    errorMessage: a.string()
+  }).authorization((allow) => [allow.authenticated()]),
+
+  EvaluationJob: a.model({
+    jobId: a.id().required(),
+    status: a.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED']),
+    modelName: a.string().required(),
+    datasetVersion: a.string().required(),
+    exactMatchRate: a.float(),
+    f1Score: a.float(),
+    avgIoU: a.float(),
+    wandbRunUrl: a.url(),
+    errorMessage: a.string()
+  }).authorization((allow) => [allow.authenticated()]),
+
+  QueueStats: a.model({
+    id: a.id().required(),
+    pendingAnnotations: a.integer().default(0),
+    lastDatasetBuild: a.datetime(),
+    nextScheduledBuild: a.datetime()
   }).authorization((allow) => [allow.authenticated()])
   ```
-- ⬜ Add relationship: Image belongs to Dataset
-- ⬜ Add relationship: Annotation belongs to Image
-- ⬜ Deploy schema updates
-  ```bash
-  npx ampx sandbox
-  ```
 
-### Dataset Management UI
-- ⬜ Create DatasetList page
-  - ⬜ Display all datasets in a grid/list
-  - ⬜ Show dataset metadata (name, version, count)
-  - ⬜ Add "Create New Dataset" button
-- ⬜ Create DatasetForm dialog
-  - ⬜ Name input field
-  - ⬜ Description textarea
-  - ⬜ Version input field
-  - ⬜ Select images to include (multi-select)
-- ⬜ Implement dataset creation (save to DynamoDB)
-- ⬜ Create DatasetDetails page
-  - ⬜ Display dataset metadata
-  - ⬜ Show included images and annotations
-  - ⬜ Display statistics (total Q&A pairs, image count)
-  - ⬜ Add edit/delete dataset functionality
-
-### Export Lambda Function
-- ⬜ Create `amplify/functions/export-dataset/` directory
-- ⬜ Create `amplify/functions/export-dataset/resource.ts`
+- ⬜ Set up SQS queue in `amplify/backend.ts`
   ```typescript
-  import { defineFunction } from '@aws-amplify/backend';
+  import * as sqs from 'aws-cdk-lib/aws-sqs';
+  import { Duration } from 'aws-cdk-lib';
 
-  export const exportDataset = defineFunction({
-    name: 'exportDataset',
-    runtime: 20,
-    timeoutSeconds: 300,
-    memoryMB: 2048
+  const annotationQueue = new sqs.Queue(stack, 'VerifiedAnnotationsQueue', {
+    visibilityTimeout: Duration.minutes(15),
+    retentionPeriod: Duration.days(14),
+    deadLetterQueue: {
+      queue: dlq,
+      maxReceiveCount: 3
+    }
   });
   ```
-- ⬜ Implement handler in `amplify/functions/export-dataset/handler.ts`
-  - ⬜ Fetch dataset data from DynamoDB
-  - ⬜ Fetch associated images and annotations
-  - ⬜ Transform to JSON format (simple structure)
-  - ⬜ Upload export file to S3
-  - ⬜ Return presigned URL for download
-- ⬜ Add error handling and validation
-- ⬜ Update `amplify/backend.ts` to include function
 
-### Export UI
-- ⬜ Add "Export Dataset" button to DatasetDetails page
-- ⬜ Create ExportDialog component
-  - ⬜ Format selection (JSON only for now)
-  - ⬜ Show export progress
-  - ⬜ Display download link when ready
-- ⬜ Implement download functionality
-- ⬜ Handle export errors
+- ⬜ Update annotation approval workflow
+  - ⬜ Add "Queue for Dataset" action on approved annotations
+  - ⬜ Send message to SQS with annotation data
+  - ⬜ Update `queuedForDataset` flag in DynamoDB
+  - ⬜ Show "Queued for dataset build" status in UI
 
-### Dashboard Enhancements
-- ⬜ Display total datasets count
-- ⬜ Show recent datasets list
-- ⬜ Add quick actions (Create Dataset, Upload Image)
+### Phase 2: Batch Processor Lambda
 
-### Weights & Biases Integration
-- ⬜ Set up W&B account and project
+- ⬜ Set up W&B account and create `biz-doc-vqa` project
   ```bash
-  pip install wandb
   wandb login
+  # Create project: biz-doc-vqa (Business Document Visual Question Answering)
   ```
+
 - ⬜ Store W&B API key in AWS Secrets Manager
   ```bash
   printf "your-wandb-api-key" | npx ampx sandbox secret set WANDB_API_KEY
   ```
-- ⬜ Create `amplify/functions/wandb-logger/` directory
-- ⬜ Create `amplify/functions/wandb-logger/resource.ts`
+
+- ⬜ Create `amplify/functions/wandb-processor/` directory
+
+- ⬜ Create `amplify/functions/wandb-processor/resource.ts`
   ```typescript
   import { defineFunction, secret } from '@aws-amplify/backend';
 
-  export const wandbLogger = defineFunction({
-    name: 'wandbLogger',
+  export const wandbProcessor = defineFunction({
+    name: 'wandbProcessor',
     runtime: 20,
-    timeoutSeconds: 300,
-    memoryMB: 1024,
+    timeoutSeconds: 900, // 15 minutes
+    memoryMB: 2048,
     environment: {
       WANDB_API_KEY: secret('WANDB_API_KEY'),
-      WANDB_PROJECT: 'business-ocr-dataset'
+      WANDB_PROJECT: 'biz-doc-vqa'
     }
   });
   ```
+
 - ⬜ Install dependencies in function directory
   ```bash
-  cd amplify/functions/wandb-logger
-  npm install wandb
+  cd amplify/functions/wandb-processor
+  npm install wandb @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
   ```
-- ⬜ Implement incremental data logging handler
-  - ⬜ Initialize W&B run
-  - ⬜ Create W&B Table for VQA data
-  - ⬜ Log images incrementally (one row at a time to avoid memory issues)
-  - ⬜ Include fields: image, question, answers, answer_bbox, document_type
-  - ⬜ Handle large image files (compress if needed before upload)
-  - ⬜ Track logging progress
-  - ⬜ Return W&B run URL
-- ⬜ Implement evaluation handler
-  - ⬜ Fetch dataset from DynamoDB
-  - ⬜ Create evaluation run in W&B
-  - ⬜ Log evaluation metrics incrementally (per annotation)
-  - ⬜ Calculate OCR accuracy metrics (exact match, F1 score)
-  - ⬜ Visualize bounding box annotations
-  - ⬜ Compare annotation quality across images
-  - ⬜ Return evaluation summary and W&B URL
-- ⬜ Update `amplify/backend.ts` to include wandbLogger function
 
-### W&B Integration UI
-- ⬜ Add "Log to W&B" button to DatasetDetails page
-- ⬜ Create WandBDialog component
-  - ⬜ Project name input
-  - ⬜ Run name input (auto-generated by default)
-  - ⬜ Show logging progress (X/Y images logged)
-  - ⬜ Display W&B run URL when complete
-- ⬜ Add "Evaluate Dataset" button
-- ⬜ Create EvaluationDialog component
-  - ⬜ Select metrics to compute
-  - ⬜ Show evaluation progress
-  - ⬜ Display evaluation results summary
-  - ⬜ Link to W&B evaluation dashboard
-- ⬜ Handle W&B API errors gracefully
-- ⬜ Store W&B run URLs in dataset metadata
+- ⬜ Implement handler in `amplify/functions/wandb-processor/handler.ts`
+  - ⬜ Implement SQS handler (batch processing)
+  - ⬜ Initialize W&B with project `biz-doc-vqa`
+  - ⬜ Create DatasetBuildJob record (status=RUNNING)
+  - ⬜ Create/update W&B artifact `business-ocr-vqa-dataset`
+  - ⬜ Log annotations incrementally to W&B Table
+    - ⬜ Include fields: question_id, image, question, answers, answer_bbox
+    - ⬜ Use `json.dumps(data, ensure_ascii=False)` for unicode preservation
+  - ⬜ Mark processed annotations with `processedAt` timestamp
+  - ⬜ Update DatasetBuildJob (status=COMPLETED, wandbRunUrl, artifactVersion)
+  - ⬜ Handle errors and update job status to FAILED
+  - ⬜ Return batch item failures for retry
+
+- ⬜ Configure Lambda SQS trigger in `amplify/backend.ts`
+  ```typescript
+  import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
+
+  wandbProcessorLambda.addEventSource(
+    new SqsEventSource(annotationQueue, {
+      batchSize: 10,
+      maxBatchingWindow: Duration.minutes(5),
+      reportBatchItemFailures: true
+    })
+  );
+  ```
+
+- ⬜ Add EventBridge schedule for daily builds
+  ```typescript
+  import * as events from 'aws-cdk-lib/aws-events';
+  import * as targets from 'aws-cdk-lib/aws-events-targets';
+
+  const dailyBuildSchedule = new events.Rule(stack, 'DailyDatasetBuild', {
+    schedule: events.Schedule.cron({
+      minute: '0',
+      hour: '2', // 2 AM UTC
+      day: '*'
+    })
+  });
+
+  dailyBuildSchedule.addTarget(new targets.LambdaFunction(wandbProcessorLambda));
+  ```
+
+### Phase 3: Status UI
+
+- ⬜ Create `src/pages/DatasetStatus.tsx`
+  - ⬜ Display queue statistics (pending annotations count)
+  - ⬜ Show last dataset build timestamp
+  - ⬜ Show next scheduled build time
+  - ⬜ Add "Trigger Manual Build" button
+  - ⬜ Display recent DatasetBuildJob table
+    - ⬜ Columns: Job ID, Status, Started, Completed, Annotation Count, W&B Link
+    - ⬜ Status badge component (color-coded)
+  - ⬜ Add direct links to W&B `biz-doc-vqa` project
+    - ⬜ Link to datasets: `https://wandb.ai/<entity>/biz-doc-vqa/artifacts`
+    - ⬜ Link to runs: `https://wandb.ai/<entity>/biz-doc-vqa`
+  - ⬜ Poll for status updates (every 30 seconds)
+  - ⬜ Handle manual trigger API call
+
+- ⬜ Create `src/pages/EvaluationStatus.tsx`
+  - ⬜ Display recent EvaluationJob table
+  - ⬜ Show evaluation metrics (EM, F1, IoU)
+  - ⬜ Add links to W&B evaluation dashboards
+  - ⬜ Show evaluation schedule information
+
+- ⬜ Update Dashboard
+  - ⬜ Add "Dataset Status" navigation link
+  - ⬜ Show queue count widget
+  - ⬜ Display last build time
+  - ⬜ Add quick link to W&B project
+
+### Phase 4: Evaluation Runner
+
+- ⬜ Create `amplify/functions/evaluation-runner/` directory
+
+- ⬜ Create `amplify/functions/evaluation-runner/resource.ts`
+  ```typescript
+  import { defineFunction, secret } from '@aws-amplify/backend';
+
+  export const evaluationRunner = defineFunction({
+    name: 'evaluationRunner',
+    runtime: 20,
+    timeoutSeconds: 900,
+    memoryMB: 2048,
+    environment: {
+      WANDB_API_KEY: secret('WANDB_API_KEY'),
+      WANDB_PROJECT: 'biz-doc-vqa'
+    }
+  });
+  ```
+
+- ⬜ Install dependencies
+  ```bash
+  cd amplify/functions/evaluation-runner
+  npm install wandb @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+  ```
+
+- ⬜ Implement handler in `amplify/functions/evaluation-runner/handler.ts`
+  - ⬜ Fetch dataset version from W&B
+  - ⬜ Create EvaluationJob record (status=RUNNING)
+  - ⬜ Run evaluation on annotations
+    - ⬜ Calculate Exact Match rate
+    - ⬜ Calculate F1 Score
+    - ⬜ Calculate average IoU (bbox accuracy)
+  - ⬜ Log evaluation results to W&B
+    - ⬜ Create evaluation artifact
+    - ⬜ Log metric visualizations
+    - ⬜ Log bbox overlay images
+  - ⬜ Update EvaluationJob (status=COMPLETED, metrics, wandbRunUrl)
+  - ⬜ Handle errors and update status to FAILED
+
+- ⬜ Add EventBridge schedule for weekly evaluations
+  ```typescript
+  const weeklyEvalSchedule = new events.Rule(stack, 'WeeklyEvaluation', {
+    schedule: events.Schedule.cron({
+      minute: '0',
+      hour: '3', // 3 AM UTC
+      weekDay: 'SUN'
+    })
+  });
+
+  weeklyEvalSchedule.addTarget(new targets.LambdaFunction(evaluationRunnerLambda));
+  ```
+
+- ⬜ Add manual evaluation trigger API
+  - ⬜ Create API endpoint to trigger evaluation
+  - ⬜ Allow model selection
+  - ⬜ Allow dataset version selection
+  - ⬜ Return evaluation job ID
+
+### Phase 5: Testing & Documentation
+
+- ⬜ Test queue processing
+  - ⬜ Submit 10 test annotations to queue
+  - ⬜ Verify batch processing completes
+  - ⬜ Verify DatasetBuildJob status updates
+  - ⬜ Check W&B artifact is created correctly
+  - ⬜ Verify unicode characters preserved (Japanese, Chinese)
+
+- ⬜ Test retry logic
+  - ⬜ Simulate Lambda failure
+  - ⬜ Verify failed messages go to DLQ
+  - ⬜ Test retry mechanism
+  - ⬜ Verify partial batch failure reporting
+
+- ⬜ Test scheduled jobs
+  - ⬜ Trigger manual dataset build
+  - ⬜ Verify EventBridge schedules are configured
+  - ⬜ Test cron expression timing
+  - ⬜ Verify status UI updates
+
+- ⬜ Test evaluation workflow
+  - ⬜ Run manual evaluation on test dataset
+  - ⬜ Verify metrics are calculated correctly
+  - ⬜ Check W&B evaluation dashboard
+  - ⬜ Verify bbox visualizations
+
+- ⬜ Documentation
+  - ⬜ Update README with queue workflow explanation
+  - ⬜ Document job status meanings (QUEUED, RUNNING, COMPLETED, FAILED)
+  - ⬜ Create W&B navigation guide
+  - ⬜ Document manual trigger process
+  - ⬜ Create troubleshooting guide for failed jobs
+  - ⬜ Document `biz-doc-vqa` project structure in W&B
 
 **Sprint 3 Acceptance Criteria:**
-- ✅ Users can create new datasets
-- ✅ Users can add images to datasets
-- ✅ Datasets are listed and searchable
-- ✅ Users can view dataset details
-- ✅ Users can export datasets in JSON format
-- ✅ Export file is downloadable
-- ✅ Datasets can be logged to W&B incrementally
-- ✅ Large images are handled without memory issues
-- ✅ Evaluations can be run on datasets
-- ✅ Evaluation metrics are displayed in W&B
-- ✅ W&B run URLs are saved and accessible
+- ✅ Approved annotations are queued automatically (non-blocking)
+- ✅ SQS queue collects verified annotations successfully
+- ✅ Scheduled batch jobs process 10+ annotations per run
+- ✅ W&B datasets update with proper versioning (v0, v1, v2...)
+- ✅ Job status UI shows real-time progress (QUEUED, RUNNING, COMPLETED, FAILED)
+- ✅ Failed jobs retry automatically via DLQ
+- ✅ Users can trigger manual dataset builds
+- ✅ Users can view datasets in W&B `biz-doc-vqa` project
+- ✅ Unicode characters preserved in W&B (Japanese, Chinese text)
+- ✅ Evaluation runs complete successfully with metrics (EM, F1, IoU)
+- ✅ Evaluation results viewable in W&B dashboard
+- ✅ Queue handles large image files without memory issues
+- ✅ Dashboard shows queue statistics and last build time
 
 ---
 
@@ -1324,7 +1401,7 @@ business-ocr-annotator/
 - ✅ Sprint 0: Foundation & Deployment
 - ✅ Sprint 1: Image Upload & Manual Annotation (MVP)
 - ⬜ Sprint 2: AI-Assisted Annotation
-- ⬜ Sprint 3: Dataset Management, Export & Validation (with W&B)
+- ⬜ Sprint 3: Queue-Based W&B Integration
 - ⬜ Sprint 4: Multi-Language Support & Optimization
 - ⬜ Sprint 5: Mobile Optimization & Camera
 - ⬜ Sprint 6: Publishing & PII Handling
