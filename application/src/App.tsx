@@ -8,6 +8,8 @@ import { Login } from './pages/Login';
 import { FileUpload } from './pages/FileUpload';
 import { ImageGallery } from './pages/ImageGallery';
 import { AnnotationWorkspace } from './pages/AnnotationWorkspace';
+import { DatasetStatus } from './pages/DatasetStatus';
+import { EvaluationStatus } from './pages/EvaluationStatus';
 
 function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -105,6 +107,8 @@ function App() {
             <Route path="/upload" element={<FileUpload />} />
             <Route path="/gallery" element={<ImageGallery />} />
             <Route path="/annotate/:imageId" element={<AnnotationWorkspace />} />
+            <Route path="/dataset-status" element={<DatasetStatus />} />
+            <Route path="/evaluation-status" element={<EvaluationStatus />} />
             <Route path="/callback" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>

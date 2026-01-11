@@ -1,0 +1,22 @@
+{
+  "name": "evaluation-runner",
+  "version": "1.0.0",
+  "description": "Lambda function for running VQA model evaluations and logging to W&B",
+  "type": "module",
+  "main": "handler.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.500.0",
+    "@aws-sdk/lib-dynamodb": "^3.500.0",
+    "@aws-sdk/client-s3": "^3.500.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.500.0",
+    "wandb": "^0.17.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.131",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  }
+}

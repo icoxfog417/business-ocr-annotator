@@ -6,21 +6,39 @@ import type { Schema } from '../../amplify/data/resource';
 
 const client = generateClient<Schema>();
 
+interface QueueStatsData {
+  pendingAnnotations: number;
+  totalProcessed: number;
+  lastDatasetBuild?: string;
+}
+
 export function Dashboard() {
-  const [stats, setStats] = useState({ images: 0, annotations: 0, datasets: 0 });
+  const [stats, setStats] = useState({ images: 0, annotations: 0, approvedAnnotations: 0 });
+  const [queueStats, setQueueStats] = useState<QueueStatsData | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [imagesResult, annotationsResult] = await Promise.all([
+        const [imagesResult, annotationsResult, queueStatsResult] = await Promise.all([
           client.models.Image.list(),
-          client.models.Annotation.list()
+          client.models.Annotation.list(),
+          client.models.QueueStats.list({ filter: { statsId: { eq: 'global' } } })
         ]);
+
+        // Count approved annotations
+        const approvedCount = annotationsResult.data.filter(
+          (a) => a.validationStatus === 'APPROVED'
+        ).length;
+
         setStats({
           images: imagesResult.data.length,
           annotations: annotationsResult.data.length,
-          datasets: 0 // Datasets not implemented yet
+          approvedAnnotations: approvedCount
         });
+
+        if (queueStatsResult.data.length > 0) {
+          setQueueStats(queueStatsResult.data[0] as QueueStatsData);
+        }
       } catch (error) {
         console.error('Failed to fetch stats:', error);
       }
@@ -243,6 +261,100 @@ export function Dashboard() {
               </p>
             </div>
           </Link>
+
+          <Link
+            to="/dataset-status"
+            style={{
+              textDecoration: 'none',
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+              e.currentTarget.style.borderColor = '#22c55e';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.borderColor = '#e5e7eb';
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                background: 'rgba(34, 197, 94, 0.1)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              </svg>
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#0f172a', margin: 0 }}>
+                Dataset Status
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.875rem', margin: '0.25rem 0 0 0' }}>
+                W&B builds & queue
+              </p>
+            </div>
+          </Link>
+
+          <Link
+            to="/evaluation-status"
+            style={{
+              textDecoration: 'none',
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+              e.currentTarget.style.borderColor = '#8b5cf6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.borderColor = '#e5e7eb';
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                background: 'rgba(139, 92, 246, 0.1)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#0f172a', margin: 0 }}>
+                Evaluations
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.875rem', margin: '0.25rem 0 0 0' }}>
+                Model performance
+              </p>
+            </div>
+          </Link>
         </div>
 
         {/* Metrics Grid */}
@@ -373,9 +485,11 @@ export function Dashboard() {
             </p>
           </div>
 
-          {/* Datasets Card */}
-          <div
+          {/* Queue Status Card */}
+          <Link
+            to="/dataset-status"
             style={{
+              textDecoration: 'none',
               background: 'white',
               border: '1px solid #e5e7eb',
               borderRadius: '12px',
@@ -400,7 +514,7 @@ export function Dashboard() {
               }}
             >
               <span style={{ color: '#64748b', fontSize: '0.875rem', fontWeight: '500' }}>
-                Datasets
+                Dataset Queue
               </span>
               <div
                 style={{
@@ -425,11 +539,15 @@ export function Dashboard() {
                 </svg>
               </div>
             </div>
-            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{stats.datasets}</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>
+              {queueStats?.pendingAnnotations ?? 0}
+            </div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              Coming in Sprint 3
+              {queueStats?.totalProcessed
+                ? `${queueStats.totalProcessed} processed total`
+                : 'Pending annotations'}
             </p>
-          </div>
+          </Link>
         </div>
 
         {/* Status Card */}

@@ -1,0 +1,19 @@
+{
+  "name": "queue-annotation",
+  "version": "1.0.0",
+  "description": "Lambda function to queue annotations for W&B dataset processing",
+  "type": "module",
+  "main": "handler.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.450.0",
+    "@aws-sdk/client-sqs": "^3.450.0",
+    "@aws-sdk/lib-dynamodb": "^3.450.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "typescript": "^5.0.0"
+  }
+}

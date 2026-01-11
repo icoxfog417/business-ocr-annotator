@@ -13,11 +13,16 @@ import {
 
 const client = generateClient<Schema>();
 
+type ValidationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
 interface Annotation {
   id: string;
   question: string;
   answer: string;
   boundingBoxes: BoundingBox[];
+  validationStatus: ValidationStatus;
+  queuedForDataset: boolean;
+  processedAt?: string;
 }
 
 interface ImageData {
@@ -63,14 +68,17 @@ export function AnnotationWorkspace() {
         filter: { imageId: { eq: imageId } }
       });
       const fetchedAnnotations = annotationsData.map(a => {
-        const boxes = typeof a.boundingBoxes === 'string' 
-          ? JSON.parse(a.boundingBoxes) 
+        const boxes = typeof a.boundingBoxes === 'string'
+          ? JSON.parse(a.boundingBoxes)
           : a.boundingBoxes as BoundingBox[];
         return {
           id: a.id,
           question: a.question,
           answer: a.answer,
-          boundingBoxes: boxes
+          boundingBoxes: boxes,
+          validationStatus: (a.validationStatus || 'PENDING') as ValidationStatus,
+          queuedForDataset: a.queuedForDataset || false,
+          processedAt: a.processedAt || undefined
         };
       });
       setAnnotations(fetchedAnnotations);
@@ -134,13 +142,15 @@ export function AnnotationWorkspace() {
       }
 
       if (newAnnotation.data) {
-        const annotation = {
+        const annotation: Annotation = {
           id: newAnnotation.data.id,
           question: newAnnotation.data.question,
           answer: newAnnotation.data.answer,
-          boundingBoxes: typeof newAnnotation.data.boundingBoxes === 'string' 
-            ? JSON.parse(newAnnotation.data.boundingBoxes) 
-            : newAnnotation.data.boundingBoxes as BoundingBox[]
+          boundingBoxes: typeof newAnnotation.data.boundingBoxes === 'string'
+            ? JSON.parse(newAnnotation.data.boundingBoxes)
+            : newAnnotation.data.boundingBoxes as BoundingBox[],
+          validationStatus: 'PENDING',
+          queuedForDataset: false
         };
         setAnnotations(prev => [...prev, annotation]);
         
@@ -170,6 +180,67 @@ export function AnnotationWorkspace() {
       }
     } catch (error) {
       console.error('Failed to delete annotation:', error);
+    }
+  };
+
+  const updateValidationStatus = async (annotationId: string, status: ValidationStatus) => {
+    try {
+      await client.models.Annotation.update({
+        id: annotationId,
+        validationStatus: status,
+        validatedBy: 'current-user',
+        validatedAt: new Date().toISOString(),
+        updatedBy: 'current-user',
+        updatedAt: new Date().toISOString()
+      });
+
+      setAnnotations(prev => prev.map(a =>
+        a.id === annotationId ? { ...a, validationStatus: status } : a
+      ));
+    } catch (error) {
+      console.error('Failed to update validation status:', error);
+      alert('Failed to update validation status');
+    }
+  };
+
+  const queueForDataset = async (annotationIds: string[]) => {
+    if (annotationIds.length === 0) return;
+
+    try {
+      // Call the custom mutation to queue annotations
+      const response = await client.mutations.queueAnnotationsForDataset({
+        annotationIds,
+        triggeredBy: 'current-user'
+      });
+
+      console.log('Queue result:', response);
+
+      if (response.errors) {
+        console.error('Queue errors:', response.errors);
+        alert('Failed to queue annotations: ' + response.errors.map(e => e.message).join(', '));
+        return;
+      }
+
+      if (response.data) {
+        const result = response.data;
+
+        if (result.queuedCount > 0) {
+          // Update local state
+          setAnnotations(prev => prev.map(a =>
+            annotationIds.includes(a.id)
+              ? { ...a, validationStatus: 'APPROVED' as ValidationStatus, queuedForDataset: true }
+              : a
+          ));
+          alert(`Queued ${result.queuedCount} annotation(s) for dataset build`);
+        }
+
+        if (result.failedIds && result.failedIds.length > 0) {
+          console.warn('Failed to queue:', result.failedIds);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to queue annotations:', error);
+      alert('Failed to queue annotations for dataset: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -326,44 +397,150 @@ export function AnnotationWorkspace() {
 
         {/* Existing Annotations */}
         <div>
-          {annotations.map((annotation) => (
-            <div
-              key={annotation.id}
-              onClick={() => showAnnotationBox(annotation.id)}
-              style={{
-                padding: '1rem',
-                border: selectedBoxId === annotation.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-                borderRadius: '8px',
-                marginBottom: '1rem',
-                backgroundColor: selectedBoxId === annotation.id ? '#eff6ff' : 'white',
-                cursor: 'pointer'
-              }}
-            >
-              <div style={{ fontWeight: '500', marginBottom: '0.5rem' }}>
-                Q: {annotation.question}
-              </div>
-              <div style={{ marginBottom: '0.5rem', color: '#374151' }}>
-                A: {annotation.answer}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                Box: [{annotation.boundingBoxes[0].join(', ')}]
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteAnnotation(annotation.id); }}
+          {annotations.map((annotation) => {
+            const statusColors: Record<ValidationStatus, { bg: string; text: string; border: string }> = {
+              PENDING: { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
+              APPROVED: { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
+              REJECTED: { bg: '#fee2e2', text: '#991b1b', border: '#ef4444' }
+            };
+            const statusStyle = statusColors[annotation.validationStatus];
+
+            return (
+              <div
+                key={annotation.id}
+                onClick={() => showAnnotationBox(annotation.id)}
                 style={{
-                  background: '#ef4444',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem',
+                  padding: '1rem',
+                  border: selectedBoxId === annotation.id ? '2px solid #3b82f6' : `1px solid ${statusStyle.border}`,
+                  borderRadius: '8px',
+                  marginBottom: '1rem',
+                  backgroundColor: selectedBoxId === annotation.id ? '#eff6ff' : 'white',
                   cursor: 'pointer'
                 }}
               >
-                Delete
-              </button>
-            </div>
-          ))}
+                {/* Status Badge */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{
+                    padding: '0.125rem 0.5rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.625rem',
+                    fontWeight: '600',
+                    backgroundColor: statusStyle.bg,
+                    color: statusStyle.text
+                  }}>
+                    {annotation.validationStatus}
+                  </span>
+                  {annotation.queuedForDataset && !annotation.processedAt && (
+                    <span style={{
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.625rem',
+                      fontWeight: '600',
+                      backgroundColor: '#dbeafe',
+                      color: '#1e40af'
+                    }}>
+                      QUEUED
+                    </span>
+                  )}
+                  {annotation.processedAt && (
+                    <span style={{
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.625rem',
+                      fontWeight: '600',
+                      backgroundColor: '#e0e7ff',
+                      color: '#3730a3'
+                    }}>
+                      IN DATASET
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Q: {annotation.question}
+                </div>
+                <div style={{ marginBottom: '0.5rem', color: '#374151' }}>
+                  A: {annotation.answer}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                  Box: [{annotation.boundingBoxes[0]?.join(', ') || 'N/A'}]
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {/* Approve/Reject buttons for PENDING status */}
+                  {annotation.validationStatus === 'PENDING' && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); updateValidationStatus(annotation.id, 'APPROVED'); }}
+                        style={{
+                          background: '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); updateValidationStatus(annotation.id, 'REJECTED'); }}
+                        style={{
+                          background: '#f59e0b',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Reject
+                      </button>
+                    </>
+                  )}
+
+                  {/* Queue for Dataset button for APPROVED status (not yet queued) */}
+                  {annotation.validationStatus === 'APPROVED' && !annotation.queuedForDataset && !annotation.processedAt && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); queueForDataset([annotation.id]); }}
+                      style={{
+                        background: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Queue for Dataset
+                    </button>
+                  )}
+
+                  {/* Delete button (always available unless processed) */}
+                  {!annotation.processedAt && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteAnnotation(annotation.id); }}
+                      style={{
+                        background: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -453,7 +453,7 @@ This task list is organized into **sprints** that deliver working software incre
 
 ### Phase 1: Queue Infrastructure & Data Models
 
-- ⬜ Update data schema in `amplify/data/resource.ts`
+- ✅ Update data schema in `amplify/data/resource.ts`
   ```typescript
   // Add to Annotation model
   Annotation: a.model({
@@ -494,7 +494,7 @@ This task list is organized into **sprints** that deliver working software incre
   }).authorization((allow) => [allow.authenticated()])
   ```
 
-- ⬜ Set up SQS queue in `amplify/backend.ts`
+- ✅ Set up SQS queue in `amplify/backend.ts`
   ```typescript
   import * as sqs from 'aws-cdk-lib/aws-sqs';
   import { Duration } from 'aws-cdk-lib';
@@ -528,9 +528,9 @@ This task list is organized into **sprints** that deliver working software incre
   printf "your-wandb-api-key" | npx ampx sandbox secret set WANDB_API_KEY
   ```
 
-- ⬜ Create `amplify/functions/wandb-processor/` directory
+- ✅ Create `amplify/functions/wandb-processor/` directory
 
-- ⬜ Create `amplify/functions/wandb-processor/resource.ts`
+- ✅ Create `amplify/functions/wandb-processor/resource.ts`
   ```typescript
   import { defineFunction, secret } from '@aws-amplify/backend';
 
@@ -546,26 +546,26 @@ This task list is organized into **sprints** that deliver working software incre
   });
   ```
 
-- ⬜ Install dependencies in function directory
+- ✅ Install dependencies in function directory
   ```bash
   cd amplify/functions/wandb-processor
   npm install wandb @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
   ```
 
-- ⬜ Implement handler in `amplify/functions/wandb-processor/handler.ts`
-  - ⬜ Implement SQS handler (batch processing)
-  - ⬜ Initialize W&B with project `biz-doc-vqa`
-  - ⬜ Create DatasetBuildJob record (status=RUNNING)
-  - ⬜ Create/update W&B artifact `business-ocr-vqa-dataset`
-  - ⬜ Log annotations incrementally to W&B Table
-    - ⬜ Include fields: question_id, image, question, answers, answer_bbox
-    - ⬜ Use `json.dumps(data, ensure_ascii=False)` for unicode preservation
-  - ⬜ Mark processed annotations with `processedAt` timestamp
-  - ⬜ Update DatasetBuildJob (status=COMPLETED, wandbRunUrl, artifactVersion)
-  - ⬜ Handle errors and update job status to FAILED
-  - ⬜ Return batch item failures for retry
+- ✅ Implement handler in `amplify/functions/wandb-processor/handler.ts`
+  - ✅ Implement SQS handler (batch processing)
+  - ✅ Initialize W&B with project `biz-doc-vqa`
+  - ✅ Create DatasetBuildJob record (status=RUNNING)
+  - ✅ Create/update W&B artifact `business-ocr-vqa-dataset`
+  - ✅ Log annotations incrementally to W&B Table
+    - ✅ Include fields: question_id, image, question, answers, answer_bbox
+    - ✅ Use `json.dumps(data, ensure_ascii=False)` for unicode preservation
+  - ✅ Mark processed annotations with `processedAt` timestamp
+  - ✅ Update DatasetBuildJob (status=COMPLETED, wandbRunUrl, artifactVersion)
+  - ✅ Handle errors and update job status to FAILED
+  - ✅ Return batch item failures for retry
 
-- ⬜ Configure Lambda SQS trigger in `amplify/backend.ts`
+- ✅ Configure Lambda SQS trigger in `amplify/backend.ts`
   ```typescript
   import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 
@@ -578,7 +578,7 @@ This task list is organized into **sprints** that deliver working software incre
   );
   ```
 
-- ⬜ Add EventBridge schedule for daily builds
+- ✅ Add EventBridge schedule for daily builds
   ```typescript
   import * as events from 'aws-cdk-lib/aws-events';
   import * as targets from 'aws-cdk-lib/aws-events-targets';
@@ -596,37 +596,37 @@ This task list is organized into **sprints** that deliver working software incre
 
 ### Phase 3: Status UI
 
-- ⬜ Create `src/pages/DatasetStatus.tsx`
-  - ⬜ Display queue statistics (pending annotations count)
-  - ⬜ Show last dataset build timestamp
-  - ⬜ Show next scheduled build time
-  - ⬜ Add "Trigger Manual Build" button
-  - ⬜ Display recent DatasetBuildJob table
-    - ⬜ Columns: Job ID, Status, Started, Completed, Annotation Count, W&B Link
-    - ⬜ Status badge component (color-coded)
-  - ⬜ Add direct links to W&B `biz-doc-vqa` project
-    - ⬜ Link to datasets: `https://wandb.ai/<entity>/biz-doc-vqa/artifacts`
-    - ⬜ Link to runs: `https://wandb.ai/<entity>/biz-doc-vqa`
-  - ⬜ Poll for status updates (every 30 seconds)
-  - ⬜ Handle manual trigger API call
+- ✅ Create `src/pages/DatasetStatus.tsx`
+  - ✅ Display queue statistics (pending annotations count)
+  - ✅ Show last dataset build timestamp
+  - ✅ Show next scheduled build time
+  - ✅ Add "Trigger Manual Build" button
+  - ✅ Display recent DatasetBuildJob table
+    - ✅ Columns: Job ID, Status, Started, Completed, Annotation Count, W&B Link
+    - ✅ Status badge component (color-coded)
+  - ✅ Add direct links to W&B `biz-doc-vqa` project
+    - ✅ Link to datasets: `https://wandb.ai/<entity>/biz-doc-vqa/artifacts`
+    - ✅ Link to runs: `https://wandb.ai/<entity>/biz-doc-vqa`
+  - ✅ Poll for status updates (every 30 seconds)
+  - ✅ Handle manual trigger API call
 
-- ⬜ Create `src/pages/EvaluationStatus.tsx`
-  - ⬜ Display recent EvaluationJob table
-  - ⬜ Show evaluation metrics (EM, F1, IoU)
-  - ⬜ Add links to W&B evaluation dashboards
-  - ⬜ Show evaluation schedule information
+- ✅ Create `src/pages/EvaluationStatus.tsx`
+  - ✅ Display recent EvaluationJob table
+  - ✅ Show evaluation metrics (EM, F1, IoU)
+  - ✅ Add links to W&B evaluation dashboards
+  - ✅ Show evaluation schedule information
 
-- ⬜ Update Dashboard
-  - ⬜ Add "Dataset Status" navigation link
-  - ⬜ Show queue count widget
-  - ⬜ Display last build time
-  - ⬜ Add quick link to W&B project
+- ✅ Update Dashboard
+  - ✅ Add "Dataset Status" navigation link
+  - ✅ Show queue count widget
+  - ✅ Display last build time
+  - ✅ Add quick link to W&B project
 
 ### Phase 4: Evaluation Runner
 
-- ⬜ Create `amplify/functions/evaluation-runner/` directory
+- ✅ Create `amplify/functions/evaluation-runner/` directory
 
-- ⬜ Create `amplify/functions/evaluation-runner/resource.ts`
+- ✅ Create `amplify/functions/evaluation-runner/resource.ts`
   ```typescript
   import { defineFunction, secret } from '@aws-amplify/backend';
 
@@ -642,27 +642,27 @@ This task list is organized into **sprints** that deliver working software incre
   });
   ```
 
-- ⬜ Install dependencies
+- ✅ Install dependencies
   ```bash
   cd amplify/functions/evaluation-runner
   npm install wandb @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
   ```
 
-- ⬜ Implement handler in `amplify/functions/evaluation-runner/handler.ts`
-  - ⬜ Fetch dataset version from W&B
-  - ⬜ Create EvaluationJob record (status=RUNNING)
-  - ⬜ Run evaluation on annotations
-    - ⬜ Calculate Exact Match rate
-    - ⬜ Calculate F1 Score
-    - ⬜ Calculate average IoU (bbox accuracy)
-  - ⬜ Log evaluation results to W&B
-    - ⬜ Create evaluation artifact
+- ✅ Implement handler in `amplify/functions/evaluation-runner/handler.ts`
+  - ✅ Fetch dataset version from W&B
+  - ✅ Create EvaluationJob record (status=RUNNING)
+  - ✅ Run evaluation on annotations
+    - ✅ Calculate Exact Match rate
+    - ✅ Calculate F1 Score
+    - ✅ Calculate average IoU (bbox accuracy)
+  - ✅ Log evaluation results to W&B
+    - ✅ Create evaluation artifact
     - ⬜ Log metric visualizations
     - ⬜ Log bbox overlay images
-  - ⬜ Update EvaluationJob (status=COMPLETED, metrics, wandbRunUrl)
-  - ⬜ Handle errors and update status to FAILED
+  - ✅ Update EvaluationJob (status=COMPLETED, metrics, wandbRunUrl)
+  - ✅ Handle errors and update status to FAILED
 
-- ⬜ Add EventBridge schedule for weekly evaluations
+- ✅ Add EventBridge schedule for weekly evaluations
   ```typescript
   const weeklyEvalSchedule = new events.Rule(stack, 'WeeklyEvaluation', {
     schedule: events.Schedule.cron({
@@ -677,8 +677,8 @@ This task list is organized into **sprints** that deliver working software incre
 
 - ⬜ Add manual evaluation trigger API
   - ⬜ Create API endpoint to trigger evaluation
-  - ⬜ Allow model selection
-  - ⬜ Allow dataset version selection
+  - ✅ Allow model selection (via EvaluationStatus page)
+  - ✅ Allow dataset version selection (via EvaluationStatus page)
   - ⬜ Return evaluation job ID
 
 ### Phase 5: Testing & Documentation
