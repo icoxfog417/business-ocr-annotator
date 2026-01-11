@@ -279,6 +279,41 @@ enum ValidationStatus {
 // - annotationsByCreator: Query annotations by createdBy
 ```
 
+#### DefaultQuestion Table
+```typescript
+interface DefaultQuestion {
+  id: string;                    // Partition Key (UUID)
+  
+  // Classification
+  documentType: DocumentType;    // RECEIPT, INVOICE, etc.
+  language: string;              // ISO 639-1 code (ja, en, zh, ko)
+  
+  // Question content
+  questionText: string;          // e.g., "What is the shop name?"
+  questionType: QuestionType;    // EXTRACTIVE only (no reasoning questions)
+  
+  // Ordering
+  displayOrder: number;          // Sort order within category+language
+  
+  // Status
+  isActive: boolean;             // Can be disabled without deletion
+  
+  // User tracking
+  createdBy: string;             // Admin who created
+  createdAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+// Authorization Rules:
+// - Anyone authenticated can read
+// - Only Admins can create, update, delete
+
+// Secondary Indexes:
+// - defaultQuestionsByDocumentType: Query by documentType
+// - Filter by language in application layer
+```
+
 #### Dataset Table
 ```typescript
 interface Dataset {

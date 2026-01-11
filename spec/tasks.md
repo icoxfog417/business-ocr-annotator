@@ -408,6 +408,33 @@ This task list is organized into **sprints** that deliver working software incre
   npx ampx sandbox --stream-function-logs
   ```
 
+### Default Questions Configuration
+- ⬜ Add DefaultQuestion model to `amplify/data/resource.ts`
+  ```typescript
+  DefaultQuestion: a.model({
+    documentType: a.enum([...]),
+    language: a.string().required(),
+    questionText: a.string().required(),
+    questionType: a.enum(['EXTRACTIVE']),
+    displayOrder: a.integer().required(),
+    isActive: a.boolean().default(true),
+    createdBy: a.string().required(),
+  }).authorization((allow) => [
+    allow.authenticated().to(['read']),
+    allow.groups(['Admin']).to(['create', 'update', 'delete'])
+  ])
+  ```
+- ⬜ Create DefaultQuestionManager admin page
+- ⬜ Seed initial default questions for each document type and language
+
+### Annotation Workflow UI
+- ⬜ Update AnnotationWorkspace with QuestionPanel layout
+- ⬜ Implement QuestionList with default questions loading
+- ⬜ Implement AISuggestionList with adopt/reject buttons
+- ⬜ Implement AnswerEditor with AI suggestion button
+- ⬜ Implement FinalizeControls with finalize/re-open buttons
+- ⬜ Add question status indicators (pending/answered)
+
 ### Frontend Integration
 - ⬜ Add "Generate Annotations" button to AnnotationWorkspace
 - ⬜ Implement API call to Lambda function
@@ -429,6 +456,11 @@ This task list is organized into **sprints** that deliver working software incre
 - ⬜ Track annotation status (pending, approved, rejected)
 - ⬜ Update data model to include status field
 - ⬜ Filter annotations by status in AnnotationList
+
+### Contribution Tracking
+- ⬜ Add ContributionStats component to Dashboard
+- ⬜ Implement getMyContributions query (images annotated, questions answered)
+- ⬜ Display contribution statistics on dashboard
 
 **Sprint 2 Acceptance Criteria:**
 - ✅ Users can click "Generate Annotations" button

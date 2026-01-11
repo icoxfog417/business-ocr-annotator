@@ -136,23 +136,50 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 - **REQ-WM-003**: Users shall mark images as complete after validation
 - **REQ-WM-004**: System shall support multi-annotator validation (consensus building)
 
-### 3.4 Dataset Statistics and Monitoring
+### 3.4 Annotation Workflow
 
-#### 3.4.1 Diversity Metrics
+#### 3.4.1 Default Questions
+- **REQ-AW-001**: Admins shall configure default questions per document type and language
+- **REQ-AW-002**: Default questions shall auto-populate when annotator starts annotation
+- **REQ-AW-003**: Default questions shall be limited to extractive question types only
+
+#### 3.4.2 AI-Assisted Question Generation
+- **REQ-AW-004**: System shall automatically generate additional question suggestions via AI
+- **REQ-AW-005**: Annotators shall adopt or reject each AI-suggested question
+- **REQ-AW-006**: Adopted questions shall be added to the annotation question list
+
+#### 3.4.3 AI-Assisted Answering
+- **REQ-AW-007**: System shall provide AI-suggested answers with evidence regions on demand
+- **REQ-AW-008**: Each question-answer pair shall have exactly one bounding box
+- **REQ-AW-009**: Annotators shall confirm or edit AI suggestions before saving
+
+#### 3.4.4 Finalization
+- **REQ-AW-010**: Annotators shall finalize annotations when all questions are answered
+- **REQ-AW-011**: Finalized annotations shall be soft-locked (status = VALIDATED)
+- **REQ-AW-012**: Annotators shall be able to self re-open their own finalized annotations
+
+#### 3.4.5 Contribution Tracking
+- **REQ-AW-013**: System shall track total images annotated per user
+- **REQ-AW-014**: System shall track total questions answered per user
+- **REQ-AW-015**: Users shall view their contribution statistics on the dashboard
+
+### 3.5 Dataset Statistics and Monitoring
+
+#### 3.5.1 Diversity Metrics
 - **REQ-DM-001**: System shall display distribution of document types
 - **REQ-DM-002**: System shall display distribution of question types
 - **REQ-DM-003**: System shall track unique vendors/entities in dataset
 - **REQ-DM-004**: System shall show temporal distribution (document dates)
 - **REQ-DM-005**: System shall identify underrepresented categories
 
-#### 3.4.2 Accuracy Metrics
+#### 3.5.2 Accuracy Metrics
 - **REQ-AM-001**: System shall track approval rate of AI-generated annotations
 - **REQ-AM-002**: System shall track edit frequency (how often annotations are modified)
 - **REQ-AM-003**: System shall measure inter-annotator agreement
 - **REQ-AM-004**: System shall track average time spent per annotation
 - **REQ-AM-005**: System shall display model confidence scores vs validation results
 
-#### 3.4.3 Dashboard
+#### 3.5.3 Dashboard
 - **REQ-DB-001**: Users shall view overall dataset statistics on a dashboard
 - **REQ-DB-002**: Dashboard shall show:
   - Total images processed
@@ -163,23 +190,23 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 - **REQ-DB-003**: Users shall filter statistics by date range
 - **REQ-DB-004**: Users shall export statistics as CSV/JSON
 
-### 3.5 Dataset Version Management
+### 3.6 Dataset Version Management
 
-#### 3.5.1 Version Creation
+#### 3.6.1 Version Creation
 - **REQ-VC-001**: Users shall create dataset versions/releases
 - **REQ-VC-002**: Users shall specify version number (semantic versioning)
 - **REQ-VC-003**: Users shall add version notes/changelog
 - **REQ-VC-004**: System shall freeze dataset content for each version
 - **REQ-VC-005**: Users shall select which annotations to include in a version (filtering by quality)
 
-#### 3.5.2 Hugging Face Integration
+#### 3.6.2 Hugging Face Integration
 - **REQ-HF-001**: System shall publish datasets to Hugging Face Hub
 - **REQ-HF-002**: Users shall configure Hugging Face credentials
 - **REQ-HF-003**: System shall format datasets according to Hugging Face standards
 - **REQ-HF-004**: System shall support dataset card generation with metadata
 - **REQ-HF-005**: System shall track published versions and their Hugging Face URLs
 
-#### 3.5.3 Export Formats
+#### 3.6.3 Export Formats
 - **REQ-EF-001**: System shall export datasets in JSON format
 - **REQ-EF-002**: System shall export datasets in JSONL format (one record per line)
 - **REQ-EF-003**: System shall export datasets in Parquet format for efficient Hugging Face streaming
