@@ -32,4 +32,3 @@ amplify/backend-config.json
 # Lambda function dependencies (to reduce file watcher noise)
 amplify/functions/**/node_modules
 amplify/functions/**/package-lock.json
-layers
