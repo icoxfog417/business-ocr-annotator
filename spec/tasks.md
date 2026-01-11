@@ -1,8 +1,8 @@
 # Implementation Tasks
 
 **Project**: Business OCR Annotator
-**Last Updated**: 2026-01-10
-**Status**: Sprint 1 (Data Schema Migration)
+**Last Updated**: 2026-01-11
+**Status**: Sprint 2 (AI-Assisted Annotation)
 **Approach**: Agile Incremental Development
 **Reference**: See [spec/proposals/20260107_reorganize_tasks_agile_approach.md](proposals/20260107_reorganize_tasks_agile_approach.md)
 
@@ -256,7 +256,7 @@ This task list is organized into **sprints** that deliver working software incre
 
 ---
 
-## Sprint 1: Image Upload & Manual Annotation (MVP)
+## Sprint 1: Image Upload & Manual Annotation (MVP) - ✅ COMPLETED
 
 **Goal**: Upload images and create annotations manually (no AI yet)
 **Duration**: 2-3 weeks
@@ -269,7 +269,7 @@ This task list is organized into **sprints** that deliver working software incre
 
 ### Data Model Setup (Amplify Gen2)
 - ✅ Define minimal data schema in `amplify/data/resource.ts`
-- ✅ Add Dataset model with basic relationships
+- ✅ Add Image and Annotation models with relationships
 - ✅ Update `amplify/backend.ts` to include data
 - ✅ Generate GraphQL client types
 - ✅ Test data operations in sandbox
@@ -320,55 +320,6 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Display total annotations count
 - ✅ Show recent uploads list
 - ✅ Add navigation to Upload and Gallery pages
-  import { uploadData } from 'aws-amplify/storage';
-  ```
-- ⬜ Save image metadata to DynamoDB via GraphQL
-  ```typescript
-  import { generateClient } from 'aws-amplify/data';
-  const client = generateClient<Schema>();
-  ```
-- ⬜ Show upload progress indicator
-- ⬜ Handle upload errors with retry option
-
-### Image Gallery UI
-- ⬜ Create ImageGallery page
-- ⬜ Implement image grid with lazy loading
-- ⬜ Fetch images from GraphQL API
-- ⬜ Display image thumbnails using S3 presigned URLs
-  ```typescript
-  import { getUrl } from 'aws-amplify/storage';
-  ```
-- ⬜ Add click to open annotation workspace
-- ⬜ Implement basic filtering (date, uploaded by)
-- ⬜ Add image deletion functionality
-
-### Manual Annotation Workspace
-- ⬜ Create AnnotationWorkspace page with layout
-- ⬜ Implement ImageViewer component
-  - ⬜ Display full-size image from S3
-  - ⬜ Add zoom controls (zoom in, out, reset, fit)
-  - ⬜ Implement pan functionality
-- ⬜ Create CanvasAnnotator for bounding boxes
-  - ⬜ Render image with HTML5 canvas overlay
-  - ⬜ Implement drag-to-create bounding box
-  - ⬜ Implement box selection (click to select)
-  - ⬜ Add delete box functionality
-  - ⬜ Store coordinates in pixels {x, y, width, height}
-- ⬜ Create AnnotationForm component
-  - ⬜ QuestionInput text field
-  - ⬜ AnswerInput text field
-  - ⬜ Associate annotation with selected bounding box
-  - ⬜ Display bounding box coordinates
-- ⬜ Create AnnotationList component
-  - ⬜ Display all annotations for current image
-  - ⬜ Click annotation to highlight its bounding box
-  - ⬜ Edit/delete existing annotations
-- ⬜ Implement save functionality (save to DynamoDB via GraphQL)
-
-### Dashboard Updates
-- ⬜ Display total images count
-- ⬜ Display total annotations count
-- ⬜ Show recent uploads list
 
 **Sprint 1 Acceptance Criteria:**
 - ✅ Users can upload images (single or batch)
@@ -567,6 +518,71 @@ This task list is organized into **sprints** that deliver working software incre
 - ⬜ Show recent datasets list
 - ⬜ Add quick actions (Create Dataset, Upload Image)
 
+### Weights & Biases Integration
+- ⬜ Set up W&B account and project
+  ```bash
+  pip install wandb
+  wandb login
+  ```
+- ⬜ Store W&B API key in AWS Secrets Manager
+  ```bash
+  printf "your-wandb-api-key" | npx ampx sandbox secret set WANDB_API_KEY
+  ```
+- ⬜ Create `amplify/functions/wandb-logger/` directory
+- ⬜ Create `amplify/functions/wandb-logger/resource.ts`
+  ```typescript
+  import { defineFunction, secret } from '@aws-amplify/backend';
+
+  export const wandbLogger = defineFunction({
+    name: 'wandbLogger',
+    runtime: 20,
+    timeoutSeconds: 300,
+    memoryMB: 1024,
+    environment: {
+      WANDB_API_KEY: secret('WANDB_API_KEY'),
+      WANDB_PROJECT: 'business-ocr-dataset'
+    }
+  });
+  ```
+- ⬜ Install dependencies in function directory
+  ```bash
+  cd amplify/functions/wandb-logger
+  npm install wandb
+  ```
+- ⬜ Implement incremental data logging handler
+  - ⬜ Initialize W&B run
+  - ⬜ Create W&B Table for VQA data
+  - ⬜ Log images incrementally (one row at a time to avoid memory issues)
+  - ⬜ Include fields: image, question, answers, answer_bbox, document_type
+  - ⬜ Handle large image files (compress if needed before upload)
+  - ⬜ Track logging progress
+  - ⬜ Return W&B run URL
+- ⬜ Implement evaluation handler
+  - ⬜ Fetch dataset from DynamoDB
+  - ⬜ Create evaluation run in W&B
+  - ⬜ Log evaluation metrics incrementally (per annotation)
+  - ⬜ Calculate OCR accuracy metrics (exact match, F1 score)
+  - ⬜ Visualize bounding box annotations
+  - ⬜ Compare annotation quality across images
+  - ⬜ Return evaluation summary and W&B URL
+- ⬜ Update `amplify/backend.ts` to include wandbLogger function
+
+### W&B Integration UI
+- ⬜ Add "Log to W&B" button to DatasetDetails page
+- ⬜ Create WandBDialog component
+  - ⬜ Project name input
+  - ⬜ Run name input (auto-generated by default)
+  - ⬜ Show logging progress (X/Y images logged)
+  - ⬜ Display W&B run URL when complete
+- ⬜ Add "Evaluate Dataset" button
+- ⬜ Create EvaluationDialog component
+  - ⬜ Select metrics to compute
+  - ⬜ Show evaluation progress
+  - ⬜ Display evaluation results summary
+  - ⬜ Link to W&B evaluation dashboard
+- ⬜ Handle W&B API errors gracefully
+- ⬜ Store W&B run URLs in dataset metadata
+
 **Sprint 3 Acceptance Criteria:**
 - ✅ Users can create new datasets
 - ✅ Users can add images to datasets
@@ -574,6 +590,11 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Users can view dataset details
 - ✅ Users can export datasets in JSON format
 - ✅ Export file is downloadable
+- ✅ Datasets can be logged to W&B incrementally
+- ✅ Large images are handled without memory issues
+- ✅ Evaluations can be run on datasets
+- ✅ Evaluation metrics are displayed in W&B
+- ✅ W&B run URLs are saved and accessible
 
 ---
 
@@ -1262,14 +1283,14 @@ business-ocr-annotator/
 
 ## Progress Tracking
 
-**Last Review Date**: 2026-01-07
+**Last Review Date**: 2026-01-11
 **Next Review Date**: TBD
-**Completed Tasks**: 5 / 250+
-**Current Sprint**: Sprint 0 (Foundation)
+**Completed Tasks**: Sprint 0 + Sprint 1 completed
+**Current Sprint**: Sprint 2 (AI-Assisted Annotation)
 
 ### Sprint Completion Status
-- ⬜ Sprint 0: Foundation & Deployment
-- ⬜ Sprint 1: Image Upload & Manual Annotation (MVP)
+- ✅ Sprint 0: Foundation & Deployment
+- ✅ Sprint 1: Image Upload & Manual Annotation (MVP)
 - ⬜ Sprint 2: AI-Assisted Annotation
 - ⬜ Sprint 3: Dataset Management & Export
 - ⬜ Sprint 4: Multi-Language Support & Optimization
