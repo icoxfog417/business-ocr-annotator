@@ -336,16 +336,17 @@ This task list is organized into **sprints** that deliver working software incre
 
 ---
 
-## Sprint 2: AI-Assisted Annotation (Bedrock Integration)
+## Sprint 2: AI-Assisted Annotation (Nemotron Integration)
 
-**Goal**: Auto-generate annotations using AWS Bedrock
+**Goal**: Auto-generate annotations using NVIDIA Nemotron Nano 12B
 **Duration**: 2-3 weeks
 **Deliverable**: One-click AI annotation generation
 
-### Bedrock Setup
-- ⬜ Enable Amazon Bedrock in AWS account
-- ⬜ Request model access for Claude 3.5 Sonnet
-- ⬜ Configure IAM permissions for Bedrock access
+### Nemotron Setup
+- ⬜ Research NVIDIA Nemotron Nano 12B deployment options
+- ⬜ Set up Nemotron model endpoint (self-hosted or API)
+- ⬜ Configure IAM permissions for Nemotron access
+- ⬜ Test model inference with sample images
 
 ### Lambda Function for Annotation Generation
 - ⬜ Create `amplify/functions/generate-annotation/` directory
@@ -353,7 +354,7 @@ This task list is organized into **sprints** that deliver working software incre
   ```bash
   cd amplify/functions/generate-annotation
   npm init -y
-  npm install @aws-sdk/client-bedrock-runtime
+  npm install @aws-sdk/client-s3
   cd ../../..
   ```
 - ⬜ Create `amplify/functions/generate-annotation/resource.ts`
@@ -363,28 +364,28 @@ This task list is organized into **sprints** that deliver working software incre
   export const generateAnnotation = defineFunction({
     name: 'generateAnnotation',
     runtime: 20, // Node.js 20.x
-    timeoutSeconds: 300, // 5 minutes for Bedrock call
+    timeoutSeconds: 300, // 5 minutes for Nemotron call
     memoryMB: 1024
   });
   ```
 - ⬜ Implement handler in `amplify/functions/generate-annotation/handler.ts`
   ```typescript
-  import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
+  import { NemotronVisionClient } from './nemotron-client';
   ```
-- ⬜ Implement BedrockVisionClient service class
-  - ⬜ Initialize Bedrock Runtime client
-  - ⬜ Create prompt template for Claude 3.5 Sonnet
-  - ⬜ Implement converse API call with image (base64 or S3 reference)
+- ⬜ Implement NemotronVisionClient service class
+  - ⬜ Initialize Nemotron client
+  - ⬜ Create prompt template for Nemotron Nano 12B
+  - ⬜ Implement API call with image (base64 or S3 reference)
   - ⬜ Parse response to extract Q&A pairs and bounding boxes
 - ⬜ Add Lambda environment variables
   ```typescript
   // In resource.ts
   environment: {
-    BEDROCK_REGION: 'us-east-1',
-    MODEL_ID: 'anthropic.claude-3-5-sonnet-20241022-v2:0'
+    NEMOTRON_ENDPOINT: 'https://api.nemotron.nvidia.com/v1',
+    MODEL_ID: 'nvidia/nemotron-nano-12b'
   }
   ```
-- ⬜ Grant Lambda permissions to access S3 and Bedrock
+- ⬜ Grant Lambda permissions to access S3 and Nemotron API
 - ⬜ Store generated annotations in DynamoDB
 - ⬜ Add error handling and retry logic
 - ⬜ Implement CloudWatch logging
@@ -416,7 +417,7 @@ This task list is organized into **sprints** that deliver working software incre
 - ⬜ Show loading state during generation (with spinner)
 - ⬜ Display generated annotations in AnnotationList
 - ⬜ Allow users to edit/approve/reject AI annotations
-- ⬜ Add confidence score display (if available from Bedrock)
+- ⬜ Add confidence score display (if available from Nemotron)
 - ⬜ Highlight AI-generated vs manual annotations
 - ⬜ Handle generation errors gracefully
 
@@ -435,15 +436,15 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Generated annotations appear in the workspace
 - ✅ Users can approve, reject, or edit AI annotations
 - ✅ Annotation status is tracked and persisted
-- ✅ Error handling works for Bedrock failures
+- ✅ Error handling works for Nemotron failures
 
 ---
 
-## Sprint 3: Dataset Management & Export
+## Sprint 3: Dataset Management, Export & Validation
 
-**Goal**: Create datasets and export in JSON format
-**Duration**: 1-2 weeks
-**Deliverable**: Dataset creation and basic export functionality
+**Goal**: Create datasets, export in JSON format, and validate quality with W&B
+**Duration**: 2-3 weeks
+**Deliverable**: Dataset creation, export functionality, and W&B-based evaluation
 
 ### Data Model Extension
 - ⬜ Add Dataset model to `amplify/data/resource.ts`
@@ -627,13 +628,13 @@ This task list is organized into **sprints** that deliver working software incre
   ```
   Note: Can start with English-only UI and add translations later if needed
 
-### Multi-Language Bedrock Prompts
+### Multi-Language Nemotron Prompts
 - ⬜ Create prompt templates directory `amplify/functions/generate-annotation/prompts/`
   - ⬜ `ja.ts` - Japanese prompt template
   - ⬜ `en.ts` - English prompt template
   - ⬜ `zh.ts` - Chinese prompt template
   - ⬜ `ko.ts` - Korean prompt template
-- ⬜ Update BedrockVisionClient to select prompt by language
+- ⬜ Update NemotronVisionClient to select prompt by language
 - ⬜ Add language parameter to annotation generation Lambda
 - ⬜ Test prompts for each language
 - ⬜ Update Lambda environment variables
@@ -1292,7 +1293,7 @@ business-ocr-annotator/
 - ✅ Sprint 0: Foundation & Deployment
 - ✅ Sprint 1: Image Upload & Manual Annotation (MVP)
 - ⬜ Sprint 2: AI-Assisted Annotation
-- ⬜ Sprint 3: Dataset Management & Export
+- ⬜ Sprint 3: Dataset Management, Export & Validation (with W&B)
 - ⬜ Sprint 4: Multi-Language Support & Optimization
 - ⬜ Sprint 5: Mobile Optimization & Camera
 - ⬜ Sprint 6: Publishing & PII Handling

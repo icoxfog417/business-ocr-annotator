@@ -23,7 +23,7 @@ graph TB
 
     subgraph "Lambda Functions - Node.js 20.x"
         ImageProc[ImageProcessor<br/>Sharp-based compression]
-        AnnotGen[AnnotationGenerator<br/>Bedrock integration]
+        AnnotGen[AnnotationGenerator<br/>Nemotron integration]
         DatasetExp[DatasetExporter<br/>JSON/JSONL/Parquet]
         PIIRedact[PIIRedactor<br/>Multi-language PII]
     end
@@ -33,7 +33,7 @@ graph TB
     end
 
     subgraph "AI Services"
-        Bedrock[Amazon Bedrock<br/>Qwen-VL / Claude Vision<br/>Multi-language]
+        Nemotron[NVIDIA Nemotron Nano 12B<br/>Vision-Language Model<br/>Multi-language]
     end
 
     subgraph "External"
@@ -50,14 +50,14 @@ graph TB
 
     ImageProc --> S3Store
     ImageProc --> DynamoDB
-    AnnotGen --> Bedrock
+    AnnotGen --> Nemotron
     AnnotGen --> DynamoDB
     DatasetExp --> S3Store
     DatasetExp --> DynamoDB
     DatasetExp --> HF
     PIIRedact --> S3Store
 
-    style Bedrock fill:#ff9900
+    style Nemotron fill:#ff9900
     style DynamoDB fill:#527FFF
     style S3Store fill:#569A31
     style AppSync fill:#945DF2
@@ -83,12 +83,12 @@ graph TB
 - **File Processing**: Lambda + Sharp v0.33+ for image processing
 
 #### AI/ML
-- **Vision Models**: **Amazon Bedrock**
-  - Qwen-VL (open-weight vision-language model)
-  - Claude 3.5 Sonnet (high-accuracy vision)
-  - Future model support via Bedrock
-- **Model Inference**: Bedrock Runtime API
-- **Multi-language**: Native support in Bedrock models
+- **Vision Models**: **NVIDIA Nemotron Nano 12B**
+  - Open-weight vision-language model with permissive licensing
+  - Multi-language support for business documents
+  - Self-hosted or API deployment options
+- **Model Inference**: Direct API calls or self-hosted inference
+- **Multi-language**: Native support in Nemotron model
 
 #### External Services
 - **Dataset Platform**: Hugging Face Hub API
@@ -235,7 +235,7 @@ interface Annotation {
 
   // Generation metadata
   generatedBy: GenerationSource; // AI or Human
-  modelVersion?: string;         // Bedrock model ID (e.g., "anthropic.claude-3-sonnet")
+  modelVersion?: string;         // Nemotron model ID (e.g., "nvidia/nemotron-nano-12b")
   confidence?: number;           // Model confidence (0-1)
 
   // User tracking

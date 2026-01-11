@@ -2,9 +2,9 @@
 
 This document records questions and answers discovered during sandbox verification of AWS Amplify Gen2 and related technologies for the Business OCR Annotator project.
 
-**Last Updated**: 2026-01-10
-**Total Questions**: 9
-**Total Verified**: 9 / 9
+**Last Updated**: 2026-01-11
+**Total Questions**: 11
+**Total Verified**: 9 / 11
 
 ## Overview
 
@@ -30,6 +30,8 @@ Each Q&A entry documents:
 | Q7 | Sharp image compression | 🟡 Medium | 4 | ✅ Verified |
 | Q8 | Hugging Face Hub API | 🟡 Medium | 6 | ✅ Verified |
 | Q9 | Secrets management | 🟡 Medium | 0,6,7 | ✅ Verified |
+| Q10 | Weights & Biases incremental data | 🟠 High | 3 | ⏳ Pending |
+| Q11 | Weights & Biases incremental eval | 🟠 High | 3 | ⏳ Pending |
 
 ---
 
@@ -919,6 +921,79 @@ export const handler = async () => {
 
 ---
 
+### Q10: How to store large images incrementally in Weights & Biases?
+
+**Priority**: 🟠 High (Sprint 3)
+**Affects Design**: ✅ Yes - Dataset validation and evaluation strategy
+**Status**: ⏳ Pending Verification
+
+**Question Details**:
+- How to initialize a W&B Table for storing VQA data with images?
+- How to log images incrementally (row by row) to avoid memory issues?
+- How to handle large image files (multi-MB business documents)?
+- How to organize data with questions, answers, and bounding boxes?
+- How to version datasets for evaluation tracking?
+- What are the best practices for incremental uploads to W&B?
+
+**Answer**: [To be verified in sandbox]
+
+**Code Sample**:
+```python
+# To be added after sandbox verification
+```
+
+**Verified in**: [`.sandbox/10-wandb-incremental-data/`](.sandbox/10-wandb-incremental-data/)
+
+**Key Findings**:
+- [To be documented after verification]
+
+**Gotchas**:
+- [To be documented after verification]
+
+**References**:
+- [W&B Tables Documentation](https://docs.wandb.ai/guides/data-vis/tables)
+- [W&B Media Logging](https://docs.wandb.ai/guides/track/log/media)
+- [W&B Artifacts](https://docs.wandb.ai/guides/artifacts)
+
+---
+
+### Q11: How to register and run evaluations incrementally in Weights & Biases?
+
+**Priority**: 🟠 High (Sprint 3)
+**Affects Design**: ✅ Yes - Dataset quality validation workflow
+**Status**: ⏳ Pending Verification
+
+**Question Details**:
+- How to create W&B evaluation runs with custom metrics?
+- How to log evaluation results incrementally (per sample)?
+- How to compute and display OCR accuracy metrics?
+- How to visualize bounding box predictions vs ground truth?
+- How to compare multiple model evaluations side-by-side?
+- How to track evaluation progress for large datasets?
+- What metrics are most relevant for VQA and OCR tasks?
+
+**Answer**: [To be verified in sandbox]
+
+**Code Sample**:
+```python
+# To be added after sandbox verification
+```
+
+**Verified in**: [`.sandbox/11-wandb-incremental-eval/`](.sandbox/11-wandb-incremental-eval/)
+
+**Key Findings**:
+- [To be documented after verification]
+
+**Gotchas**:
+- [To be documented after verification]
+
+**References**:
+- [W&B Evaluations](https://docs.wandb.ai/guides/model_registry/model-evaluations)
+- [W&B Custom Metrics](https://docs.wandb.ai/guides/track/log/logging-faqs)
+- [W&B Visualizations](https://docs.wandb.ai/guides/data-vis)
+
+---
+
 ## Verification Workflow
 
 ### Step 1: Critical Questions (Before Sprint 0)
@@ -929,12 +1004,14 @@ export const handler = async () => {
 3. Q3: Amplify Data → Data model
 ```
 
-### Step 2: High Priority Questions (Before Sprint 1-2)
+### Step 2: High Priority Questions (Before Sprint 1-3)
 ```bash
 # Verify before starting respective sprints
 4. Q4: S3 Storage → Sprint 1 (Image Upload)
 5. Q5: Lambda Functions → Sprint 1-2 (Backend)
 6. Q6: Bedrock → Sprint 2 (AI Annotation)
+10. Q10: W&B Incremental Data → Sprint 3 (Dataset Validation)
+11. Q11: W&B Incremental Eval → Sprint 3 (Evaluation)
 ```
 
 ### Step 3: Medium Priority Questions (As Needed)
@@ -954,10 +1031,12 @@ export const handler = async () => {
 - [x] **Q2**: Google OAuth authentication
 - [x] **Q3**: Amplify Gen2 Data (AppSync + DynamoDB)
 
-### Core Features (Verify before Sprint 1-2)
+### Core Features (Verify before Sprint 1-3)
 - [x] **Q4**: S3 storage configuration
 - [x] **Q5**: Lambda function creation and deployment
 - [x] **Q6**: Bedrock integration with image input
+- [ ] **Q10**: Weights & Biases incremental data storage
+- [ ] **Q11**: Weights & Biases incremental evaluation
 
 ### Extended Features (Verify as needed)
 - [x] **Q7**: Sharp image compression in Lambda

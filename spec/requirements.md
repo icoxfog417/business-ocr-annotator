@@ -72,10 +72,10 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 
 ### 3.2 AI-Powered Question Generation
 
-#### 3.2.1 Automatic Annotation via Amazon Bedrock
-- **REQ-BR-001**: System shall use Amazon Bedrock for vision model inference
-- **REQ-BR-002**: System shall support multiple Bedrock models (Qwen-VL, Claude 3.5 Sonnet)
-- **REQ-QG-001**: System shall automatically generate questions for uploaded images using Bedrock vision models
+#### 3.2.1 Automatic Annotation via NVIDIA Nemotron Nano 12B
+- **REQ-BR-001**: System shall use NVIDIA Nemotron Nano 12B for vision model inference
+- **REQ-BR-002**: System shall integrate with Nemotron Nano 12B API for annotation generation
+- **REQ-QG-001**: System shall automatically generate questions for uploaded images using Nemotron vision models
 - **REQ-QG-002**: System shall generate diverse question types:
   - Extractive ("What is the total amount?")
   - Abstractive ("What is the highest priced item?")
@@ -96,11 +96,11 @@ The Business OCR Annotator is a platform for creating high-quality Visual dialog
 - **REQ-ML-004**: Annotations shall include language metadata (ISO 639-1 code)
 
 #### 3.2.3 Model Configuration
-- **REQ-MC-001**: Administrators shall select Bedrock models for annotation generation
-- **REQ-MC-002**: System shall support multiple Bedrock model versions
-- **REQ-MC-003**: System shall allow model parameter tuning (temperature, max tokens)
-- **REQ-MC-004**: System shall track which Bedrock model version generated each annotation
-- **REQ-MC-005**: System shall provide model performance metrics (latency, cost, accuracy)
+- **REQ-MC-001**: Administrators shall configure NVIDIA Nemotron Nano 12B for annotation generation
+- **REQ-MC-002**: System shall support Nemotron model parameter tuning (temperature, max tokens)
+- **REQ-MC-003**: System shall track which Nemotron model version generated each annotation
+- **REQ-MC-004**: System shall provide model performance metrics (latency, accuracy)
+- **REQ-MC-005**: System shall support model endpoint configuration (self-hosted or API)
 
 ### 3.3 Human Validation Workflow
 
@@ -317,10 +317,10 @@ I want the system to automatically detect and redact sensitive personal informat
 So that published datasets comply with privacy regulations globally.
 ```
 
-### 5.10 Bedrock Model Selection
+### 5.10 Nemotron Model Selection
 ```
 As an administrator,
-I want to select and configure different Bedrock vision models (Qwen-VL, Claude Vision),
+I want to select and configure different Nemotron model parameters,
 So that I can optimize for accuracy, cost, and performance based on document types.
 ```
 
@@ -329,8 +329,8 @@ So that I can optimize for accuracy, cost, and performance based on document typ
 ### 6.1 Minimum Viable Product (MVP)
 - Image upload and basic management (multi-format support)
 - Language selection on upload
-- Amazon Bedrock-based automatic question generation with bounding boxes
-- Support for at least 2 Bedrock models (Qwen-VL, Claude Vision)
+- NVIDIA Nemotron Nano 12B-based automatic question generation with bounding boxes
+- Support for Nemotron model configuration and parameter tuning
 - Manual annotation review and editing interface
 - Basic approval/rejection workflow
 - Export to JSON and Parquet formats
@@ -349,7 +349,7 @@ So that I can optimize for accuracy, cost, and performance based on document typ
 ## 7. Constraints
 
 - Must use AWS Amplify Gen2 for infrastructure
-- Must use Amazon Bedrock for vision model inference
+- Must use NVIDIA Nemotron Nano 12B for vision model inference
 - Must integrate with Hugging Face for dataset publishing
 - Must support standard bounding box formats (LayoutLM, DocVQA compatible)
 - Must use Node.js 20.x for Lambda functions
@@ -357,8 +357,8 @@ So that I can optimize for accuracy, cost, and performance based on document typ
 
 ## 8. Dependencies
 
-- AWS Account with Amazon Bedrock access enabled
-- Bedrock model access (Qwen-VL, Claude 3.5 Sonnet)
+- AWS Account with appropriate service access
+- NVIDIA Nemotron Nano 12B model access (API or self-hosted)
 - Hugging Face account and API access
 - Node.js 20.x development environment
 - AWS Amplify Gen2 CLI
