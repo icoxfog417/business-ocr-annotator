@@ -144,4 +144,5 @@ vite.config.ts.timestamp-*
 !.sandbox/README.md
 google-auth-oauth-info.json
 hugging-face-token.json
+wandb-api-key.json
 *.zip

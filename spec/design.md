@@ -33,7 +33,7 @@ graph TB
     end
 
     subgraph "AI Services"
-        Bedrock[Amazon Bedrock<br/>Qwen-VL / Claude Vision<br/>Multi-language]
+        Bedrock[Amazon Bedrock<br/>Nemotron Nano 12B]
     end
 
     subgraph "External"
@@ -83,12 +83,12 @@ graph TB
 - **File Processing**: Lambda + Sharp v0.33+ for image processing
 
 #### AI/ML
-- **Vision Models**: **Amazon Bedrock**
-  - Qwen-VL (open-weight vision-language model)
-  - Claude 3.5 Sonnet (high-accuracy vision)
-  - Future model support via Bedrock
-- **Model Inference**: Bedrock Runtime API
-- **Multi-language**: Native support in Bedrock models
+- **Vision Models**: **NVIDIA Nemotron Nano 12B**
+  - Open-weight vision-language model with permissive licensing
+  - Multi-language support for business documents
+  - Self-hosted or API deployment options
+- **Model Inference**: Direct API calls or self-hosted inference
+- **Multi-language**: Native support in Nemotron model
 
 #### External Services
 - **Dataset Platform**: Hugging Face Hub API
@@ -187,7 +187,12 @@ enum DocumentType {
 // Note: Simplified status enum for MVP
 // UPLOADED: Initial state after upload
 // ANNOTATING: Currently being annotated
-// VALIDATED: Annotations have been validated
+// VALIDATED: Annotations have been validated (finalized by annotator)
+//
+// Status Synchronization:
+// - Image.status = VALIDATED corresponds to all Annotation.validationStatus = APPROVED
+// - When annotator finalizes, Image.status changes to VALIDATED
+// - When annotator re-opens, Image.status changes back to ANNOTATING
 enum ImageStatus {
   UPLOADED = 'UPLOADED',
   ANNOTATING = 'ANNOTATING',
@@ -235,7 +240,7 @@ interface Annotation {
 
   // Generation metadata
   generatedBy: GenerationSource; // AI or Human
-  modelVersion?: string;         // Bedrock model ID (e.g., "anthropic.claude-3-sonnet")
+  modelVersion?: string;         // Nemotron model ID (e.g., "nvidia/nemotron-nano-12b")
   confidence?: number;           // Model confidence (0-1)
 
   // User tracking
@@ -277,6 +282,44 @@ enum ValidationStatus {
 // - annotationsByImage: Query annotations by imageId
 // - annotationsByValidationStatus: Query annotations by validationStatus
 // - annotationsByCreator: Query annotations by createdBy
+```
+
+#### DefaultQuestion Table
+```typescript
+interface DefaultQuestion {
+  id: string;                    // Partition Key (UUID)
+  
+  // Classification - links to Image.documentType
+  documentType: DocumentType;    // RECEIPT, INVOICE, etc. (same enum as Image)
+  language: string;              // ISO 639-1 code (ja, en, zh, ko)
+  
+  // Question content
+  questionText: string;          // e.g., "What is the shop name?"
+  questionType: QuestionType;    // EXTRACTIVE only (no reasoning questions)
+  
+  // Ordering
+  displayOrder: number;          // Sort order within category+language
+  
+  // User tracking
+  createdBy: string;             // Admin who created
+  createdAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+// Note: DefaultQuestion.documentType uses the same DocumentType enum as Image.documentType
+// This allows querying default questions by the image's document category
+
+// Note: DefaultQuestion.questionType uses the same QuestionType enum as Annotation.questionType
+// DefaultQuestion is limited to EXTRACTIVE only, but shares the enum for consistency
+
+// Authorization Rules:
+// - Anyone authenticated can read
+// - Only Admins can create, update, delete
+
+// Secondary Indexes:
+// - defaultQuestionsByDocumentType: Query by documentType
+// - Filter by language in application layer
 ```
 
 #### Dataset Table
