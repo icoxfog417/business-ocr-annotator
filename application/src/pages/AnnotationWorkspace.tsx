@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { generateClient } from 'aws-amplify/data';
 import { getUrl, downloadData } from 'aws-amplify/storage';
-import type { Schema } from '../../amplify/data/resource';
+import { client } from '../lib/apiClient';
+import { LANGUAGES } from '../lib/constants';
+import { getStatusStyle } from '../lib/statusStyles';
 import { CanvasAnnotator } from '../components/CanvasAnnotator';
 import {
   type BoundingBox,
@@ -11,8 +12,6 @@ import {
   canvasToHuggingFace,
   huggingFaceToCanvas,
 } from '../types';
-
-const client = generateClient<Schema>();
 
 interface Annotation {
   id: string;
@@ -38,13 +37,6 @@ interface ImageData {
   height: number;
   status?: string;
 }
-
-const LANGUAGES = [
-  { code: 'ja', label: '日本語' },
-  { code: 'en', label: 'English' },
-  { code: 'zh', label: '中文' },
-  { code: 'ko', label: '한국어' },
-];
 
 export function AnnotationWorkspace() {
   const { imageId } = useParams<{ imageId: string }>();
@@ -164,7 +156,7 @@ export function AnnotationWorkspace() {
       // Convert all annotation bounding boxes to canvas format
       const allCanvasBoxes: CanvasBoundingBox[] = [];
       fetchedAnnotations.forEach((annotation) => {
-        annotation.boundingBoxes.forEach((bbox, index) => {
+        annotation.boundingBoxes.forEach((bbox: BoundingBox, index: number) => {
           allCanvasBoxes.push(huggingFaceToCanvas(bbox, `${annotation.id}-${index}`));
         });
       });
@@ -310,7 +302,7 @@ export function AnnotationWorkspace() {
         setAnnotations((prev) => [...prev, annotation]);
         
         // Add to canvas boxes
-        annotation.boundingBoxes.forEach((bbox, index) => {
+        annotation.boundingBoxes.forEach((bbox: BoundingBox, index: number) => {
           const canvasBox = huggingFaceToCanvas(bbox, `${annotation.id}-${index}`);
           setCanvasBoxes((prev) => [...prev, canvasBox]);
         });
@@ -540,7 +532,6 @@ export function AnnotationWorkspace() {
     }
   };
 
-  // Re-open annotations (mark image as ANNOTATING)
   // Filter annotations based on status
   const filteredAnnotations =
     statusFilter === 'ALL'
@@ -574,10 +565,6 @@ export function AnnotationWorkspace() {
         <button onClick={() => window.history.back()}>Go Back</button>
       </div>
     );
-  }
-
-  if (!image) {
-    return <div style={{ padding: '2rem' }}>Image not found</div>;
   }
 
   return (
@@ -651,22 +638,7 @@ export function AnnotationWorkspace() {
                 padding: '0.25rem 0.75rem',
                 borderRadius: '9999px',
                 fontWeight: '600',
-                backgroundColor:
-                  image.status === 'VALIDATED'
-                    ? '#d1fae5'
-                    : image.status === 'PROCESSING'
-                      ? '#dbeafe'
-                      : image.status === 'ANNOTATING'
-                        ? '#fef3c7'
-                        : '#f3f4f6',
-                color:
-                  image.status === 'VALIDATED'
-                    ? '#065f46'
-                    : image.status === 'PROCESSING'
-                      ? '#1e40af'
-                      : image.status === 'ANNOTATING'
-                        ? '#92400e'
-                        : '#374151',
+                ...getStatusStyle(image.status),
               }}
             >
               {image.status || 'UPLOADED'}
@@ -1138,13 +1110,6 @@ export function AnnotationWorkspace() {
           ))}
         </div>
       </div>
-
-      {/* CSS for spinner animation */}
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

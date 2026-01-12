@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
 import { signOut } from 'aws-amplify/auth';
 import { Link } from 'react-router-dom';
-import { generateClient } from 'aws-amplify/data';
-import type { Schema } from '../../amplify/data/resource';
-
-const client = generateClient<Schema>();
+import { client } from '../lib/apiClient';
 
 interface Stats {
   images: number;

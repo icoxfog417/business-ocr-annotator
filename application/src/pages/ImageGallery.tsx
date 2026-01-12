@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { generateClient } from 'aws-amplify/data';
 import { getUrl } from 'aws-amplify/storage';
-import type { Schema } from '../../amplify/data/resource';
-
-const client = generateClient<Schema>();
+import { client } from '../lib/apiClient';
+import { getStatusStyle, getProcessingOpacity } from '../lib/statusStyles';
 
 interface ImageWithUrl {
   id: string;
@@ -177,7 +175,7 @@ export function ImageGallery() {
                     width: '100%',
                     height: '200px',
                     objectFit: 'cover',
-                    opacity: image.status === 'PROCESSING' ? 0.6 : 1
+                    opacity: getProcessingOpacity(image.status)
                   }}
                 />
               ) : (
@@ -241,16 +239,7 @@ export function ImageGallery() {
                       borderRadius: '4px',
                       display: 'inline-block',
                       marginBottom: '0.5rem',
-                      backgroundColor:
-                        image.status === 'PROCESSING' ? '#fef3c7' :
-                        image.status === 'UPLOADED' ? '#d1fae5' :
-                        image.status === 'ANNOTATING' ? '#dbeafe' :
-                        '#f3f4f6',
-                      color:
-                        image.status === 'PROCESSING' ? '#92400e' :
-                        image.status === 'UPLOADED' ? '#065f46' :
-                        image.status === 'ANNOTATING' ? '#1e40af' :
-                        '#374151'
+                      ...getStatusStyle(image.status)
                     }}
                   >
                     {image.status}
@@ -293,13 +282,6 @@ export function ImageGallery() {
           ))}
         </div>
       )}
-
-      {/* CSS for spinner animation */}
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

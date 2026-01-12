@@ -1,36 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { uploadData } from 'aws-amplify/storage';
-import { generateClient } from 'aws-amplify/data';
-import type { Schema } from '../../amplify/data/resource';
-
-const client = generateClient<Schema>();
-
-const LANGUAGES = [
-  { code: 'ja', label: '日本語 (Japanese)' },
-  { code: 'en', label: 'English' },
-  { code: 'zh', label: '中文 (Chinese)' },
-  { code: 'ko', label: '한국어 (Korean)' },
-];
-
-const DOCUMENT_TYPES = [
-  { code: 'RECEIPT', label: 'Receipt' },
-  { code: 'INVOICE', label: 'Invoice' },
-  { code: 'ORDER_FORM', label: 'Order Form' },
-  { code: 'TAX_FORM', label: 'Tax Form' },
-  { code: 'CONTRACT', label: 'Contract' },
-  { code: 'APPLICATION_FORM', label: 'Application Form' },
-  { code: 'OTHER', label: 'Other' },
-];
-
-type DocumentTypeValue = 'RECEIPT' | 'INVOICE' | 'ORDER_FORM' | 'TAX_FORM' | 'CONTRACT' | 'APPLICATION_FORM' | 'OTHER';
+import { client } from '../lib/apiClient';
+import { LANGUAGES, DOCUMENT_TYPES, type DocumentTypeCode } from '../lib/constants';
 
 export function FileUpload() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [language, setLanguage] = useState('ja');
-  const [documentType, setDocumentType] = useState<DocumentTypeValue>('RECEIPT');
+  const [documentType, setDocumentType] = useState<DocumentTypeCode>('RECEIPT');
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -224,7 +203,7 @@ export function FileUpload() {
             </label>
             <select
               value={documentType}
-              onChange={(e) => setDocumentType(e.target.value as DocumentTypeValue)}
+              onChange={(e) => setDocumentType(e.target.value as DocumentTypeCode)}
               style={{
                 padding: '0.5rem',
                 borderRadius: '4px',
