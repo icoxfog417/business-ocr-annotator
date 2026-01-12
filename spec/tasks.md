@@ -465,7 +465,40 @@ This task list is organized into **sprints** that deliver working software incre
 **Deliverable**: Optimized annotation workflow, mobile-friendly interface, user consent system
 **Proposal**: See [spec/proposals/20260112_sprint3_mobile_first_ui.md](proposals/20260112_sprint3_mobile_first_ui.md)
 
-### Phase 0: Legal & Consent System (Day 1)
+### Parallel Work Units
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         SPRINT 3 PARALLEL EXECUTION                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Day 1-2: Foundation (Run in Parallel)                                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │ Unit A       │  │ Unit B       │  │ Unit C       │  │ Unit D       │    │
+│  │ Backend      │  │ Config &     │  │ Layout       │  │ i18n &       │    │
+│  │ Infrastructure│  │ Hooks        │  │ Components   │  │ Styles       │    │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘    │
+│         │                 │                 │                 │             │
+│         ▼                 ▼                 ▼                 ▼             │
+│  Day 3-4: Features (Run in Parallel, depends on Foundation)                  │
+│  ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────┐  │
+│  │ Unit E               │  │ Unit F               │  │ Unit G           │  │
+│  │ Upload Flow          │  │ Annotation Flow      │  │ Mobile Features  │  │
+│  │ (Consent + Questions)│  │ (Box-first + Read)   │  │ (Touch + Camera) │  │
+│  └──────────┬───────────┘  └──────────┬───────────┘  └────────┬─────────┘  │
+│             │                         │                       │             │
+│             ▼                         ▼                       ▼             │
+│  Day 5-6: Integration & Testing                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │ Unit H: Page Integration + Testing                                   │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Unit A: Backend Infrastructure ⚡ (No dependencies - Start immediately)
 
 - ⬜ Add Cognito custom attributes for consent in `amplify/auth/resource.ts`
   ```typescript
@@ -477,160 +510,240 @@ This task list is organized into **sprints** that deliver working software incre
   ```
 
 - ⬜ Update `Annotation` model in `amplify/data/resource.ts` with AI tracking fields
-  - `aiAssisted: boolean` - True if [📖 Read] was used
-  - `aiModelId: string` - Model ID (e.g., "anthropic.claude-3-5-sonnet")
-  - `aiModelProvider: string` - Provider (e.g., "bedrock")
-  - `aiExtractionTimestamp: datetime` - When AI extraction occurred
+  - `aiAssisted: a.boolean()` - True if [📖 Read] was used
+  - `aiModelId: a.string()` - Model ID (e.g., "anthropic.claude-3-5-sonnet")
+  - `aiModelProvider: a.string()` - Provider (e.g., "bedrock")
+  - `aiExtractionTimestamp: a.datetime()` - When AI extraction occurred
 
-- ⬜ Create `StartContributingDialog` component
-  - ⬜ Multi-language consent message (EN, JA, ZH)
-  - ⬜ Checkbox for explicit consent
-  - ⬜ Cancel and Accept buttons
-  - ⬜ Block upload/annotation without contributor status
+- ⬜ Update `generate-annotation` Lambda to return model ID in response
 
-- ⬜ Create `useContributorStatus` hook
-  - ⬜ Check `custom:contributor` attribute via `fetchUserAttributes()`
-  - ⬜ Update Cognito attributes via `updateUserAttributes()` when accepted
-  - ⬜ Return contributor status for conditional rendering
+---
 
-- ⬜ Create `ContributorContext` provider
-  - ⬜ Cache contributor status globally
-  - ⬜ Provide `isContributor` and `becomeContributor()` to components
+### Unit B: Config & Hooks ⚡ (No dependencies - Start immediately)
 
-- ⬜ Add consent translations
-  - ⬜ `src/i18n/consent/en.json`
-  - ⬜ `src/i18n/consent/ja.json`
-  - ⬜ `src/i18n/consent/zh.json`
+- ⬜ Create `src/config/defaultQuestions.json`
+  - All document types (RECEIPT, INVOICE, ORDER_FORM, TAX_FORM, CONTRACT, APPLICATION_FORM, OTHER)
+  - All languages (ja, en, zh, ko)
+  - Default + optional questions per type/language
 
-### Phase 1: UX Flow Refactor (Day 1-2)
+- ⬜ Create `src/hooks/useDefaultQuestions.ts`
+  - Load questions from JSON config
+  - Filter by document type and language
+  - Fallback to English if language not found
 
-- ⬜ Create default questions configuration
-  - ⬜ Create `src/config/defaultQuestions.json`
-    - All document types (RECEIPT, INVOICE, ORDER_FORM, etc.)
-    - All languages (ja, en, zh, ko)
-    - Default + optional questions per type/language
-  - ⬜ Create `src/hooks/useDefaultQuestions.ts` hook
+- ⬜ Create `src/hooks/useContributorStatus.ts`
+  - Check `custom:contributor` via `fetchUserAttributes()`
+  - Update via `updateUserAttributes()` when accepted
+  - Return `{ isContributor, isLoading, becomeContributor }`
 
-- ⬜ Create `QuestionSelector` component (on Upload screen)
-  - ⬜ Load questions from config by document type + language
-  - ⬜ Checkbox list for question selection
-  - ⬜ Default questions pre-checked
-  - ⬜ Add custom question input
-  - ⬜ Pass selected questions to annotation flow
+- ⬜ Create `src/contexts/ContributorContext.tsx`
+  - Cache contributor status globally
+  - Provide context to all components
 
-- ⬜ Create `QuestionNavigator` component
-  - ⬜ Previous/Next navigation buttons
-  - ⬜ Progress dots indicator
-  - ⬜ Current question highlight
-  - ⬜ Skip question functionality
+- ⬜ Create `src/hooks/useBreakpoint.ts`
+  - Detect breakpoint: mobile (<768px), tablet (768-1024px), desktop (>1024px)
+  - Return `{ isMobile, isTablet, isDesktop }`
 
-- ⬜ Create `AnnotationFlow` container
-  - ⬜ Question-by-question state management
-  - ⬜ Box-first workflow (draw → read → confirm)
-  - ⬜ Auto-advance on save
-  - ⬜ No question add/remove during annotation
+- ⬜ Create `src/hooks/useKeyboardShortcuts.ts`
+  - Register/unregister keyboard event listeners
+  - Support: `→`, `←`, `D`, `R`, `S`, `Esc`, `Ctrl+Enter`
 
-- ⬜ Create `ReadButton` component (AI text extraction)
-  - ⬜ Calls existing Bedrock Lambda with bounding box region
-  - ⬜ Extracts text from selected area
-  - ⬜ Fills answer field automatically
-  - ⬜ Capture and store model ID from response
-  - ⬜ Shows loading state during extraction
-  - ⬜ Handles errors gracefully
+---
 
-- ⬜ Create `FinalizeScreen` component
-  - ⬜ Summary of completed annotations
-  - ⬜ "Upload Next Image" primary action
-  - ⬜ "Back to Gallery" secondary action
+### Unit C: Layout Components ⚡ (No dependencies - Start immediately)
 
-- ⬜ Add keyboard shortcuts for desktop
-  - ⬜ `→` or `Enter` - Next question
-  - ⬜ `←` - Previous question
-  - ⬜ `D` - Toggle draw mode
-  - ⬜ `R` - Read text from box (AI)
-  - ⬜ `S` - Skip question
-  - ⬜ `Esc` - Cancel drawing
-  - ⬜ `Ctrl+Enter` - Finalize annotation
-
-- ⬜ Update Upload page with question selection
-- ⬜ Update AnnotationWorkspace layout (simplified)
-
-### Phase 2: Responsive Layout (Day 2-3)
-
-- ⬜ Define CSS breakpoint variables
+- ⬜ Create `src/styles/breakpoints.css`
   ```css
-  --breakpoint-mobile: 768px;
-  --breakpoint-tablet: 1024px;
+  :root {
+    --breakpoint-mobile: 768px;
+    --breakpoint-tablet: 1024px;
+  }
   ```
 
-- ⬜ Create responsive layout components
-  - ⬜ `src/components/layout/ResponsiveContainer.tsx`
-  - ⬜ `src/components/layout/StackedLayout.tsx` (mobile)
-  - ⬜ `src/components/layout/SplitLayout.tsx` (tablet/desktop)
+- ⬜ Create `src/components/layout/ResponsiveContainer.tsx`
+  - Wrapper that provides breakpoint context
+  - Applies appropriate layout based on screen size
 
-- ⬜ Create `src/hooks/useBreakpoint.ts` hook
-  - ⬜ Detect current breakpoint (mobile/tablet/desktop)
-  - ⬜ Return boolean flags for conditional rendering
+- ⬜ Create `src/components/layout/StackedLayout.tsx`
+  - Mobile-first vertical stacking
+  - Full-width content areas
 
-- ⬜ Update existing pages for responsiveness
-  - ⬜ Dashboard (card grid → stacked)
-  - ⬜ Gallery (grid adjustment)
-  - ⬜ Upload page
-  - ⬜ Annotation workspace
+- ⬜ Create `src/components/layout/SplitLayout.tsx`
+  - Side-by-side layout for tablet/desktop
+  - Configurable split ratio (e.g., 60/40)
 
-- ⬜ Create `MobileNavigation` component (bottom bar)
-  - ⬜ 60px height + safe area
-  - ⬜ Home, Upload, Gallery, Profile icons
-  - ⬜ Active state indicator
+- ⬜ Create `src/components/layout/MobileNavigation.tsx`
+  - Bottom navigation bar (60px + safe area)
+  - Icons: Home, Upload, Gallery, Profile
+  - Active state indicator
+  - Hide on desktop
 
-### Phase 3: Mobile-Specific Features (Day 3-4)
+---
 
-- ⬜ Create `CameraCapture` component
-  - ⬜ HTML5 file input with `capture="environment"`
-  - ⬜ Image preview before upload
-  - ⬜ Gallery fallback option
-  - ⬜ Works on iOS Safari and Android Chrome
+### Unit D: i18n & Styles ⚡ (No dependencies - Start immediately)
 
-- ⬜ Create `TouchCanvas` component
-  - ⬜ Native touch event handlers (touchstart, touchmove, touchend)
-  - ⬜ Draw mode toggle button
-  - ⬜ Move existing boxes by touch
-  - ⬜ Resize boxes via corner handles (32x32px touch area)
-  - ⬜ Visual feedback on touch interactions
+- ⬜ Create `src/i18n/consent/en.json`
+  ```json
+  {
+    "title": "Data Usage Consent",
+    "message": "The images and Q&A you submit will be used to build a dataset...",
+    "warning": "DO NOT submit personal or sensitive information.",
+    "checkbox": "I understand and consent to the above terms",
+    "cancel": "Cancel",
+    "agree": "I Agree & Continue"
+  }
+  ```
 
-- ⬜ Add mobile zoom controls
-  - ⬜ [+] zoom in button
-  - ⬜ [-] zoom out button
-  - ⬜ [Fit] reset to fit view
+- ⬜ Create `src/i18n/consent/ja.json` (Japanese translation)
 
-- ⬜ Update generate-annotation Lambda
-  - ⬜ Return model ID in response for tracking
+- ⬜ Create `src/i18n/consent/zh.json` (Chinese translation)
 
-### Phase 4: Polish & Testing (Day 5-6)
+- ⬜ Create `src/styles/mobile.css`
+  - Touch target minimum sizes (48px)
+  - Mobile-specific spacing
+  - Safe area padding for notched devices
 
+---
+
+### Unit E: Upload Flow 🔗 (Depends on: Unit B, Unit C, Unit D)
+
+- ⬜ Create `src/components/consent/StartContributingDialog.tsx`
+  - Multi-language consent message (loads from i18n)
+  - Checkbox for explicit consent
+  - Cancel and Accept buttons
+  - Calls `becomeContributor()` on accept
+
+- ⬜ Create `src/components/consent/ContributorGate.tsx`
+  - Wrapper component for contributor-only actions
+  - Shows dialog if not contributor
+  - Passes through if contributor
+
+- ⬜ Create `src/components/upload/QuestionSelector.tsx`
+  - Load questions via `useDefaultQuestions(docType, lang)`
+  - Checkbox list with default questions pre-checked
+  - Optional questions section
+  - Custom question input field
+  - Returns selected questions array
+
+- ⬜ Create `src/components/upload/CameraCapture.tsx`
+  - HTML5 input with `capture="environment"`
+  - Image preview before upload
+  - "Take Photo" and "Choose from Gallery" options
+  - Works on iOS Safari and Android Chrome
+
+- ⬜ Update `src/pages/FileUpload.tsx`
+  - Wrap upload action with `ContributorGate`
+  - Add `QuestionSelector` component
+  - Add `CameraCapture` for mobile
+  - Pass selected questions to annotation
+
+---
+
+### Unit F: Annotation Flow 🔗 (Depends on: Unit A, Unit B, Unit C)
+
+- ⬜ Create `src/components/annotation/ProgressDots.tsx`
+  - Visual dots for question progress
+  - States: pending (○), current (●), completed (✓)
+  - Shows "3 of 5" text
+
+- ⬜ Create `src/components/annotation/QuestionNavigator.tsx`
+  - Previous/Next buttons
+  - Skip button
+  - Progress dots
+  - Current question display
+  - Keyboard shortcut integration
+
+- ⬜ Create `src/components/annotation/ReadButton.tsx`
+  - [📖 Read] button with loading state
+  - Calls Bedrock Lambda with bounding box region
+  - Extracts text and fills answer field
+  - Captures model ID for tracking
+  - Error handling with retry option
+
+- ⬜ Create `src/components/annotation/FinalizeScreen.tsx`
+  - Summary: X questions answered, Y boxes drawn
+  - "Upload Next Image" primary button
+  - "Back to Gallery" secondary button
+  - Session stats (optional)
+
+- ⬜ Create `src/components/annotation/AnnotationFlow.tsx`
+  - Container managing question-by-question flow
+  - State: currentQuestionIndex, answers, boxes
+  - Box-first workflow enforcement
+  - Auto-advance on save
+  - Integrates all annotation components
+
+- ⬜ Update `src/pages/AnnotationWorkspace.tsx`
+  - Replace current layout with `AnnotationFlow`
+  - Remove question add/remove during annotation
+  - Add keyboard shortcut support
+  - Responsive layout integration
+
+---
+
+### Unit G: Mobile Features 🔗 (Depends on: Unit B, Unit C)
+
+- ⬜ Create `src/components/annotation/TouchCanvas.tsx`
+  - Native touch events (touchstart, touchmove, touchend)
+  - View mode: scroll/pan pass-through
+  - Draw mode: single-finger box creation
+  - Box selection by tap
+  - Corner handles for resize (32×32px touch area)
+  - Visual feedback during interactions
+
+- ⬜ Create `src/components/annotation/ModeBadge.tsx`
+  - Fixed position indicator (top-right)
+  - Shows "VIEW" (gray) or "DRAW" (blue pulsing)
+  - Tappable to toggle mode (48px touch area)
+
+- ⬜ Create `src/components/annotation/ZoomControls.tsx`
+  - [+] zoom in button
+  - [−] zoom out button
+  - [Fit] reset to fit view
+  - Touch-friendly sizing (48×48px each)
+
+---
+
+### Unit H: Integration & Testing 🔗 (Depends on: All Units)
+
+**Page Updates:**
+- ⬜ Update `src/pages/Dashboard.tsx` for responsiveness
+  - Card grid → stacked on mobile
+  - Add "Start Contributing" banner for non-contributors
+
+- ⬜ Update `src/pages/ImageGallery.tsx` for responsiveness
+  - Grid column adjustment by breakpoint
+  - Touch-friendly image cards
+
+- ⬜ Integrate `MobileNavigation` in `src/App.tsx`
+  - Show on mobile only
+  - Hide header nav on mobile
+
+**Testing:**
 - ⬜ Touch target audit
-  - ⬜ All buttons ≥48×48px
-  - ⬜ All form inputs ≥48px height
-  - ⬜ All nav items ≥48×48px
-  - ⬜ Box corner handles ≥32×32px touch area
+  - All buttons ≥48×48px
+  - All form inputs ≥48px height
+  - Box corner handles ≥32×32px
 
 - ⬜ Keyboard shortcut testing (desktop)
-  - ⬜ All shortcuts work as documented
-  - ⬜ No conflicts with browser shortcuts
+  - All shortcuts work as documented
+  - No conflicts with browser shortcuts
 
 - ⬜ Device testing
-  - ⬜ iPhone Safari
-  - ⬜ Android Chrome
-  - ⬜ iPad Safari
-  - ⬜ Desktop Chrome/Firefox/Safari
+  - iPhone Safari
+  - Android Chrome
+  - iPad Safari
+  - Desktop Chrome/Firefox/Safari
 
 - ⬜ Flow testing
-  - ⬜ Upload → Select Questions → Annotate → Finalize → Next
-  - ⬜ Consent flow blocks upload without agreement
-  - ⬜ AI model tracking recorded correctly
+  - Upload → Select Questions → Annotate → Finalize → Next
+  - Consent flow blocks upload without agreement
+  - AI model tracking recorded correctly
 
 - ⬜ Performance check
-  - ⬜ Lighthouse mobile score >70
+  - Lighthouse mobile score >70
+
+---
 
 **Sprint 3 Acceptance Criteria:**
 - ⬜ Contributor consent dialog appears before first upload/annotation
