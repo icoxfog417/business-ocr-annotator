@@ -1,121 +1,112 @@
 # Business OCR Annotator
 
-A Visual dialogue dataset creation platform for evaluating OCR accuracy of generative AI models in business scenarios.
+A platform for creating high-quality Visual Question Answering (VQA) datasets to evaluate OCR accuracy of generative AI models on business documents.
 
-## Purpose
+## Why This Project?
 
-Behind many OCR projects, there are only a few high-quality datasets to evaluate OCR accuracy of generative AI models, especially for business documents. This project aims to create a comprehensive Visual dialogue dataset that:
+There are few high-quality datasets for evaluating OCR accuracy on business documents. This platform enables:
 
-- **Collects diverse business documents**: Receipts, order forms, official application forms, invoices, and other business-related images
-- **Generates intelligent questions**: Automatically creates questions with bounding box evidence using open-weight models (e.g., Qwen)
-- **Enables human validation**: Provides an interface for validating and refining AI-generated annotations
-- **Monitors dataset quality**: Tracks diversity and accuracy statistics to ensure high-quality annotations
-- **Manages dataset versions**: Leverages Hugging Face platform for versioning and publishing datasets
+- **Crowdsourced annotation** of business documents (receipts, invoices, contracts, etc.)
+- **AI-assisted workflow** using Amazon Bedrock for text extraction
+- **Multi-language support** (Japanese, English, Chinese, Korean)
+- **Quality tracking** with validation status and contribution statistics
 
-## Key Features
+## Features
 
-### 1. Image Upload and Management
-Upload business scene images including:
-- Receipts
-- Order forms
-- Official application forms
-- Invoices
-- Business contracts
-- Other business documents
+### 📷 Image Upload
+- Drag & drop or camera capture (mobile)
+- Automatic 3-tier compression (original → compressed → thumbnail)
+- Support for JPEG, PNG up to 20MB
 
-### 2. AI-Powered Question Generation
-Automatically generates questions with bounding box areas as evidence:
-- "Please tell me the total of this receipt"
-- "What is the highest price item name and price?"
-- "What is the invoice number?"
-- Questions are generated using open-weight models without license limitations
+### 📝 Smart Annotation
+- Question-by-question workflow
+- Draw bounding box → AI reads text → Confirm answer
+- Keyboard shortcuts for desktop (←→ navigate, D draw, S skip)
+- Touch-friendly interface for mobile
 
-### 3. Human Validation Workflow
-- Review AI-generated questions and answers
-- Validate or correct bounding box areas
-- Approve or reject annotation pairs
-- Ensure high-quality dataset output
+### 📊 Dashboard
+- Track annotation progress
+- View AI vs human contribution stats
+- Monitor document type distribution
 
-### 4. Dataset Statistics and Monitoring
-- Track annotation diversity (document types, question types)
-- Monitor accuracy metrics
-- View dataset growth over time
-- Ensure balanced representation across categories
-
-### 5. Version Management with Hugging Face
-- Publish datasets to Hugging Face Hub
-- Maintain version history
-- Enable easy sharing and collaboration
-- Support standard dataset formats
+### 🌐 Multi-Language
+- Document languages: Japanese, English, Chinese, Korean
+- Default questions per document type and language
+- UI supports multiple languages
 
 ## Technology Stack
 
-- **Frontend & Backend**: AWS Amplify Gen2
-- **AI Models**: Open-weight models (Qwen, etc.) for annotation assistance
-- **Dataset Platform**: Hugging Face Hub for version management and publishing
-- **Storage**: AWS S3 for image storage
-- **Database**: AWS DynamoDB for metadata and annotations
+| Component | Technology |
+|-----------|------------|
+| Frontend | React 18 + TypeScript + Vite |
+| Backend | AWS Amplify Gen2 |
+| Authentication | Amazon Cognito (Google OAuth) |
+| Database | Amazon DynamoDB |
+| Storage | Amazon S3 (3-tier) |
+| AI | Amazon Bedrock (Claude 3.5 Sonnet) |
+| Image Processing | AWS Lambda + Sharp |
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ and npm
-- AWS Account
-- Hugging Face Account (for dataset publishing)
+- Node.js 20+
+- AWS Account with Bedrock access
+- Google OAuth credentials
 
-### Installation
+### Local Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/business-ocr-annotator.git
-cd business-ocr-annotator
-
-# Install dependencies
+# Clone and install
+git clone https://github.com/icoxfog417/business-ocr-annotator.git
+cd business-ocr-annotator/application
 npm install
 
-# Configure AWS Amplify
-npm run amplify configure
+# Set up secrets
+npx ampx sandbox secret set GOOGLE_CLIENT_ID
+npx ampx sandbox secret set GOOGLE_CLIENT_SECRET
 
-# Start development server
+# Start sandbox (backend + frontend)
+npx ampx sandbox
 npm run dev
 ```
 
-### Configuration
+### Production Deployment
 
-1. Set up your AWS credentials
-2. Configure Hugging Face API token for dataset publishing
-3. Configure OCR model endpoints (Qwen or other open-weight models)
-
-## Usage
-
-1. **Upload Images**: Navigate to the upload page and select business document images
-2. **Review Annotations**: AI will automatically generate questions and bounding boxes
-3. **Validate**: Review and validate the generated annotations
-4. **Manage Dataset**: Monitor statistics and manage dataset versions
-5. **Publish**: Export and publish validated datasets to Hugging Face Hub
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
 
 ## Project Structure
 
 ```
 business-ocr-annotator/
-├── spec/                  # Project specifications
-│   ├── requirements.md    # User experience and features
-│   ├── design.md         # Architecture and component design
-│   ├── tasks.md          # Implementation task list
-│   └── proposals/        # Design proposals and changes
-├── amplify/              # AWS Amplify configuration
-├── src/                  # Source code
-└── README.md            # This file
+├── application/           # Main application
+│   ├── amplify/          # Amplify Gen2 backend
+│   │   ├── auth/         # Cognito configuration
+│   │   ├── data/         # GraphQL schema
+│   │   ├── storage/      # S3 configuration
+│   │   └── functions/    # Lambda functions
+│   └── src/              # React frontend
+├── spec/                 # Specifications
+│   ├── requirements.md   # Feature requirements
+│   ├── design.md        # Architecture design
+│   └── tasks.md         # Sprint tasks
+└── DEPLOYMENT.md        # Production deployment guide
 ```
+
+## Document Types Supported
+
+- 🧾 Receipts
+- 📄 Invoices
+- 📋 Order Forms
+- 📑 Tax Forms
+- 📃 Contracts
+- 📝 Application Forms
 
 ## Contributing
 
-Please refer to [CLAUDE.md](./CLAUDE.md) for guidelines on how to contribute to this project, especially for AI-assisted development workflows.
+1. Check `spec/tasks.md` for current sprint tasks
+2. Create proposals in `spec/proposals/` for significant changes
+3. Follow the workflow in [CLAUDE.md](./CLAUDE.md)
 
 ## License
 
-[To be determined]
-
-## Contact
-
-[To be added]
+Apache License 2.0 - See [LICENSE](./LICENSE)
