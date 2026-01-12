@@ -71,7 +71,7 @@ export function AnnotationWorkspace() {
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [defaultQuestions, setDefaultQuestions] = useState<string[]>([]);
 
-  // Mobile flow mode - use AnnotationFlow if on mobile with passed questions
+  // Mobile flow mode - use AnnotationFlow if on mobile
   // Use multiple mobile detection methods for better reliability
   const isMobileDevice = isMobile || 
     (typeof window !== 'undefined' && (
@@ -79,7 +79,8 @@ export function AnnotationWorkspace() {
       /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
     ));
   
-  const useMobileFlow = (isMobileDevice || passedQuestions) && passedQuestions && passedQuestions.length > 0;
+  // Use mobile flow if on mobile device, regardless of whether questions were passed
+  const useMobileFlow = isMobileDevice;
 
   // Debug: Show mobile flow decision
   console.log('Mobile flow debug:', {
@@ -169,7 +170,13 @@ export function AnnotationWorkspace() {
       const { data: annotationsData } = await client.models.Annotation.list({
         filter: { imageId: { eq: imageId } },
       });
-      const fetchedAnnotations = annotationsData.map((a) => {
+      
+      // Sort by createdAt to preserve annotation order
+      const sortedAnnotations = [...annotationsData].sort((a, b) => 
+        (a.createdAt || '').localeCompare(b.createdAt || '')
+      );
+      
+      const fetchedAnnotations = sortedAnnotations.map((a) => {
         const boxes =
           typeof a.boundingBoxes === 'string'
             ? JSON.parse(a.boundingBoxes)
@@ -184,6 +191,7 @@ export function AnnotationWorkspace() {
           confidence: a.confidence ?? undefined,
         };
       });
+      
       setAnnotations(fetchedAnnotations);
       
       // Convert all annotation bounding boxes to canvas format
@@ -626,53 +634,11 @@ export function AnnotationWorkspace() {
       throw new Error('Image not loaded');
     }
 
-    console.log('=== COORDINATE DEBUG ===');
-    console.log('Box from TouchCanvas:', box);
-    console.log('Image metadata:', { width: image.width, height: image.height });
-    
-    // The issue might be that we need to use the display coordinates directly
-    // instead of the converted coordinates. Let me try a different approach:
-    
-    // Get the actual displayed image element to understand the scaling
+    // Get canvas container for coordinate validation
     const container = document.querySelector('.touch-canvas');
     if (!container) {
       throw new Error('Canvas container not found');
     }
-    
-    const containerRect = container.getBoundingClientRect();
-    console.log('Container dimensions:', { 
-      width: containerRect.width, 
-      height: containerRect.height 
-    });
-    
-    // Calculate the actual image display size within the container
-    const imageAspect = image.width / image.height;
-    const containerAspect = containerRect.width / containerRect.height;
-    
-    let displayWidth, displayHeight, offsetX, offsetY;
-    if (imageAspect > containerAspect) {
-      displayWidth = containerRect.width;
-      displayHeight = containerRect.width / imageAspect;
-      offsetX = 0;
-      offsetY = (containerRect.height - displayHeight) / 2;
-    } else {
-      displayWidth = containerRect.height * imageAspect;
-      displayHeight = containerRect.height;
-      offsetX = (containerRect.width - displayWidth) / 2;
-      offsetY = 0;
-    }
-    
-    console.log('Calculated display:', { displayWidth, displayHeight, offsetX, offsetY });
-    
-    // Convert the box coordinates back to display coordinates
-    const displayBox = {
-      x: (box.x / image.width) * displayWidth,
-      y: (box.y / image.height) * displayHeight,
-      width: (box.width / image.width) * displayWidth,
-      height: (box.height / image.height) * displayHeight
-    };
-    
-    console.log('Display box coordinates:', displayBox);
 
     // Download the image
     const imageKey = image.s3KeyCompressed || image.s3KeyOriginal;
@@ -688,22 +654,14 @@ export function AnnotationWorkspace() {
     const img = new Image();
     const blobUrl = URL.createObjectURL(blob);
     
-    let cropWidth = 0;
-    let cropHeight = 0;
-    
-    const croppedBase64 = await new Promise<string>((resolve, reject) => {
+    const { base64, width: cropWidth, height: cropHeight } = await new Promise<{ base64: string; width: number; height: number }>((resolve, reject) => {
       img.onload = () => {
         URL.revokeObjectURL(blobUrl);
         
-        console.log('Loaded image actual dimensions:', { width: img.width, height: img.height });
-        
-        // IMPORTANT: Scale coordinates if image dimensions don't match metadata
+        // Scale coordinates if image dimensions don't match metadata
         const scaleX = img.width / image.width;
         const scaleY = img.height / image.height;
         
-        console.log('Scale factors:', { scaleX, scaleY });
-        
-        // Scale the box coordinates to match the actual loaded image
         const scaledBox = {
           x: box.x * scaleX,
           y: box.y * scaleY,
@@ -711,34 +669,19 @@ export function AnnotationWorkspace() {
           height: box.height * scaleY
         };
         
-        console.log('Original box:', box);
-        console.log('Scaled box:', scaledBox);
-        
-        // Use the scaled coordinates
+        // Validate and clamp coordinates
         const cropX = Math.max(0, Math.min(Math.floor(scaledBox.x), img.width - 1));
         const cropY = Math.max(0, Math.min(Math.floor(scaledBox.y), img.height - 1));
-        cropWidth = Math.max(1, Math.min(Math.floor(scaledBox.width), img.width - cropX));
-        cropHeight = Math.max(1, Math.min(Math.floor(scaledBox.height), img.height - cropY));
+        const w = Math.max(1, Math.min(Math.floor(scaledBox.width), img.width - cropX));
+        const h = Math.max(1, Math.min(Math.floor(scaledBox.height), img.height - cropY));
         
-        console.log('Final crop coordinates:', { cropX, cropY, cropWidth, cropHeight });
-        console.log('Crop percentage of image:', {
-          x: (cropX / img.width * 100).toFixed(1) + '%',
-          y: (cropY / img.height * 100).toFixed(1) + '%',
-          width: (cropWidth / img.width * 100).toFixed(1) + '%',
-          height: (cropHeight / img.height * 100).toFixed(1) + '%'
-        });
+        canvas.width = w;
+        canvas.height = h;
         
-        canvas.width = cropWidth;
-        canvas.height = cropHeight;
-        
-        ctx.drawImage(
-          img,
-          cropX, cropY, cropWidth, cropHeight,
-          0, 0, cropWidth, cropHeight
-        );
+        ctx.drawImage(img, cropX, cropY, w, h, 0, 0, w, h);
         
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        resolve(dataUrl.split(',')[1]);
+        resolve({ base64: dataUrl.split(',')[1], width: w, height: h });
       };
       
       img.onerror = () => {
@@ -749,19 +692,11 @@ export function AnnotationWorkspace() {
       img.src = blobUrl;
     });
 
-    console.log('Calling generateAnnotation with:', {
-      imageId: imageId!,
-      imageFormat: 'jpeg',
-      language: image.language,
-      documentType: image.documentType || 'OTHER',
-      width: cropWidth,
-      height: cropHeight,
-      question: 'Extract the text in this image region.',
-    });
+    console.log('Calling generateAnnotation:', { imageId, cropWidth, cropHeight });
 
     const result = await client.queries.generateAnnotation({
       imageId: imageId!,
-      imageBase64: croppedBase64,
+      imageBase64: base64,
       imageFormat: 'jpeg',
       language: image.language,
       documentType: image.documentType || 'OTHER',
@@ -769,13 +704,12 @@ export function AnnotationWorkspace() {
       height: cropHeight,
       question: 'Extract the text in this image region.',
     });
-
-    console.log('Raw Lambda result:', result);
 
     // Check if there are GraphQL errors
     if (result.errors && result.errors.length > 0) {
       console.error('GraphQL errors:', result.errors);
-      throw new Error(`GraphQL error: ${result.errors[0].message}`);
+      const errorMsg = result.errors[0].message;
+      throw new Error(`GraphQL error: ${errorMsg}`);
     }
 
     let data = result.data as { success?: boolean; annotations?: AIAnnotationResult[]; error?: string } | string | null;
@@ -793,13 +727,11 @@ export function AnnotationWorkspace() {
     if (typeof data === 'string') {
       try {
         data = JSON.parse(data);
-      } catch (e) {
+      } catch {
         console.error('Failed to parse JSON response:', data);
-        throw new Error('Invalid JSON response from server');
+        throw new Error(`Invalid JSON response from server: ${data}`);
       }
     }
-
-    console.log('Parsed data:', data);
 
     if (data && typeof data === 'object' && data.success && data.annotations?.length) {
       return {
@@ -809,9 +741,11 @@ export function AnnotationWorkspace() {
       };
     }
 
-    const errorMsg = (data && typeof data === 'object') ? data.error || 'No annotations returned' : 'Invalid response format';
-    console.error('Lambda error:', errorMsg, 'Full response:', data);
-    throw new Error(errorMsg);
+    const errorMsg = (data && typeof data === 'object') ? 
+      data.error || 'No annotations returned' : 
+      `Invalid response format: ${JSON.stringify(data)}`;
+    console.error('Lambda error:', errorMsg);
+    throw new Error(`AI model error: ${errorMsg}`);
   };
 
   const handleUploadNext = () => {
@@ -853,6 +787,39 @@ export function AnnotationWorkspace() {
       );
     }
     
+    // For mobile flow, we need questions. Use passed questions or create from existing annotations
+    let mobileQuestions = passedQuestions;
+    
+    if (!mobileQuestions || mobileQuestions.length === 0) {
+      // If no passed questions (editing existing annotations), create questions from existing annotations
+      if (annotations.length > 0) {
+        mobileQuestions = annotations.map(ann => ({
+          id: ann.id || '',
+          text: ann.question,
+          type: 'EXTRACTIVE',
+          isCustom: false
+        }));
+      } else {
+        // If no existing annotations, use default questions
+        mobileQuestions = defaultQuestions.map((q, index) => ({
+          id: `default-${index}`,
+          text: q,
+          type: 'EXTRACTIVE',
+          isCustom: false
+        }));
+      }
+    }
+    
+    // Ensure we have questions for mobile flow
+    if (!mobileQuestions || mobileQuestions.length === 0) {
+      mobileQuestions = [{
+        id: 'fallback-1',
+        text: 'What is the main content of this document?',
+        type: 'EXTRACTIVE',
+        isCustom: false
+      }];
+    }
+    
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <AnnotationFlow
@@ -860,7 +827,8 @@ export function AnnotationWorkspace() {
           imageSrc={imageUrl}
           imageWidth={image.width}
           imageHeight={image.height}
-          questions={passedQuestions}
+          questions={mobileQuestions}
+          existingAnnotations={annotations}
           language={image.language}
           onComplete={handleMobileComplete}
           onReadText={handleMobileReadText}

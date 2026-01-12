@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getUrl } from 'aws-amplify/storage';
 import { client } from '../lib/apiClient';
 import { getStatusStyle, getProcessingOpacity } from '../lib/statusStyles';
@@ -18,6 +18,7 @@ interface ImageWithUrl {
 export function ImageGallery() {
   const [images, setImages] = useState<ImageWithUrl[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchImages();
@@ -70,9 +71,19 @@ export function ImageGallery() {
   };
 
   const deleteImage = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this image?')) return;
+    if (!confirm('Are you sure you want to delete this image and all its annotations?')) return;
     
     try {
+      // Delete all annotations for this image first
+      const { data: annotations } = await client.models.Annotation.list({
+        filter: { imageId: { eq: id } },
+      });
+      
+      await Promise.all(annotations.map(ann => 
+        client.models.Annotation.delete({ id: ann.id })
+      ));
+      
+      // Then delete the image
       await client.models.Image.delete({ id });
       setImages(prev => prev.filter(img => img.id !== id));
     } catch (error) {
@@ -90,7 +101,7 @@ export function ImageGallery() {
   }
 
   return (
-    <div style={{ padding: '2rem' }}>
+    <div style={{ padding: window.innerWidth < 768 ? '1rem' : '2rem' }}>
       <div style={{ marginBottom: '2rem' }}>
         <Link
           to="/"
@@ -108,8 +119,15 @@ export function ImageGallery() {
         </Link>
       </div>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h1>Image Gallery ({images.length})</h1>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '2rem',
+        flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+        gap: window.innerWidth < 768 ? '1rem' : '0'
+      }}>
+        <h1 style={{ margin: 0 }}>Image Gallery ({images.length})</h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <button
             onClick={fetchImages}
@@ -152,7 +170,7 @@ export function ImageGallery() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(250px, 100%), 1fr))',
             gap: '1rem'
           }}
         >
@@ -245,19 +263,20 @@ export function ImageGallery() {
                     {image.status}
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
                   <button
-                    onClick={() => window.location.href = `/annotate/${image.id}`}
+                    onClick={() => navigate(`/annotate/${image.id}`)}
                     disabled={image.status === 'PROCESSING'}
                     style={{
                       background: image.status === 'PROCESSING' ? '#9ca3af' : '#10b981',
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
-                      padding: '0.5rem 1rem',
+                      padding: window.innerWidth < 768 ? '0.75rem 1rem' : '0.5rem 1rem',
                       fontSize: '0.875rem',
                       cursor: image.status === 'PROCESSING' ? 'not-allowed' : 'pointer',
-                      flex: 1
+                      flex: 1,
+                      minHeight: window.innerWidth < 768 ? '44px' : 'auto'
                     }}
                   >
                     Annotate
@@ -269,9 +288,10 @@ export function ImageGallery() {
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
-                      padding: '0.5rem 1rem',
+                      padding: window.innerWidth < 768 ? '0.75rem 1rem' : '0.5rem 1rem',
                       fontSize: '0.875rem',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      minHeight: window.innerWidth < 768 ? '44px' : 'auto'
                     }}
                   >
                     Delete

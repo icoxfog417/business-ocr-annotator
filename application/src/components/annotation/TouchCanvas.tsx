@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 
 export type TouchMode = 'view' | 'draw';
 
@@ -18,16 +18,8 @@ interface TouchCanvasProps {
   mode: TouchMode;
   onModeChange: (mode: TouchMode) => void;
   onBoxCreated: (box: BoundingBox) => void;
-  onBoxSelected: (index: number | null) => void;
-  onBoxUpdated: (index: number, box: BoundingBox) => void;
-  zoom?: number;
-  className?: string;
 }
 
-/**
- * Touch-friendly canvas for bounding box annotation.
- * Supports view mode (scroll/pan) and draw mode (box creation).
- */
 export function TouchCanvas({
   imageSrc,
   imageWidth,
@@ -37,27 +29,25 @@ export function TouchCanvas({
   mode,
   onModeChange,
   onBoxCreated,
-  onBoxSelected,
-  onBoxUpdated,
-  zoom = 1,
-  className = '',
 }: TouchCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
-  const [currentBox, setCurrentBox] = useState<BoundingBox | null>(null);
-  const [isDraggingHandle, setIsDraggingHandle] = useState<string | null>(null);
+  
+  // Drawing state in ref to avoid stale closures
+  const drawingRef = useRef({
+    isDrawing: false,
+    startPoint: null as { x: number; y: number } | null,
+    currentBox: null as BoundingBox | null,
+  });
+  
+  const [redrawTrigger, setRedrawTrigger] = useState(0);
 
-  // Get position relative to canvas, accounting for background image positioning
   const getCanvasPosition = useCallback(
     (clientX: number, clientY: number): { x: number; y: number } => {
       const container = containerRef.current;
       if (!container) return { x: 0, y: 0 };
 
       const rect = container.getBoundingClientRect();
-      
-      // Calculate the actual image dimensions and position within the container
       const containerWidth = rect.width;
       const containerHeight = rect.height;
       const imageAspect = imageWidth / imageHeight;
@@ -66,20 +56,17 @@ export function TouchCanvas({
       let actualImageWidth, actualImageHeight, offsetX, offsetY;
       
       if (imageAspect > containerAspect) {
-        // Image is wider - fit to width
         actualImageWidth = containerWidth;
         actualImageHeight = containerWidth / imageAspect;
         offsetX = 0;
         offsetY = (containerHeight - actualImageHeight) / 2;
       } else {
-        // Image is taller - fit to height
         actualImageWidth = containerHeight * imageAspect;
         actualImageHeight = containerHeight;
         offsetX = (containerWidth - actualImageWidth) / 2;
         offsetY = 0;
       }
       
-      // Convert client coordinates to image coordinates
       const relativeX = clientX - rect.left - offsetX;
       const relativeY = clientY - rect.top - offsetY;
       
@@ -91,8 +78,8 @@ export function TouchCanvas({
     [imageWidth, imageHeight]
   );
 
-  // Draw canvas with proper scaling
-  const drawCanvas = useCallback(() => {
+  // Draw function - called directly, not via useEffect for real-time updates
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -100,14 +87,12 @@ export function TouchCanvas({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size to match container
     const rect = container.getBoundingClientRect();
     if (canvas.width !== rect.width || canvas.height !== rect.height) {
       canvas.width = rect.width;
       canvas.height = rect.height;
     }
 
-    // Calculate image scaling and position
     const containerWidth = rect.width;
     const containerHeight = rect.height;
     const imageAspect = imageWidth / imageHeight;
@@ -127,30 +112,25 @@ export function TouchCanvas({
       offsetY = 0;
     }
 
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw existing boxes
     boxes.forEach((box, index) => {
       const isSelected = index === selectedBoxIndex;
-
-      // Convert image coordinates to canvas coordinates
       const canvasX = offsetX + (box.x / imageWidth) * actualImageWidth;
       const canvasY = offsetY + (box.y / imageHeight) * actualImageHeight;
       const canvasWidth = (box.width / imageWidth) * actualImageWidth;
       const canvasHeight = (box.height / imageHeight) * actualImageHeight;
 
-      // Box outline
       ctx.strokeStyle = isSelected ? '#3b82f6' : '#10b981';
       ctx.lineWidth = isSelected ? 3 : 2;
       ctx.strokeRect(canvasX, canvasY, canvasWidth, canvasHeight);
-
-      // Box fill (semi-transparent)
       ctx.fillStyle = isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
       ctx.fillRect(canvasX, canvasY, canvasWidth, canvasHeight);
     });
 
-    // Draw current box being drawn
+    // Draw current drawing box (while dragging)
+    const { currentBox } = drawingRef.current;
     if (currentBox) {
       const canvasX = offsetX + (currentBox.x / imageWidth) * actualImageWidth;
       const canvasY = offsetY + (currentBox.y / imageHeight) * actualImageHeight;
@@ -161,245 +141,140 @@ export function TouchCanvas({
       ctx.lineWidth = 2;
       ctx.setLineDash([5, 5]);
       ctx.strokeRect(canvasX, canvasY, canvasWidth, canvasHeight);
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.1)';
+      ctx.fillRect(canvasX, canvasY, canvasWidth, canvasHeight);
       ctx.setLineDash([]);
     }
-  }, [boxes, selectedBoxIndex, currentBox, imageWidth, imageHeight]);
+  }, [boxes, selectedBoxIndex, imageWidth, imageHeight]);
 
-  // Update canvas size and redraw when container changes
+  // Redraw when boxes change or trigger updates
   useEffect(() => {
-    const updateCanvas = () => {
-      const canvas = canvasRef.current;
-      const container = containerRef.current;
-      if (!canvas || !container) return;
+    draw();
+  }, [draw, redrawTrigger]);
 
-      const rect = container.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-      drawCanvas();
+  // Resize handler
+  useEffect(() => {
+    const handleResize = () => {
+      draw();
     };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [draw]);
 
-    updateCanvas();
-    window.addEventListener('resize', updateCanvas);
-    return () => window.removeEventListener('resize', updateCanvas);
-  }, [drawCanvas]);
-
-  // Redraw on changes
-  useEffect(() => {
-    drawCanvas();
-  }, [drawCanvas]);
-
-  // Touch/Mouse handlers
-  const handleStart = useCallback(
-    (x: number, y: number) => {
-      if (mode !== 'draw') return;
-
-      const pos = getCanvasPosition(x, y);
-
-      // Check if clicking on a handle
-      if (selectedBoxIndex !== null) {
-        const box = boxes[selectedBoxIndex];
-        const handleSize = 32; // Touch area for handles
-        const handles = [
-          { name: 'tl', x: box.x, y: box.y },
-          { name: 'tr', x: box.x + box.width, y: box.y },
-          { name: 'bl', x: box.x, y: box.y + box.height },
-          { name: 'br', x: box.x + box.width, y: box.y + box.height },
-        ];
-
-        for (const handle of handles) {
-          const dist = Math.sqrt((pos.x - handle.x) ** 2 + (pos.y - handle.y) ** 2);
-          if (dist < handleSize / 2) {
-            setIsDraggingHandle(handle.name);
-            setStartPoint(pos);
-            return;
-          }
-        }
-      }
-
-      // Check if clicking on existing box
-      for (let i = boxes.length - 1; i >= 0; i--) {
-        const box = boxes[i];
-        if (pos.x >= box.x && pos.x <= box.x + box.width && pos.y >= box.y && pos.y <= box.y + box.height) {
-          onBoxSelected(i);
-          return;
-        }
-      }
-
-      // Start drawing new box
-      setIsDrawing(true);
-      setStartPoint(pos);
-      setCurrentBox(null);
-      onBoxSelected(null);
-    },
-    [mode, getCanvasPosition, boxes, selectedBoxIndex, onBoxSelected]
-  );
-
-  const handleMove = useCallback(
-    (x: number, y: number) => {
-      if (mode !== 'draw') return;
-
-      const pos = getCanvasPosition(x, y);
-
-      // Handle dragging
-      if (isDraggingHandle && startPoint && selectedBoxIndex !== null) {
-        const box = boxes[selectedBoxIndex];
-        const dx = pos.x - startPoint.x;
-        const dy = pos.y - startPoint.y;
-
-        let newBox = { ...box };
-        switch (isDraggingHandle) {
-          case 'tl':
-            newBox = { x: box.x + dx, y: box.y + dy, width: box.width - dx, height: box.height - dy };
-            break;
-          case 'tr':
-            newBox = { ...box, y: box.y + dy, width: box.width + dx, height: box.height - dy };
-            break;
-          case 'bl':
-            newBox = { ...box, x: box.x + dx, width: box.width - dx, height: box.height + dy };
-            break;
-          case 'br':
-            newBox = { ...box, width: box.width + dx, height: box.height + dy };
-            break;
-        }
-
-        // Ensure positive dimensions
-        if (newBox.width < 10 || newBox.height < 10) return;
-
-        onBoxUpdated(selectedBoxIndex, newBox);
-        setStartPoint(pos);
-        return;
-      }
-
-      // Drawing new box
-      if (isDrawing && startPoint) {
-        const width = pos.x - startPoint.x;
-        const height = pos.y - startPoint.y;
-
-        setCurrentBox({
-          x: width >= 0 ? startPoint.x : pos.x,
-          y: height >= 0 ? startPoint.y : pos.y,
-          width: Math.abs(width),
-          height: Math.abs(height),
-        });
-      }
-    },
-    [mode, getCanvasPosition, isDrawing, startPoint, isDraggingHandle, selectedBoxIndex, boxes, onBoxUpdated]
-  );
-
-  const handleEnd = useCallback(() => {
-    if (isDraggingHandle) {
-      setIsDraggingHandle(null);
-      setStartPoint(null);
-      return;
-    }
-
-    if (isDrawing && currentBox && currentBox.width > 10 && currentBox.height > 10) {
-      onBoxCreated(currentBox);
-      // Auto-exit draw mode after successful box creation
-      onModeChange('view');
-    }
-
-    setIsDrawing(false);
-    setStartPoint(null);
-    setCurrentBox(null);
-  }, [isDraggingHandle, isDrawing, currentBox, onBoxCreated, onModeChange]);
-
-  // Add native touch event listeners with passive: false
+  // Touch/Mouse event handlers
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const handleTouchStart = (e: TouchEvent) => {
+    const handleStart = (clientX: number, clientY: number) => {
       if (mode !== 'draw') return;
-      e.preventDefault();
-      const touch = e.touches[0];
-      handleStart(touch.clientX, touch.clientY);
+      const pos = getCanvasPosition(clientX, clientY);
+      drawingRef.current = { isDrawing: true, startPoint: pos, currentBox: null };
     };
 
-    const handleTouchMove = (e: TouchEvent) => {
+    const handleMove = (clientX: number, clientY: number) => {
       if (mode !== 'draw') return;
-      e.preventDefault();
-      const touch = e.touches[0];
-      handleMove(touch.clientX, touch.clientY);
+      const { isDrawing, startPoint } = drawingRef.current;
+      if (!isDrawing || !startPoint) return;
+
+      const pos = getCanvasPosition(clientX, clientY);
+      const width = pos.x - startPoint.x;
+      const height = pos.y - startPoint.y;
+
+      drawingRef.current.currentBox = {
+        x: width >= 0 ? startPoint.x : pos.x,
+        y: height >= 0 ? startPoint.y : pos.y,
+        width: Math.abs(width),
+        height: Math.abs(height),
+      };
+      
+      // Redraw immediately to show box while dragging
+      draw();
     };
 
-    const handleTouchEnd = (e: TouchEvent) => {
+    const handleEnd = () => {
+      const { isDrawing, currentBox } = drawingRef.current;
+      if (isDrawing && currentBox && currentBox.width > 10 && currentBox.height > 10) {
+        onBoxCreated(currentBox);
+        onModeChange('view');
+      }
+      drawingRef.current = { isDrawing: false, startPoint: null, currentBox: null };
+      setRedrawTrigger(n => n + 1);
+    };
+
+    // Touch events
+    const onTouchStart = (e: TouchEvent) => {
+      if (mode !== 'draw') return;
+      e.preventDefault();
+      handleStart(e.touches[0].clientX, e.touches[0].clientY);
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (mode !== 'draw') return;
+      e.preventDefault();
+      handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    };
+    const onTouchEnd = (e: TouchEvent) => {
       if (mode !== 'draw') return;
       e.preventDefault();
       handleEnd();
     };
 
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    // Mouse events
+    const onMouseDown = (e: MouseEvent) => handleStart(e.clientX, e.clientY);
+    const onMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
+    const onMouseUp = () => handleEnd();
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+    canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mouseup', onMouseUp);
+    canvas.addEventListener('mouseleave', onMouseUp);
 
     return () => {
-      canvas.removeEventListener('touchstart', handleTouchStart);
-      canvas.removeEventListener('touchmove', handleTouchMove);
-      canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('mousedown', onMouseDown);
+      canvas.removeEventListener('mousemove', onMouseMove);
+      canvas.removeEventListener('mouseup', onMouseUp);
+      canvas.removeEventListener('mouseleave', onMouseUp);
     };
-  }, [mode, handleStart, handleMove, handleEnd]);
-
-  // React event handlers for mouse (keep these for desktop)
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (mode !== 'draw') return;
-    handleStart(e.clientX, e.clientY);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (mode !== 'draw') return;
-    handleMove(e.clientX, e.clientY);
-  };
-
-  const handleMouseUp = () => {
-    if (mode !== 'draw') return;
-    handleEnd();
-  };
-
-  const containerStyle: React.CSSProperties = {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-    overflow: mode === 'view' ? 'auto' : 'hidden',
-    touchAction: mode === 'view' ? 'auto' : 'none',
-  };
-
-  const canvasContainerStyle: React.CSSProperties = {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-    backgroundImage: `url(${imageSrc})`,
-    backgroundSize: 'contain',
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'center',
-    minHeight: '300px', // Ensure minimum height for mobile
-  };
-
-  const canvasStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    pointerEvents: mode === 'draw' ? 'auto' : 'none',
-  };
+  }, [mode, getCanvasPosition, onBoxCreated, onModeChange, draw]);
 
   return (
     <div
       ref={containerRef}
-      className={`touch-canvas ${className}`}
-      style={containerStyle}
+      className="touch-canvas"
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        overflow: mode === 'view' ? 'auto' : 'hidden',
+        touchAction: mode === 'view' ? 'auto' : 'none',
+      }}
     >
-      <div style={canvasContainerStyle}>
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        backgroundImage: `url(${imageSrc})`,
+        backgroundSize: 'contain',
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center',
+        minHeight: '300px',
+      }}>
         <canvas
           ref={canvasRef}
-          width={imageWidth}
-          height={imageHeight}
-          style={canvasStyle}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleEnd}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: mode === 'draw' ? 'auto' : 'none',
+          }}
         />
       </div>
     </div>

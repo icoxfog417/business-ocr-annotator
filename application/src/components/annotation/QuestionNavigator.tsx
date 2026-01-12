@@ -25,7 +25,7 @@ interface QuestionNavigatorProps {
 export function QuestionNavigator({
   currentIndex,
   totalQuestions,
-  currentQuestion,
+  // currentQuestion, // Not used in current implementation
   statuses = [],
   onPrevious,
   onNext,
@@ -75,24 +75,25 @@ export function QuestionNavigator({
     borderRadius: '12px',
   };
 
-  const questionContainerStyle: React.CSSProperties = {
-    textAlign: 'center',
-  };
+  // Unused styles (for future implementation)
+  // const questionContainerStyle: React.CSSProperties = {
+  //   textAlign: 'center',
+  // };
 
-  const questionLabelStyle: React.CSSProperties = {
-    fontSize: '12px',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    marginBottom: '4px',
-  };
+  // const questionLabelStyle: React.CSSProperties = {
+  //   fontSize: '12px',
+  //   color: '#6b7280',
+  //   textTransform: 'uppercase',
+  //   letterSpacing: '0.05em',
+  //   marginBottom: '4px',
+  // };
 
-  const questionTextStyle: React.CSSProperties = {
-    fontSize: '18px',
-    fontWeight: 600,
-    color: '#111827',
-    lineHeight: '1.4',
-  };
+  // const questionTextStyle: React.CSSProperties = {
+  //   fontSize: '18px',
+  //   fontWeight: 600,
+  //   color: '#111827',
+  //   lineHeight: '1.4',
+  // };
 
   const navigationStyle: React.CSSProperties = {
     display: 'flex',

@@ -107,51 +107,23 @@ const SINGLE_QUESTION_PROMPTS: Record<string, string> = {
 
 質問: {{QUESTION}}
 
-回答と、回答が見つかる位置のバウンディングボックス座標をJSON形式で返してください。
-座標は必ず0から1の間の小数で指定してください（例: x0=0.1は画像幅の10%の位置）。
-
-{"answer": "回答", "boundingBox": {"x0": 0.1, "y0": 0.2, "x1": 0.3, "y1": 0.25}, "confidence": 0.95}`,
+回答のテキストのみを返してください。JSONや特殊な形式は不要です。`,
   en: `Look at this image and answer the following question.
 
 Question: {{QUESTION}}
 
-Return the answer and bounding box coordinates in JSON format.
-Coordinates MUST be decimal values between 0 and 1 (e.g., x0=0.1 means 10% from left edge).
-
-{"answer": "your answer", "boundingBox": {"x0": 0.1, "y0": 0.2, "x1": 0.3, "y1": 0.25}, "confidence": 0.95}`,
+Return only the answer text. No JSON or special formatting needed.`,
   zh: `查看这张图片并回答以下问题。
 
 问题: {{QUESTION}}
 
-返回答案和边界框坐标（百分比0-1）的JSON格式:
-{"answer": "答案", "boundingBox": {"x0": 0.1, "y0": 0.2, "x1": 0.3, "y1": 0.25}, "confidence": 0.95}`,
+只返回答案文本，不需要JSON或特殊格式。`,
   ko: `이 이미지를 보고 다음 질문에 답하세요.
 
 질문: {{QUESTION}}
 
-답변과 경계 상자 좌표(백분율 0-1)를 JSON 형식으로 반환:
-{"answer": "답변", "boundingBox": {"x0": 0.1, "y0": 0.2, "x1": 0.3, "y1": 0.25}, "confidence": 0.95}`,
+답변 텍스트만 반환하세요. JSON이나 특별한 형식은 필요하지 않습니다.`,
 };
-
-function convertToPixelCoordinates(
-  bbox: { x0: number; y0: number; x1: number; y1: number },
-  width: number,
-  height: number
-): [number, number, number, number] {
-  // Normalize coordinates if model returned pixel values instead of 0-1
-  let { x0, y0, x1, y1 } = bbox;
-  if (x0 > 1) x0 = x0 / width;
-  if (y0 > 1) y0 = y0 / height;
-  if (x1 > 1) x1 = x1 / width;
-  if (y1 > 1) y1 = y1 / height;
-
-  return [
-    Math.round(x0 * width),
-    Math.round(y0 * height),
-    Math.round(x1 * width),
-    Math.round(y1 * height),
-  ];
-}
 
 export const handler = async (
   event: GenerateAnnotationEvent | { arguments: GenerateAnnotationEvent }
@@ -165,7 +137,7 @@ export const handler = async (
   const args = 'arguments' in event ? event.arguments : event;
 
   try {
-    console.log('Event received for imageId:', args.imageId);
+    console.log('Processing annotation request for imageId:', args.imageId);
 
     const { imageId, imageBase64, imageFormat, language, width, height, question } = args;
 
@@ -187,7 +159,7 @@ export const handler = async (
     }
 
     // Call Bedrock Converse API
-    console.log('Calling Bedrock with model:', modelId);
+    console.log('Calling Bedrock model:', modelId);
     const command = new ConverseCommand({
       modelId,
       messages: [
@@ -214,58 +186,48 @@ export const handler = async (
     const content = response.output?.message?.content;
     const responseText = content?.[0] && 'text' in content[0] ? content[0].text : '';
 
-    console.log('Bedrock response:', responseText);
     console.log('Token usage:', response.usage);
 
-    // Parse JSON response
-    interface ParsedAnnotation {
-      question?: string;
-      answer: string;
-      boundingBox: { x0: number; y0: number; x1: number; y1: number };
-      confidence?: number;
-    }
-
-    let parsedAnnotations: ParsedAnnotation[];
-
-    try {
-      const jsonMatch = responseText?.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        // Handle both single-question format and multi-question format
-        if (parsed.annotations) {
-          parsedAnnotations = parsed.annotations;
-        } else if (parsed.answer) {
-          // Single question response - wrap in array
-          parsedAnnotations = [{ ...parsed, question: question || '' }];
-        } else {
-          throw new Error('Unexpected response format');
-        }
-      } else {
-        throw new Error('No JSON found in response');
-      }
-    } catch (parseError) {
-      console.error('Failed to parse response:', parseError);
+    if (!responseText || responseText.trim().length === 0) {
       return {
         success: false,
         imageId,
         modelVersion: modelId,
-        error: 'Failed to parse model response',
+        error: 'No text extracted from image',
       };
     }
 
-    // Convert bounding boxes to pixel coordinates
-    const annotations: AnnotationResult[] = parsedAnnotations.map((ann) => ({
-      question: ann.question || question || '',
-      answer: ann.answer,
-      boundingBox: convertToPixelCoordinates(ann.boundingBox, width, height),
-      confidence: ann.confidence,
-    }));
+    // Clean up the response text (remove any JSON artifacts if present)
+    let cleanText = responseText.trim();
+    
+    // Remove common JSON wrapper patterns if model still returns them
+    cleanText = cleanText.replace(/^["']|["']$/g, ''); // Remove quotes
+    cleanText = cleanText.replace(/^.*"answer":\s*["']([^"']+)["'].*$/s, '$1'); // Extract from JSON if present
+    cleanText = cleanText.replace(/\n+/g, ' ').trim(); // Clean up whitespace
 
+    // For single question mode, construct the JSON response here
+    if (question) {
+      const annotations: AnnotationResult[] = [{
+        question: question,
+        answer: cleanText,
+        boundingBox: [0, 0, width, height], // Use full image as bounding box
+        confidence: 0.9, // High confidence since we're just doing OCR
+      }];
+
+      return {
+        success: true,
+        imageId,
+        annotations,
+        modelVersion: modelId,
+      };
+    }
+
+    // Multi-question mode (not used for mobile read button, but keep for completeness)
     return {
-      success: true,
+      success: false,
       imageId,
-      annotations,
       modelVersion: modelId,
+      error: 'Multi-question mode not implemented for text extraction',
     };
   } catch (error) {
     console.error('Error:', error);

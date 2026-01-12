@@ -88,11 +88,29 @@ export function ReadButton({
       onTextExtracted(result.text, metadata);
     } catch (err) {
       console.error('Error reading text:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      
+      // Show user-friendly error message based on language
+      let userError = errorMessage;
+      if (language === 'ja') {
+        if (errorMessage.includes('GraphQL error')) {
+          userError = 'サーバーエラーが発生しました';
+        } else if (errorMessage.includes('AI model error')) {
+          userError = 'AIモデルの応答エラー';
+        } else if (errorMessage.includes('Invalid JSON')) {
+          userError = 'AIモデルの応答形式エラー';
+        } else if (errorMessage.includes('No annotations')) {
+          userError = 'テキストが検出されませんでした';
+        } else {
+          userError = '読み取りに失敗しました';
+        }
+      }
+      
+      setError(userError);
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, disabled, hasBox, onRead, onTextExtracted]);
+  }, [isLoading, disabled, hasBox, onRead, onTextExtracted, language]);
 
   const getButtonText = () => {
     if (isLoading) return t.reading;
