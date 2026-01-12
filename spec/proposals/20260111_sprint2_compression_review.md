@@ -24,42 +24,18 @@ The compression implementation (process-image Lambda) successfully delivers the 
 
 ## Critical Issues (P0)
 
-### 1. DynamoDB Scan Instead of Query - MUST FIX
+### 1. ~~DynamoDB Scan Instead of Query~~ - RESOLVED
 
-**Location**: `handler.ts` lines 120-127 (`findImageByS3Key` function)
+**Resolution**: Replaced DynamoDB Scan with Query using GSI on `s3KeyOriginal`.
+**Date Fixed**: 2026-01-11
 
-```typescript
-// CURRENT (PROBLEMATIC):
-const result = await docClient.send(new ScanCommand({
-  TableName: tableName,
-  FilterExpression: 's3KeyOriginal = :s3Key',
-  ExpressionAttributeValues: {
-    ':s3Key': s3KeyOriginal,
-  },
-  Limit: 1,
-}));
-```
-
-**Problem**:
-- Scans entire DynamoDB table until finding a match
-- Cost: Charged per item examined, not items returned
-- Performance: O(n) instead of O(1) - will timeout on large tables
-- Violates DynamoDB best practices
-
-**Impact**:
-- 100+ images: Noticeable latency
-- 1,000+ images: Risk of Lambda timeout
-- 10,000+ images: Guaranteed failures and high AWS costs
-
-**Required Fix**:
-1. Create GSI on `s3KeyOriginal` field
-2. Replace `ScanCommand` with `QueryCommand` using GSI
+The Lambda now uses the `imagesByS3KeyOriginal` secondary index for O(1) lookups:
 
 ```typescript
-// FIXED:
+// FIXED - using GSI:
 const result = await docClient.send(new QueryCommand({
   TableName: tableName,
-  IndexName: 's3KeyOriginal-index',
+  IndexName: 'imagesByS3KeyOriginal',
   KeyConditionExpression: 's3KeyOriginal = :s3Key',
   ExpressionAttributeValues: {
     ':s3Key': s3KeyOriginal,
@@ -68,7 +44,7 @@ const result = await docClient.send(new QueryCommand({
 }));
 ```
 
-**Effort**: ~1 hour (includes schema migration)
+~~**Effort**: ~1 hour (includes schema migration)~~
 
 ---
 

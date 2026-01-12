@@ -1,8 +1,8 @@
 # Implementation Tasks
 
 **Project**: Business OCR Annotator
-**Last Updated**: 2026-01-11
-**Status**: Sprint 2 (AI-Assisted Annotation)
+**Last Updated**: 2026-01-12
+**Status**: Sprint 2 Complete, Starting Sprint 3
 **Approach**: Agile Incremental Development
 **Reference**: See [spec/proposals/20260107_reorganize_tasks_agile_approach.md](proposals/20260107_reorganize_tasks_agile_approach.md)
 
@@ -1399,20 +1399,28 @@ business-ocr-annotator/
 
 ## Progress Tracking
 
-**Last Review Date**: 2026-01-11
+**Last Review Date**: 2026-01-12
 **Next Review Date**: TBD
-**Completed Tasks**: Sprint 0 + Sprint 1 completed
-**Current Sprint**: Sprint 2 (AI-Assisted Annotation)
+**Completed Tasks**: Sprint 0 + Sprint 1 + Sprint 2 completed
+**Current Sprint**: Sprint 3 (Queue-Based W&B Integration)
 
 ### Sprint Completion Status
 - ✅ Sprint 0: Foundation & Deployment
 - ✅ Sprint 1: Image Upload & Manual Annotation (MVP)
-- ⬜ Sprint 2: AI-Assisted Annotation
+- ✅ Sprint 2: AI-Assisted Annotation
 - ⬜ Sprint 3: Queue-Based W&B Integration
 - ⬜ Sprint 4: Multi-Language Support & Optimization
 - ⬜ Sprint 5: Mobile Optimization & Camera
 - ⬜ Sprint 6: Publishing & PII Handling
 - ⬜ Sprint 7: Production Readiness
+
+### Deferred from Sprint 2
+- ⬜ Per-user contribution tracking (REQ-AW-013, REQ-AW-014)
+  - Requires User model implementation
+  - Currently shows global stats only (Dashboard displays AI vs Human counts)
+- ⬜ Test model inference with sample images
+  - Using mock fallback implementation currently
+  - DefaultQuestionManager uses fallback question generation
 
 ---
 

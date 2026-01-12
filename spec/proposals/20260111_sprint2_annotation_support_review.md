@@ -29,38 +29,31 @@ The annotation support feature implements AI-assisted Q&A generation using Amazo
 
 ## Critical Issues (P0)
 
-### 1. Missing API Endpoint Configuration - BLOCKER
+### 1. ~~Missing API Endpoint Configuration~~ - RESOLVED
 
-**Location**: `AnnotationWorkspace.tsx` line 136
+**Resolution**: Implemented as GraphQL custom query instead of REST endpoint.
+**Date Fixed**: 2026-01-11
+
+The Lambda function is now invoked via GraphQL custom query (`generateAnnotationAI`) defined in `amplify/data/resource.ts`. This approach:
+- Uses existing Amplify Data API infrastructure
+- Provides automatic authentication via Cognito
+- Returns typed responses through GraphQL schema
 
 ```typescript
-// CURRENT:
-const response = await fetch('/api/generate-annotation', {
-  method: 'POST',
-  // ...
-});
+// amplify/data/resource.ts
+generateAnnotationAI: a.query()
+  .arguments({
+    imageId: a.string().required(),
+    s3Key: a.string().required(),
+    language: a.string().required(),
+    documentType: a.string(),
+  })
+  .returns(a.ref('AIAnnotationResult'))
+  .handler(a.handler.function(generateAnnotation))
+  .authorization((allow) => [allow.authenticated()]),
 ```
 
-**Problem**:
-- No `/api/generate-annotation` endpoint is defined in backend.ts
-- Lambda function exists but has no HTTP trigger (API Gateway or Function URL)
-- **Feature will return 404 in production**
-
-**Required Fix**:
-Option A: Add Lambda Function URL
-```typescript
-// backend.ts
-import { FunctionUrlAuthType } from 'aws-cdk-lib/aws-lambda';
-
-backend.generateAnnotation.resources.lambda.addFunctionUrl({
-  authType: FunctionUrlAuthType.AWS_IAM,
-  cors: { allowedOrigins: ['*'] },
-});
-```
-
-Option B: Create API Gateway integration
-
-**Effort**: 2-3 hours
+~~**Effort**: 2-3 hours~~
 
 ### 2. Fragile JSON Parsing - High Risk of Silent Failures
 

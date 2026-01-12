@@ -366,16 +366,16 @@ export const getProcessingOpacity = (status?: string): number => {
 - [x] No inline @keyframes definitions
 
 ### P2 - Documentation
-- [ ] design.md removes unimplemented GSIs and FLAGGED status
-- [ ] design.md keeps Dataset model for Sprint 3
-- [ ] tasks.md reflects actual completion status
+- [x] design.md removes unimplemented GSIs and FLAGGED status
+- [x] design.md keeps Dataset model for Sprint 3
+- [x] tasks.md reflects actual completion status
 
 ### P3 - Code Quality
 - [x] Consistent status colors across all pages
 - [x] No orphaned comments
 
 ### P4 - Cleanup
-- [ ] Review documents show resolution status
+- [x] Review documents show resolution status
 
 ### Verification
 - [x] Application builds without errors (`npm run build`)

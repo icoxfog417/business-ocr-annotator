@@ -2,7 +2,7 @@
 
 **Project**: Business OCR Annotator
 **Version**: 1.0
-**Last Updated**: 2026-01-04
+**Last Updated**: 2026-01-12
 
 ## 1. Architecture Overview
 
@@ -221,8 +221,10 @@ enum ImageStatus {
 // - Owner (uploadedBy) can create and delete
 // - Curators and Admins can update and delete all images
 
-// Secondary Indexes:
+// Secondary Indexes (Implemented):
 // - imagesByS3KeyOriginal: Query images by s3KeyOriginal (used by process-image Lambda)
+//
+// Future Indexes (Not Yet Implemented):
 // - imagesByUploader: Query images by uploadedBy
 // - imagesByStatus: Query images by status
 // - imagesByDocumentType: Query images by documentType
@@ -287,8 +289,8 @@ enum GenerationSource {
 enum ValidationStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED',
-  FLAGGED = 'FLAGGED'
+  REJECTED = 'REJECTED'
+  // FLAGGED = 'FLAGGED'  // Future: For items needing review
 }
 
 // Authorization Rules:
@@ -392,6 +394,10 @@ enum VersionStatus {
 ```
 
 #### User Table
+
+> **Status**: Future Enhancement - Currently using Cognito directly for authentication.
+> Per-user statistics and role-based access will be implemented in a later sprint.
+
 ```typescript
 interface User {
   id: string;                    // Partition Key (Cognito User ID)
