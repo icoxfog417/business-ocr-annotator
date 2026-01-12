@@ -336,7 +336,7 @@ This task list is organized into **sprints** that deliver working software incre
 
 ---
 
-## Sprint 2: AI-Assisted Annotation (Nemotron Integration)
+## Sprint 2: AI-Assisted Annotation (Nemotron Integration) - ✅ COMPLETED
 
 **Goal**: Auto-generate annotations using NVIDIA Nemotron Nano 12B
 **Duration**: 2-3 weeks
@@ -359,7 +359,7 @@ This task list is organized into **sprints** that deliver working software incre
   - ✅ Parse response to extract Q&A pairs and bounding boxes
 - ✅ Add Lambda environment variables (MODEL_ID, STORAGE_BUCKET_NAME)
 - ✅ Grant Lambda permissions to access S3 and Bedrock
-- ⬜ Store generated annotations in DynamoDB (done via frontend)
+- ✅ Store generated annotations in DynamoDB (done via frontend)
 - ✅ Add error handling and retry logic
 - ✅ Implement CloudWatch logging
 
@@ -444,9 +444,6 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ P1: Increase Lambda timeout from 60s to 90s
 - ✅ P2: Track compression ratio (originalSize / compressedSize)
 - ✅ P2: Track original image format from Sharp metadata
-- ⬜ P3: Add PDF support (deferred to future sprint)
-- ⬜ P3: Implement structured logging with AWS Lambda Powertools
-- ⬜ P3: Add EXIF data extraction
 
 **Sprint 2 Acceptance Criteria:**
 - ✅ Users can click "Generate Annotations" button
