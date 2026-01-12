@@ -1,0 +1,295 @@
+{
+  "version": "1.0",
+  "documentTypes": {
+    "RECEIPT": {
+      "ja": {
+        "default": [
+          { "id": "r-ja-1", "text": "店名は何ですか？", "type": "EXTRACTIVE" },
+          { "id": "r-ja-2", "text": "日付はいつですか？", "type": "EXTRACTIVE" },
+          { "id": "r-ja-3", "text": "合計金額はいくらですか？", "type": "EXTRACTIVE" },
+          { "id": "r-ja-4", "text": "支払い方法は何ですか？", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "r-ja-5", "text": "レシート番号は何ですか？", "type": "EXTRACTIVE" },
+          { "id": "r-ja-6", "text": "税額はいくらですか？", "type": "EXTRACTIVE" }
+        ]
+      },
+      "en": {
+        "default": [
+          { "id": "r-en-1", "text": "What is the store name?", "type": "EXTRACTIVE" },
+          { "id": "r-en-2", "text": "What is the date?", "type": "EXTRACTIVE" },
+          { "id": "r-en-3", "text": "What is the total amount?", "type": "EXTRACTIVE" },
+          { "id": "r-en-4", "text": "What is the payment method?", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "r-en-5", "text": "What is the receipt number?", "type": "EXTRACTIVE" },
+          { "id": "r-en-6", "text": "What is the tax amount?", "type": "EXTRACTIVE" }
+        ]
+      },
+      "zh": {
+        "default": [
+          { "id": "r-zh-1", "text": "店名是什么？", "type": "EXTRACTIVE" },
+          { "id": "r-zh-2", "text": "日期是什么时候？", "type": "EXTRACTIVE" },
+          { "id": "r-zh-3", "text": "总金额是多少？", "type": "EXTRACTIVE" },
+          { "id": "r-zh-4", "text": "付款方式是什么？", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "r-zh-5", "text": "收据号是什么？", "type": "EXTRACTIVE" },
+          { "id": "r-zh-6", "text": "税额是多少？", "type": "EXTRACTIVE" }
+        ]
+      },
+      "ko": {
+        "default": [
+          { "id": "r-ko-1", "text": "상점 이름은 무엇입니까?", "type": "EXTRACTIVE" },
+          { "id": "r-ko-2", "text": "날짜는 언제입니까?", "type": "EXTRACTIVE" },
+          { "id": "r-ko-3", "text": "총 금액은 얼마입니까?", "type": "EXTRACTIVE" },
+          { "id": "r-ko-4", "text": "결제 방법은 무엇입니까?", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "r-ko-5", "text": "영수증 번호는 무엇입니까?", "type": "EXTRACTIVE" },
+          { "id": "r-ko-6", "text": "세액은 얼마입니까?", "type": "EXTRACTIVE" }
+        ]
+      }
+    },
+    "INVOICE": {
+      "ja": {
+        "default": [
+          { "id": "i-ja-1", "text": "請求書番号は何ですか？", "type": "EXTRACTIVE" },
+          { "id": "i-ja-2", "text": "請求金額はいくらですか？", "type": "EXTRACTIVE" },
+          { "id": "i-ja-3", "text": "支払期限はいつですか？", "type": "EXTRACTIVE" },
+          { "id": "i-ja-4", "text": "請求先は誰ですか？", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "i-ja-5", "text": "発行日はいつですか？", "type": "EXTRACTIVE" },
+          { "id": "i-ja-6", "text": "消費税額はいくらですか？", "type": "EXTRACTIVE" }
+        ]
+      },
+      "en": {
+        "default": [
+          { "id": "i-en-1", "text": "What is the invoice number?", "type": "EXTRACTIVE" },
+          { "id": "i-en-2", "text": "What is the invoice amount?", "type": "EXTRACTIVE" },
+          { "id": "i-en-3", "text": "When is the due date?", "type": "EXTRACTIVE" },
+          { "id": "i-en-4", "text": "Who is the recipient?", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "i-en-5", "text": "What is the issue date?", "type": "EXTRACTIVE" },
+          { "id": "i-en-6", "text": "What is the VAT amount?", "type": "EXTRACTIVE" }
+        ]
+      },
+      "zh": {
+        "default": [
+          { "id": "i-zh-1", "text": "发票号码是什么？", "type": "EXTRACTIVE" },
+          { "id": "i-zh-2", "text": "发票金额是多少？", "type": "EXTRACTIVE" },
+          { "id": "i-zh-3", "text": "到期日是什么时候？", "type": "EXTRACTIVE" },
+          { "id": "i-zh-4", "text": "收款人是谁？", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      },
+      "ko": {
+        "default": [
+          { "id": "i-ko-1", "text": "청구서 번호는 무엇입니까?", "type": "EXTRACTIVE" },
+          { "id": "i-ko-2", "text": "청구 금액은 얼마입니까?", "type": "EXTRACTIVE" },
+          { "id": "i-ko-3", "text": "지불 기한은 언제입니까?", "type": "EXTRACTIVE" },
+          { "id": "i-ko-4", "text": "수신인은 누구입니까?", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      }
+    },
+    "ORDER_FORM": {
+      "ja": {
+        "default": [
+          { "id": "o-ja-1", "text": "注文番号は何ですか？", "type": "EXTRACTIVE" },
+          { "id": "o-ja-2", "text": "注文日はいつですか？", "type": "EXTRACTIVE" },
+          { "id": "o-ja-3", "text": "合計金額はいくらですか？", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "o-ja-4", "text": "配送先住所は何ですか？", "type": "EXTRACTIVE" },
+          { "id": "o-ja-5", "text": "注文者名は何ですか？", "type": "EXTRACTIVE" }
+        ]
+      },
+      "en": {
+        "default": [
+          { "id": "o-en-1", "text": "What is the order number?", "type": "EXTRACTIVE" },
+          { "id": "o-en-2", "text": "What is the order date?", "type": "EXTRACTIVE" },
+          { "id": "o-en-3", "text": "What is the total amount?", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "o-en-4", "text": "What is the shipping address?", "type": "EXTRACTIVE" },
+          { "id": "o-en-5", "text": "What is the customer name?", "type": "EXTRACTIVE" }
+        ]
+      },
+      "zh": {
+        "default": [
+          { "id": "o-zh-1", "text": "订单号是什么？", "type": "EXTRACTIVE" },
+          { "id": "o-zh-2", "text": "订单日期是什么时候？", "type": "EXTRACTIVE" },
+          { "id": "o-zh-3", "text": "总金额是多少？", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      },
+      "ko": {
+        "default": [
+          { "id": "o-ko-1", "text": "주문 번호는 무엇입니까?", "type": "EXTRACTIVE" },
+          { "id": "o-ko-2", "text": "주문 날짜는 언제입니까?", "type": "EXTRACTIVE" },
+          { "id": "o-ko-3", "text": "총 금액은 얼마입니까?", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      }
+    },
+    "TAX_FORM": {
+      "ja": {
+        "default": [
+          { "id": "t-ja-1", "text": "納税者番号は何ですか？", "type": "EXTRACTIVE" },
+          { "id": "t-ja-2", "text": "課税年度は何年ですか？", "type": "EXTRACTIVE" },
+          { "id": "t-ja-3", "text": "納税額はいくらですか？", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "t-ja-4", "text": "申告日はいつですか？", "type": "EXTRACTIVE" },
+          { "id": "t-ja-5", "text": "納税者名は何ですか？", "type": "EXTRACTIVE" }
+        ]
+      },
+      "en": {
+        "default": [
+          { "id": "t-en-1", "text": "What is the taxpayer ID?", "type": "EXTRACTIVE" },
+          { "id": "t-en-2", "text": "What is the tax year?", "type": "EXTRACTIVE" },
+          { "id": "t-en-3", "text": "What is the tax amount?", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "t-en-4", "text": "What is the filing date?", "type": "EXTRACTIVE" },
+          { "id": "t-en-5", "text": "What is the taxpayer name?", "type": "EXTRACTIVE" }
+        ]
+      },
+      "zh": {
+        "default": [
+          { "id": "t-zh-1", "text": "纳税人识别号是什么？", "type": "EXTRACTIVE" },
+          { "id": "t-zh-2", "text": "纳税年度是哪一年？", "type": "EXTRACTIVE" },
+          { "id": "t-zh-3", "text": "应纳税额是多少？", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      },
+      "ko": {
+        "default": [
+          { "id": "t-ko-1", "text": "납세자 번호는 무엇입니까?", "type": "EXTRACTIVE" },
+          { "id": "t-ko-2", "text": "과세 연도는 몇 년입니까?", "type": "EXTRACTIVE" },
+          { "id": "t-ko-3", "text": "납세액은 얼마입니까?", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      }
+    },
+    "CONTRACT": {
+      "ja": {
+        "default": [
+          { "id": "c-ja-1", "text": "契約番号は何ですか？", "type": "EXTRACTIVE" },
+          { "id": "c-ja-2", "text": "契約日はいつですか？", "type": "EXTRACTIVE" },
+          { "id": "c-ja-3", "text": "契約当事者は誰ですか？", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "c-ja-4", "text": "契約金額はいくらですか？", "type": "EXTRACTIVE" },
+          { "id": "c-ja-5", "text": "契約期間はいつまでですか？", "type": "EXTRACTIVE" }
+        ]
+      },
+      "en": {
+        "default": [
+          { "id": "c-en-1", "text": "What is the contract number?", "type": "EXTRACTIVE" },
+          { "id": "c-en-2", "text": "What is the contract date?", "type": "EXTRACTIVE" },
+          { "id": "c-en-3", "text": "Who are the parties?", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "c-en-4", "text": "What is the contract value?", "type": "EXTRACTIVE" },
+          { "id": "c-en-5", "text": "What is the contract duration?", "type": "EXTRACTIVE" }
+        ]
+      },
+      "zh": {
+        "default": [
+          { "id": "c-zh-1", "text": "合同编号是什么？", "type": "EXTRACTIVE" },
+          { "id": "c-zh-2", "text": "合同日期是什么时候？", "type": "EXTRACTIVE" },
+          { "id": "c-zh-3", "text": "合同当事人是谁？", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      },
+      "ko": {
+        "default": [
+          { "id": "c-ko-1", "text": "계약 번호는 무엇입니까?", "type": "EXTRACTIVE" },
+          { "id": "c-ko-2", "text": "계약 날짜는 언제입니까?", "type": "EXTRACTIVE" },
+          { "id": "c-ko-3", "text": "계약 당사자는 누구입니까?", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      }
+    },
+    "APPLICATION_FORM": {
+      "ja": {
+        "default": [
+          { "id": "a-ja-1", "text": "申請者名は何ですか？", "type": "EXTRACTIVE" },
+          { "id": "a-ja-2", "text": "申請日はいつですか？", "type": "EXTRACTIVE" },
+          { "id": "a-ja-3", "text": "申請番号は何ですか？", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "a-ja-4", "text": "申請目的は何ですか？", "type": "EXTRACTIVE" },
+          { "id": "a-ja-5", "text": "連絡先は何ですか？", "type": "EXTRACTIVE" }
+        ]
+      },
+      "en": {
+        "default": [
+          { "id": "a-en-1", "text": "What is the applicant name?", "type": "EXTRACTIVE" },
+          { "id": "a-en-2", "text": "What is the application date?", "type": "EXTRACTIVE" },
+          { "id": "a-en-3", "text": "What is the application number?", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "a-en-4", "text": "What is the purpose of application?", "type": "EXTRACTIVE" },
+          { "id": "a-en-5", "text": "What is the contact information?", "type": "EXTRACTIVE" }
+        ]
+      },
+      "zh": {
+        "default": [
+          { "id": "a-zh-1", "text": "申请人姓名是什么？", "type": "EXTRACTIVE" },
+          { "id": "a-zh-2", "text": "申请日期是什么时候？", "type": "EXTRACTIVE" },
+          { "id": "a-zh-3", "text": "申请编号是什么？", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      },
+      "ko": {
+        "default": [
+          { "id": "a-ko-1", "text": "신청자 이름은 무엇입니까?", "type": "EXTRACTIVE" },
+          { "id": "a-ko-2", "text": "신청 날짜는 언제입니까?", "type": "EXTRACTIVE" },
+          { "id": "a-ko-3", "text": "신청 번호는 무엇입니까?", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      }
+    },
+    "OTHER": {
+      "ja": {
+        "default": [
+          { "id": "x-ja-1", "text": "文書のタイトルは何ですか？", "type": "EXTRACTIVE" },
+          { "id": "x-ja-2", "text": "日付はいつですか？", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "x-ja-3", "text": "発行者は誰ですか？", "type": "EXTRACTIVE" },
+          { "id": "x-ja-4", "text": "文書番号は何ですか？", "type": "EXTRACTIVE" }
+        ]
+      },
+      "en": {
+        "default": [
+          { "id": "x-en-1", "text": "What is the document title?", "type": "EXTRACTIVE" },
+          { "id": "x-en-2", "text": "What is the date?", "type": "EXTRACTIVE" }
+        ],
+        "optional": [
+          { "id": "x-en-3", "text": "Who is the issuer?", "type": "EXTRACTIVE" },
+          { "id": "x-en-4", "text": "What is the document number?", "type": "EXTRACTIVE" }
+        ]
+      },
+      "zh": {
+        "default": [
+          { "id": "x-zh-1", "text": "文档标题是什么？", "type": "EXTRACTIVE" },
+          { "id": "x-zh-2", "text": "日期是什么时候？", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      },
+      "ko": {
+        "default": [
+          { "id": "x-ko-1", "text": "문서 제목은 무엇입니까?", "type": "EXTRACTIVE" },
+          { "id": "x-ko-2", "text": "날짜는 언제입니까?", "type": "EXTRACTIVE" }
+        ],
+        "optional": []
+      }
+    }
+  }
+}

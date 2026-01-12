@@ -88,6 +88,12 @@ const schema = a.schema({
       modelVersion: a.string(),
       confidence: a.float(),
 
+      // AI assistance tracking (Sprint 3) - for [📖 Read] button usage
+      aiAssisted: a.boolean(), // True if [📖 Read] was used to extract the answer
+      aiModelId: a.string(), // Model ID (e.g., "anthropic.claude-3-5-sonnet-20241022-v2:0")
+      aiModelProvider: a.string(), // Provider (e.g., "bedrock")
+      aiExtractionTimestamp: a.datetime(), // When AI extraction occurred
+
       // Tracking fields
       createdBy: a.string().required(),
       createdAt: a.datetime().required(),
