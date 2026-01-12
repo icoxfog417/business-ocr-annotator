@@ -15,8 +15,13 @@ export const auth = defineAuth({
       callbackUrls: [
         'http://localhost:5173/',
         'http://localhost:5173/callback',
+        'https://main.d1qijheh7kkv51.amplifyapp.com/',
+        'https://main.d1qijheh7kkv51.amplifyapp.com/callback',
       ],
-      logoutUrls: ['http://localhost:5173/'],
+      logoutUrls: [
+        'http://localhost:5173/',
+        'https://main.d1qijheh7kkv51.amplifyapp.com/',
+      ],
     },
   },
   // Custom attributes for contributor consent tracking (Sprint 3)
