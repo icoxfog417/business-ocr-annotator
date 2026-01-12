@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { Amplify } from 'aws-amplify';
 import './index.css';
 import './styles/animations.css';
+import './styles/breakpoints.css';
+import './styles/mobile.css';
 import App from './App.tsx';
 import outputs from '../amplify_outputs.json';
 

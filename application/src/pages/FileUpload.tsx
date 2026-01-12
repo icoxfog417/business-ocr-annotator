@@ -1,15 +1,40 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { uploadData } from 'aws-amplify/storage';
 import { client } from '../lib/apiClient';
 import { LANGUAGES, DOCUMENT_TYPES, type DocumentTypeCode } from '../lib/constants';
+import { ContributorGatedButton } from '../components/consent';
+import { QuestionSelector, CameraCapture, type SelectedQuestion } from '../components/upload';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useDefaultQuestions } from '../hooks/useDefaultQuestions';
 
 export function FileUpload() {
+  const navigate = useNavigate();
+  const { isMobile } = useBreakpoint();
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [language, setLanguage] = useState('ja');
   const [documentType, setDocumentType] = useState<DocumentTypeCode>('RECEIPT');
+  const [selectedQuestions, setSelectedQuestions] = useState<SelectedQuestion[]>([]);
+  const [showQuestionSelector, setShowQuestionSelector] = useState(false);
+
+  // Load default questions when document type or language changes
+  const { defaultQuestions } = useDefaultQuestions(documentType, language);
+
+  // Initialize selected questions with defaults when they load
+  useEffect(() => {
+    if (defaultQuestions.length > 0 && selectedQuestions.length === 0) {
+      setSelectedQuestions(
+        defaultQuestions.map((q) => ({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          isCustom: false,
+        }))
+      );
+    }
+  }, [defaultQuestions, selectedQuestions.length]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -45,10 +70,17 @@ export function FileUpload() {
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Handle camera capture (mobile)
+  const handleCameraCapture = (file: File) => {
+    setFiles((prev) => [...prev, file]);
+  };
+
   const uploadFiles = async () => {
     if (files.length === 0) return;
 
     setUploading(true);
+    const uploadedImageIds: string[] = [];
+
     try {
       for (const file of files) {
         // Upload to images/original/ folder for 3-tier storage
@@ -62,15 +94,15 @@ export function FileUpload() {
           path: s3KeyOriginal,
           data: file,
           options: {
-            contentType: file.type
-          }
+            contentType: file.type,
+          },
         }).result;
 
         console.log('Upload successful:', uploadResult);
 
         // Get image dimensions
         const img = new Image();
-        const dimensions = await new Promise<{width: number, height: number}>((resolve) => {
+        const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
           img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
           img.src = URL.createObjectURL(file);
         });
@@ -89,14 +121,18 @@ export function FileUpload() {
           language: language,
           status: 'PROCESSING',
           uploadedBy: 'current-user',
-          uploadedAt: new Date().toISOString()
+          uploadedAt: new Date().toISOString(),
         });
 
         console.log('Database result:', dbResult);
 
         if (dbResult.errors) {
           console.error('Database errors:', dbResult.errors);
-          throw new Error(dbResult.errors.map(e => e.message).join(', '));
+          throw new Error(dbResult.errors.map((e) => e.message).join(', '));
+        }
+
+        if (dbResult.data?.id) {
+          uploadedImageIds.push(dbResult.data.id);
         }
 
         // Note: The process-image Lambda should be triggered automatically
@@ -106,10 +142,24 @@ export function FileUpload() {
       }
 
       setFiles([]);
-      alert('Files uploaded successfully! Images are being processed. You can view them in the gallery.');
+
+      // If only one image uploaded, navigate directly to annotation with questions
+      if (uploadedImageIds.length === 1) {
+        navigate(`/annotate/${uploadedImageIds[0]}`, {
+          state: { selectedQuestions },
+        });
+      } else {
+        // Multiple images: go to gallery
+        alert(
+          'Files uploaded successfully! Images are being processed. You can view them in the gallery.'
+        );
+        navigate('/gallery');
+      }
     } catch (error) {
       console.error('Upload failed:', error);
-      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please check the console for details.`);
+      alert(
+        `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please check the console for details.`
+      );
     } finally {
       setUploading(false);
     }
@@ -134,7 +184,26 @@ export function FileUpload() {
       </div>
       
       <h1>Upload Images</h1>
-      
+
+      {/* Mobile Camera Capture */}
+      {isMobile && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <CameraCapture onCapture={handleCameraCapture} language={language} maxSizeMB={20} />
+          <div
+            style={{
+              textAlign: 'center',
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginTop: '1rem',
+              marginBottom: '1rem',
+            }}
+          >
+            — or —
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Drag & Drop */}
       <div
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -143,11 +212,11 @@ export function FileUpload() {
         style={{
           border: `2px dashed ${dragActive ? '#3b82f6' : '#d1d5db'}`,
           borderRadius: '8px',
-          padding: '3rem',
+          padding: isMobile ? '2rem' : '3rem',
           textAlign: 'center',
           backgroundColor: dragActive ? '#eff6ff' : '#f9fafb',
           cursor: 'pointer',
-          marginBottom: '1rem'
+          marginBottom: '1rem',
         }}
       >
         <input
@@ -160,7 +229,7 @@ export function FileUpload() {
         />
         <label htmlFor="file-input" style={{ cursor: 'pointer' }}>
           <div style={{ fontSize: '1.125rem', fontWeight: '500', marginBottom: '0.5rem' }}>
-            Drop images here or click to select
+            {isMobile ? 'Tap to select files' : 'Drop images here or click to select'}
           </div>
           <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
             Supports JPEG, PNG (max 20MB per file)
@@ -209,7 +278,7 @@ export function FileUpload() {
                 borderRadius: '4px',
                 border: '1px solid #d1d5db',
                 fontSize: '1rem',
-                minWidth: '200px'
+                minWidth: '200px',
               }}
             >
               {DOCUMENT_TYPES.map((type) => (
@@ -219,7 +288,53 @@ export function FileUpload() {
               ))}
             </select>
           </div>
-          
+
+          {/* Question Selection */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <button
+              type="button"
+              onClick={() => setShowQuestionSelector(!showQuestionSelector)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                background: 'none',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                width: '100%',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span>
+                {language === 'ja' ? '質問を選択' : 'Select Questions'} ({selectedQuestions.length})
+              </span>
+              <span style={{ transform: showQuestionSelector ? 'rotate(180deg)' : 'none' }}>▼</span>
+            </button>
+
+            {showQuestionSelector && (
+              <div
+                style={{
+                  marginTop: '0.75rem',
+                  padding: '1rem',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  backgroundColor: '#ffffff',
+                }}
+              >
+                <QuestionSelector
+                  documentType={documentType}
+                  language={language}
+                  selectedQuestions={selectedQuestions}
+                  onQuestionsChange={setSelectedQuestions}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* File List */}
           {files.map((file, index) => (
             <div
               key={index}
@@ -257,9 +372,10 @@ export function FileUpload() {
         </div>
       )}
 
-      <button
+      <ContributorGatedButton
         onClick={uploadFiles}
         disabled={files.length === 0 || uploading}
+        language={language}
         style={{
           background: files.length === 0 || uploading ? '#9ca3af' : '#3b82f6',
           color: 'white',
@@ -268,11 +384,18 @@ export function FileUpload() {
           padding: '0.75rem 1.5rem',
           fontSize: '1rem',
           fontWeight: '500',
-          cursor: files.length === 0 || uploading ? 'not-allowed' : 'pointer'
+          cursor: files.length === 0 || uploading ? 'not-allowed' : 'pointer',
+          minHeight: '48px',
         }}
       >
-        {uploading ? 'Uploading...' : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
-      </button>
+        {uploading
+          ? language === 'ja'
+            ? 'アップロード中...'
+            : 'Uploading...'
+          : language === 'ja'
+            ? `${files.length}件のファイルをアップロード`
+            : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
+      </ContributorGatedButton>
     </div>
   );
 }
