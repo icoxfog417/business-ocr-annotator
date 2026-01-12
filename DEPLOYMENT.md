@@ -66,30 +66,6 @@ Find Cognito domain after deployment:
 aws cognito-idp describe-user-pool --user-pool-id <POOL_ID> --query 'UserPool.Domain'
 ```
 
-## Build Specification
-
-The build spec is auto-configured. Key phases:
-
-```yaml
-backend:
-  phases:
-    build:
-      commands:
-        - npm ci
-        - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
-
-frontend:
-  phases:
-    preBuild:
-      commands:
-        - npx ampx generate outputs --branch $AWS_BRANCH --app-id $AWS_APP_ID
-    build:
-      commands:
-        - npm run build
-```
-
-**Important**: The `preBuild` step generates `amplify_outputs.json` for the frontend.
-
 ## Environment Differences
 
 | Component | Sandbox | Production |
