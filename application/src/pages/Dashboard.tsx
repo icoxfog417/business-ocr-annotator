@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { signOut } from 'aws-amplify/auth';
 import { Link } from 'react-router-dom';
 import { client } from '../lib/apiClient';
+import { MobileNavSpacer } from '../components/layout';
 
 interface Stats {
   images: number;
@@ -606,6 +607,8 @@ export function Dashboard() {
             </div>
           </div>
         </div>
+
+        <MobileNavSpacer />
       </main>
     </div>
   );
