@@ -1,0 +1,16 @@
+{
+  "title": "Data Usage Consent",
+  "subtitle": "Important: Please Read Before Contributing",
+  "message": "The images and question-answer pairs you submit will be used to build a dataset for evaluating and improving AI model capabilities.",
+  "publicNotice": "This dataset will be published publicly and may be used for both academic research and commercial purposes to accelerate AI development.",
+  "warning": "DO NOT submit any personal information or other sensitive information that you would not want to be shared publicly.",
+  "acknowledgment": "By continuing to use this application, you acknowledge and consent to this data sharing.",
+  "checkbox": "I understand and consent to the above terms",
+  "cancel": "Cancel",
+  "agree": "I Agree & Continue",
+  "banner": {
+    "title": "Start Contributing",
+    "description": "Help improve AI models by contributing annotated business documents.",
+    "button": "Get Started"
+  }
+}

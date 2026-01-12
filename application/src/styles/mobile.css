@@ -1,0 +1,322 @@
+/* Mobile-specific styles for Sprint 3 */
+
+/* Touch target requirements - minimum 48x48px */
+@media (max-width: 767px) {
+  /* Buttons */
+  button,
+  .btn,
+  [role='button'] {
+    min-height: var(--touch-target-min, 48px);
+    min-width: var(--touch-target-min, 48px);
+    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  }
+
+  /* Form inputs */
+  input,
+  select,
+  textarea {
+    min-height: var(--touch-target-min, 48px);
+    font-size: 16px; /* Prevent iOS zoom on focus */
+    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  }
+
+  /* Links with touch area */
+  a.touch-target {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--touch-target-min, 48px);
+    min-width: var(--touch-target-min, 48px);
+  }
+
+  /* List items as touch targets */
+  li.touch-target,
+  .list-item-touch {
+    min-height: var(--touch-target-min, 48px);
+    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  }
+
+  /* Checkbox and radio touch area */
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 24px;
+    height: 24px;
+    margin-right: var(--spacing-sm, 8px);
+  }
+
+  /* Checkbox/radio labels need larger touch area */
+  label:has(input[type='checkbox']),
+  label:has(input[type='radio']) {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-target-min, 48px);
+    padding: var(--spacing-sm, 8px) 0;
+  }
+}
+
+/* Safe area padding for notched devices */
+.safe-area-padding {
+  padding-top: var(--safe-area-top, 0px);
+  padding-bottom: var(--safe-area-bottom, 0px);
+  padding-left: var(--safe-area-left, 0px);
+  padding-right: var(--safe-area-right, 0px);
+}
+
+.safe-area-padding-top {
+  padding-top: var(--safe-area-top, 0px);
+}
+
+.safe-area-padding-bottom {
+  padding-bottom: var(--safe-area-bottom, 0px);
+}
+
+/* Mobile navigation bottom spacing */
+.mobile-nav-spacing {
+  padding-bottom: calc(var(--mobile-nav-height, 60px) + var(--safe-area-bottom, 0px));
+}
+
+/* Bottom navigation bar styles */
+.mobile-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--mobile-nav-height, 60px) + var(--safe-area-bottom, 0px));
+  padding-bottom: var(--safe-area-bottom, 0px);
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 1000;
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target-min, 48px);
+  min-height: var(--touch-target-min, 48px);
+  padding: var(--spacing-xs, 4px);
+  color: #6b7280;
+  text-decoration: none;
+  font-size: 10px;
+  transition: color 0.2s ease;
+}
+
+.mobile-nav-item.active {
+  color: #3b82f6;
+}
+
+.mobile-nav-item:hover {
+  color: #3b82f6;
+}
+
+.mobile-nav-icon {
+  font-size: 24px;
+  margin-bottom: 2px;
+}
+
+/* Stacked layout for mobile */
+.stacked-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+  padding: var(--spacing-md, 16px);
+  padding-bottom: calc(var(--mobile-nav-height, 60px) + var(--safe-area-bottom, 0px) + var(--spacing-md, 16px));
+}
+
+/* Split layout for tablet/desktop */
+@media (min-width: 768px) {
+  .split-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-lg, 24px);
+    padding: var(--spacing-lg, 24px);
+  }
+
+  .split-layout-60-40 {
+    grid-template-columns: 60fr 40fr;
+  }
+
+  .split-layout-40-60 {
+    grid-template-columns: 40fr 60fr;
+  }
+
+  .split-layout-70-30 {
+    grid-template-columns: 70fr 30fr;
+  }
+}
+
+/* Bounding box corner handles for touch */
+.bbox-handle {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  background: #3b82f6;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  touch-action: none;
+}
+
+.bbox-handle:active {
+  background: #2563eb;
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Mode badge (view/draw indicator) */
+.mode-badge {
+  position: fixed;
+  top: 50px;
+  right: var(--spacing-md, 16px);
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  min-width: var(--touch-target-min, 48px);
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  z-index: 100;
+  transition: all 0.2s ease;
+}
+
+.mode-badge.view {
+  background: #6b7280;
+  color: #ffffff;
+}
+
+.mode-badge.draw {
+  background: #3b82f6;
+  color: #ffffff;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Progress dots */
+.progress-dots {
+  display: flex;
+  gap: var(--spacing-sm, 8px);
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm, 8px) 0;
+}
+
+.progress-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.progress-dot.pending {
+  border-color: #d1d5db;
+  background: transparent;
+}
+
+.progress-dot.current {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  transform: scale(1.2);
+}
+
+.progress-dot.completed {
+  border-color: #10b981;
+  background: #10b981;
+}
+
+/* Zoom controls for mobile */
+.zoom-controls-mobile {
+  display: flex;
+  gap: var(--spacing-xs, 4px);
+  padding: var(--spacing-sm, 8px);
+}
+
+.zoom-btn {
+  width: var(--touch-target-min, 48px);
+  height: var(--touch-target-min, 48px);
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #374151;
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.zoom-btn:hover {
+  background: #f3f4f6;
+}
+
+.zoom-btn:active {
+  background: #e5e7eb;
+}
+
+/* Card grid responsive */
+.card-grid {
+  display: grid;
+  gap: var(--spacing-md, 16px);
+}
+
+@media (max-width: 767px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .card-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Image gallery responsive grid */
+.image-grid {
+  display: grid;
+  gap: var(--spacing-sm, 8px);
+}
+
+@media (max-width: 767px) {
+  .image-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .image-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .image-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
