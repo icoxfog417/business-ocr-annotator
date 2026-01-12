@@ -54,6 +54,19 @@ export function useContributorStatus(): UseContributorStatusReturn {
         consentVersion,
       });
     } catch (error) {
+      // User not authenticated - this is expected before login
+      const errorName = (error as { name?: string })?.name;
+      if (errorName === 'UserUnAuthenticatedException') {
+        setStatus({
+          isContributor: false,
+          isLoading: false,
+          error: null,
+          consentDate: null,
+          consentVersion: null,
+        });
+        return;
+      }
+
       console.error('Failed to fetch contributor status:', error);
       setStatus((prev) => ({
         ...prev,
