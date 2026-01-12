@@ -78,7 +78,7 @@ export function Login() {
               color: '#0f172a',
             }}
           >
-            Visual Dialogue Datasets for OCR Evaluation
+            Build VQA Datasets for Business Documents
           </h1>
 
           <p
@@ -89,8 +89,8 @@ export function Login() {
               marginBottom: '3rem',
             }}
           >
-            Enterprise-grade platform for creating high-quality annotated datasets. Leverage AI
-            to accelerate your OCR model development.
+            Crowdsourced annotation platform for creating high-quality Visual Question Answering
+            datasets. Help evaluate OCR accuracy of AI models.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -103,7 +103,7 @@ export function Login() {
                   borderRadius: '50%',
                 }}
               />
-              <span style={{ color: '#475569' }}>Automated annotation with Amazon Bedrock</span>
+              <span style={{ color: '#475569' }}>AI-assisted text extraction with Amazon Bedrock</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div
@@ -114,7 +114,7 @@ export function Login() {
                   borderRadius: '50%',
                 }}
               />
-              <span style={{ color: '#475569' }}>Real-time collaboration tools</span>
+              <span style={{ color: '#475569' }}>Multi-language support (Japanese, English, Chinese, Korean)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div
@@ -125,7 +125,7 @@ export function Login() {
                   borderRadius: '50%',
                 }}
               />
-              <span style={{ color: '#475569' }}>Direct export to Hugging Face Hub</span>
+              <span style={{ color: '#475569' }}>Mobile-friendly with camera capture</span>
             </div>
           </div>
         </div>
@@ -216,8 +216,7 @@ export function Login() {
               lineHeight: '1.6',
             }}
           >
-            By continuing, you agree to our Terms of Service and Privacy Policy. Powered by AWS
-            Amplify & Amazon Bedrock.
+            By continuing, you agree to our Terms of Service and Privacy Policy.
           </p>
         </div>
       </div>
