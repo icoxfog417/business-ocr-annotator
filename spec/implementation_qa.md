@@ -2,9 +2,9 @@
 
 This document records questions and answers discovered during sandbox verification of AWS Amplify Gen2 and related technologies for the Business OCR Annotator project.
 
-**Last Updated**: 2026-01-11
-**Total Questions**: 12
-**Total Verified**: 12 / 12
+**Last Updated**: 2026-01-12
+**Total Questions**: 13
+**Total Verified**: 13 / 13
 
 ## Overview
 
@@ -33,6 +33,7 @@ Each Q&A entry documents:
 | Q10 | Weights & Biases incremental data | 🟠 High | 3 | ✅ Verified |
 | Q11 | Weights & Biases incremental eval | 🟠 High | 3 | ✅ Verified |
 | Q12 | DynamoDB GSI for efficient lookups | 🟠 High | 2 | ✅ Verified |
+| Q13 | Touch bounding box drawing (native) | 🟠 High | 3 | ✅ Verified |
 
 ---
 
@@ -1460,6 +1461,162 @@ async function findWithRetry(tableName: string, indexName: string, s3Key: string
 - [AWS DynamoDB Secondary Indexes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/SecondaryIndexes.html)
 - [Amplify Gen2 Data Secondary Indexes](https://docs.amplify.aws/gen2/build-a-backend/data/data-modeling/secondary-index/)
 - [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
+
+---
+
+### Q13: How to implement touch-based bounding box drawing without external libraries?
+
+**Priority**: 🟠 High (Sprint 3)
+**Affects Design**: ✅ Yes - Mobile annotation UX
+**Status**: ✅ Verified
+
+**Question Details**:
+- How to handle touch events for drawing bounding boxes?
+- How to convert touch coordinates to normalized image coordinates?
+- How to prevent page scroll during drawing?
+- How to provide visual feedback while drawing?
+- How to handle edge cases (multi-touch, touch outside image)?
+- Should we use a gesture library like Hammer.js or native touch events?
+
+**Answer**: For draw-only bounding boxes (no pinch-zoom, no multi-finger gestures), native touch events are sufficient and recommended. Hammer.js (~7KB) is overkill for this simple use case. The key UX insight is using an **explicit draw mode toggle** with a **tappable mode indicator badge**.
+
+**Recommended UX Pattern**:
+```
+┌─────────────────────────────────────────────────────────────┐
+│  VIEW MODE (default)          │  DRAW MODE                  │
+├───────────────────────────────┼─────────────────────────────┤
+│  • One finger = scroll        │  • One finger = draw box    │
+│  • Two fingers = scroll       │  • Two fingers = scroll     │
+│  • Touch layer: pointer-events│  • Touch layer: captures    │
+│    none (pass-through)        │    single-touch only        │
+├───────────────────────────────┴─────────────────────────────┤
+│  MODE TOGGLE OPTIONS (all three recommended):               │
+│  1. "Draw Box" button - primary action                      │
+│  2. Mode badge (top-right corner) - tap to toggle ⭐        │
+│  3. Cancel button - appears in draw mode                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Code Sample**:
+```typescript
+// State management
+const [isDrawMode, setIsDrawMode] = useState(false);
+const [isDrawing, setIsDrawing] = useState(false);
+
+// Convert touch to normalized coordinates (0-1 range)
+function getTouchPoint(touch: Touch, imageRect: DOMRect): Point {
+  const x = (touch.clientX - imageRect.left) / imageRect.width;
+  const y = (touch.clientY - imageRect.top) / imageRect.height;
+  return {
+    x: Math.max(0, Math.min(1, x)),
+    y: Math.max(0, Math.min(1, y)),
+  };
+}
+
+// Touch handlers - only active in draw mode
+const handleTouchStart = (e: React.TouchEvent) => {
+  if (!isDrawMode) return;
+  if (e.touches.length !== 1) return; // Single touch only, multi-touch = scroll
+
+  e.preventDefault();
+  const point = getTouchPoint(e.touches[0], imageRect);
+  setStartPoint(point);
+  setIsDrawing(true);
+};
+
+const handleTouchMove = (e: React.TouchEvent) => {
+  if (!isDrawing) return;
+
+  // If user adds second finger, cancel drawing and allow scroll
+  if (e.touches.length !== 1) {
+    setIsDrawing(false);
+    setPreviewBox(null);
+    return;
+  }
+
+  e.preventDefault();
+  const point = getTouchPoint(e.touches[0], imageRect);
+  const box = {
+    x: Math.min(startPoint.x, point.x),
+    y: Math.min(startPoint.y, point.y),
+    width: Math.abs(point.x - startPoint.x),
+    height: Math.abs(point.y - startPoint.y),
+  };
+  setPreviewBox(box);
+};
+
+const handleTouchEnd = (e: React.TouchEvent) => {
+  if (!isDrawing) return;
+  e.preventDefault();
+
+  const MIN_SIZE = 0.02; // 2% minimum
+  if (previewBox.width > MIN_SIZE && previewBox.height > MIN_SIZE) {
+    onBoxDrawn(previewBox);
+    // Auto-exit draw mode after successful draw
+    setTimeout(() => setIsDrawMode(false), 500);
+  }
+  setIsDrawing(false);
+};
+
+// CSS for touch layer
+const touchLayerStyle = {
+  position: 'absolute',
+  inset: 0,
+  // Key: allow pan in draw mode so two-finger scroll works
+  touchAction: isDrawMode ? 'pan-x pan-y' : 'auto',
+  pointerEvents: isDrawMode ? 'auto' : 'none',
+};
+
+// Tappable mode indicator (top-right badge)
+<div
+  className={`mode-indicator ${isDrawMode ? 'draw' : ''}`}
+  onClick={() => setIsDrawMode(!isDrawMode)}
+  style={{ cursor: 'pointer' }}
+>
+  {isDrawMode ? 'DRAW MODE' : 'VIEW MODE'}
+</div>
+```
+
+**Verified in**: [`.sandbox/touch-bounding-box/`](.sandbox/touch-bounding-box/)
+
+**Key Findings**:
+1. **Explicit draw mode is essential**: Always-on drawing causes accidental draws when scrolling
+2. **Tappable mode badge is highly useful**: Users found tapping the corner badge intuitive and quick
+3. **Two-finger scroll in draw mode**: Use `touch-action: pan-x pan-y` to let browser handle two-finger scroll while capturing single-touch for drawing
+4. **Auto-exit after drawing**: Return to view mode after successful box creation improves flow
+5. **Cancel mid-draw**: If user adds second finger during draw, cancel drawing and allow scroll
+6. **Minimum size threshold**: 2% of image dimension prevents accidental taps from creating tiny boxes
+7. **Normalized coordinates**: Store as 0-1 range for zoom-independence
+
+**Gotchas**:
+- **Must use `{ passive: false }`** on touch event listeners to allow `preventDefault()`
+- **`touch-action: none`** blocks ALL touch - use `pan-x pan-y` instead to allow two-finger scroll
+- **`pointer-events: none`** in view mode lets touches pass through to enable normal scrolling
+- **Multi-touch detection**: Check `e.touches.length` in both start and move handlers
+- **Visual feedback**: Show mode indicator prominently so user knows current state
+- **Button size**: All touch targets must be ≥48px for reliable tapping
+
+**Recommended UI Elements**:
+| Element | Purpose | Size |
+|---------|---------|------|
+| Mode badge (top-right) | Quick toggle, always visible | 48px tap area |
+| Draw Box button | Primary action | 48px height |
+| Cancel button | Exit without drawing (in draw mode only) | 48px height |
+| Draw hint overlay | Shows "☝️ One finger = Draw, ✌️ Two = Scroll" | Full image |
+
+**Native vs Hammer.js Comparison**:
+| Aspect | Native Touch | Hammer.js |
+|--------|--------------|-----------|
+| Bundle size | 0 KB | ~7 KB gzipped |
+| Maintenance | Browser-native | Last update 2016 |
+| Complexity for draw | Low | Adds abstraction |
+| Gesture recognition | Manual | Built-in |
+| When to use | Draw-only (Sprint 3) | Complex gestures (Sprint 6) |
+
+**References**:
+- [MDN Touch Events](https://developer.mozilla.org/en-US/docs/Web/API/Touch_events)
+- [MDN touch-action CSS](https://developer.mozilla.org/en-US/docs/Web/CSS/touch-action)
+- [Hammer.js (for future reference)](https://hammerjs.github.io/)
 
 ---
 

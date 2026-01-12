@@ -2,7 +2,7 @@
 
 **Project**: Business OCR Annotator
 **Last Updated**: 2026-01-12
-**Status**: Sprint 2 Complete, Starting Sprint 3
+**Status**: Sprint 2 Complete, Starting Sprint 3 (UX & Mobile Optimization)
 **Approach**: Agile Incremental Development
 **Reference**: See [spec/proposals/20260107_reorganize_tasks_agile_approach.md](proposals/20260107_reorganize_tasks_agile_approach.md)
 
@@ -408,7 +408,7 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Display AI vs Human annotation counts
 - ✅ Display approved vs pending annotation counts
 
-### Image Compression (Moved from Sprint 4)
+### Image Compression (Moved from Sprint 5)
 **Proposal**: See [spec/proposals/20260111_move_compression_to_sprint2.md](proposals/20260111_move_compression_to_sprint2.md)
 
 - ✅ Update data schema with 3-tier storage keys
@@ -458,7 +458,202 @@ This task list is organized into **sprints** that deliver working software incre
 
 ---
 
-## Sprint 3: Queue-Based W&B Integration
+## Sprint 3: UX & Mobile UI Optimization
+
+**Goal**: Streamlined annotation cycle + responsive mobile UI + legal compliance
+**Duration**: 1 week (5-6 working days)
+**Deliverable**: Optimized annotation workflow, mobile-friendly interface, user consent system
+**Proposal**: See [spec/proposals/20260112_sprint3_mobile_first_ui.md](proposals/20260112_sprint3_mobile_first_ui.md)
+
+### Phase 0: Legal & Consent System (Day 1)
+
+- ⬜ Add Cognito custom attributes for consent in `amplify/auth/resource.ts`
+  ```typescript
+  userAttributes: {
+    'custom:contributor': { dataType: 'String', mutable: true },
+    'custom:consent_date': { dataType: 'String', mutable: true },
+    'custom:consent_version': { dataType: 'String', mutable: true },
+  }
+  ```
+
+- ⬜ Update `Annotation` model in `amplify/data/resource.ts` with AI tracking fields
+  - `aiAssisted: boolean` - True if [📖 Read] was used
+  - `aiModelId: string` - Model ID (e.g., "anthropic.claude-3-5-sonnet")
+  - `aiModelProvider: string` - Provider (e.g., "bedrock")
+  - `aiExtractionTimestamp: datetime` - When AI extraction occurred
+
+- ⬜ Create `StartContributingDialog` component
+  - ⬜ Multi-language consent message (EN, JA, ZH)
+  - ⬜ Checkbox for explicit consent
+  - ⬜ Cancel and Accept buttons
+  - ⬜ Block upload/annotation without contributor status
+
+- ⬜ Create `useContributorStatus` hook
+  - ⬜ Check `custom:contributor` attribute via `fetchUserAttributes()`
+  - ⬜ Update Cognito attributes via `updateUserAttributes()` when accepted
+  - ⬜ Return contributor status for conditional rendering
+
+- ⬜ Create `ContributorContext` provider
+  - ⬜ Cache contributor status globally
+  - ⬜ Provide `isContributor` and `becomeContributor()` to components
+
+- ⬜ Add consent translations
+  - ⬜ `src/i18n/consent/en.json`
+  - ⬜ `src/i18n/consent/ja.json`
+  - ⬜ `src/i18n/consent/zh.json`
+
+### Phase 1: UX Flow Refactor (Day 1-2)
+
+- ⬜ Create default questions configuration
+  - ⬜ Create `src/config/defaultQuestions.json`
+    - All document types (RECEIPT, INVOICE, ORDER_FORM, etc.)
+    - All languages (ja, en, zh, ko)
+    - Default + optional questions per type/language
+  - ⬜ Create `src/hooks/useDefaultQuestions.ts` hook
+
+- ⬜ Create `QuestionSelector` component (on Upload screen)
+  - ⬜ Load questions from config by document type + language
+  - ⬜ Checkbox list for question selection
+  - ⬜ Default questions pre-checked
+  - ⬜ Add custom question input
+  - ⬜ Pass selected questions to annotation flow
+
+- ⬜ Create `QuestionNavigator` component
+  - ⬜ Previous/Next navigation buttons
+  - ⬜ Progress dots indicator
+  - ⬜ Current question highlight
+  - ⬜ Skip question functionality
+
+- ⬜ Create `AnnotationFlow` container
+  - ⬜ Question-by-question state management
+  - ⬜ Box-first workflow (draw → read → confirm)
+  - ⬜ Auto-advance on save
+  - ⬜ No question add/remove during annotation
+
+- ⬜ Create `ReadButton` component (AI text extraction)
+  - ⬜ Calls existing Bedrock Lambda with bounding box region
+  - ⬜ Extracts text from selected area
+  - ⬜ Fills answer field automatically
+  - ⬜ Capture and store model ID from response
+  - ⬜ Shows loading state during extraction
+  - ⬜ Handles errors gracefully
+
+- ⬜ Create `FinalizeScreen` component
+  - ⬜ Summary of completed annotations
+  - ⬜ "Upload Next Image" primary action
+  - ⬜ "Back to Gallery" secondary action
+
+- ⬜ Add keyboard shortcuts for desktop
+  - ⬜ `→` or `Enter` - Next question
+  - ⬜ `←` - Previous question
+  - ⬜ `D` - Toggle draw mode
+  - ⬜ `R` - Read text from box (AI)
+  - ⬜ `S` - Skip question
+  - ⬜ `Esc` - Cancel drawing
+  - ⬜ `Ctrl+Enter` - Finalize annotation
+
+- ⬜ Update Upload page with question selection
+- ⬜ Update AnnotationWorkspace layout (simplified)
+
+### Phase 2: Responsive Layout (Day 2-3)
+
+- ⬜ Define CSS breakpoint variables
+  ```css
+  --breakpoint-mobile: 768px;
+  --breakpoint-tablet: 1024px;
+  ```
+
+- ⬜ Create responsive layout components
+  - ⬜ `src/components/layout/ResponsiveContainer.tsx`
+  - ⬜ `src/components/layout/StackedLayout.tsx` (mobile)
+  - ⬜ `src/components/layout/SplitLayout.tsx` (tablet/desktop)
+
+- ⬜ Create `src/hooks/useBreakpoint.ts` hook
+  - ⬜ Detect current breakpoint (mobile/tablet/desktop)
+  - ⬜ Return boolean flags for conditional rendering
+
+- ⬜ Update existing pages for responsiveness
+  - ⬜ Dashboard (card grid → stacked)
+  - ⬜ Gallery (grid adjustment)
+  - ⬜ Upload page
+  - ⬜ Annotation workspace
+
+- ⬜ Create `MobileNavigation` component (bottom bar)
+  - ⬜ 60px height + safe area
+  - ⬜ Home, Upload, Gallery, Profile icons
+  - ⬜ Active state indicator
+
+### Phase 3: Mobile-Specific Features (Day 3-4)
+
+- ⬜ Create `CameraCapture` component
+  - ⬜ HTML5 file input with `capture="environment"`
+  - ⬜ Image preview before upload
+  - ⬜ Gallery fallback option
+  - ⬜ Works on iOS Safari and Android Chrome
+
+- ⬜ Create `TouchCanvas` component
+  - ⬜ Native touch event handlers (touchstart, touchmove, touchend)
+  - ⬜ Draw mode toggle button
+  - ⬜ Move existing boxes by touch
+  - ⬜ Resize boxes via corner handles (32x32px touch area)
+  - ⬜ Visual feedback on touch interactions
+
+- ⬜ Add mobile zoom controls
+  - ⬜ [+] zoom in button
+  - ⬜ [-] zoom out button
+  - ⬜ [Fit] reset to fit view
+
+- ⬜ Update generate-annotation Lambda
+  - ⬜ Return model ID in response for tracking
+
+### Phase 4: Polish & Testing (Day 5-6)
+
+- ⬜ Touch target audit
+  - ⬜ All buttons ≥48×48px
+  - ⬜ All form inputs ≥48px height
+  - ⬜ All nav items ≥48×48px
+  - ⬜ Box corner handles ≥32×32px touch area
+
+- ⬜ Keyboard shortcut testing (desktop)
+  - ⬜ All shortcuts work as documented
+  - ⬜ No conflicts with browser shortcuts
+
+- ⬜ Device testing
+  - ⬜ iPhone Safari
+  - ⬜ Android Chrome
+  - ⬜ iPad Safari
+  - ⬜ Desktop Chrome/Firefox/Safari
+
+- ⬜ Flow testing
+  - ⬜ Upload → Select Questions → Annotate → Finalize → Next
+  - ⬜ Consent flow blocks upload without agreement
+  - ⬜ AI model tracking recorded correctly
+
+- ⬜ Performance check
+  - ⬜ Lighthouse mobile score >70
+
+**Sprint 3 Acceptance Criteria:**
+- ⬜ Contributor consent dialog appears before first upload/annotation
+- ⬜ Consent stored as Cognito custom attributes (custom:contributor, custom:consent_date)
+- ⬜ Question selection works on Upload screen
+- ⬜ Default questions auto-load by document type + language
+- ⬜ Question-by-question navigation works
+- ⬜ Box-first workflow: draw → read/type → next
+- ⬜ [📖 Read] button extracts text from bounding box
+- ⬜ AI model ID recorded when Read is used
+- ⬜ Progress dots show completion status
+- ⬜ Keyboard shortcuts work on desktop
+- ⬜ Finalize screen shows summary
+- ⬜ All pages responsive at 375px width
+- ⬜ Bottom navigation works on mobile
+- ⬜ Camera capture works on iOS/Android
+- ⬜ Touch bounding box drawing works
+- ⬜ All touch targets ≥48px
+- ⬜ Lighthouse mobile score >70
+
+---
+
+## Sprint 4: Queue-Based W&B Integration
 
 **Goal**: Queue-based batch processing for W&B dataset builds and evaluations
 **Duration**: 2-3 weeks
@@ -730,7 +925,7 @@ This task list is organized into **sprints** that deliver working software incre
   - ⬜ Create troubleshooting guide for failed jobs
   - ⬜ Document `biz-doc-vqa` project structure in W&B
 
-**Sprint 3 Acceptance Criteria:**
+**Sprint 4 Acceptance Criteria:**
 - ✅ Approved annotations are queued automatically (non-blocking)
 - ✅ SQS queue collects verified annotations successfully
 - ✅ Scheduled batch jobs process 10+ annotations per run
@@ -747,7 +942,7 @@ This task list is organized into **sprints** that deliver working software incre
 
 ---
 
-## Sprint 4: Multi-Language Support & Image Optimization
+## Sprint 5: Multi-Language Support & Image Optimization
 
 **Goal**: Support multiple languages and optimize image storage
 **Duration**: 2 weeks
@@ -815,7 +1010,7 @@ This task list is organized into **sprints** that deliver working software incre
   - ⬜ Parameter tuning (temperature, max tokens)
 - ⬜ Save settings to user preferences (DynamoDB)
 
-**Sprint 4 Acceptance Criteria:**
+**Sprint 5 Acceptance Criteria:**
 - ✅ Users can select language when uploading images
 - ✅ Images can be filtered by language
 - ✅ Bedrock prompts use appropriate language
@@ -827,62 +1022,51 @@ Note: Image compression tasks moved to Sprint 2. See [spec/proposals/20260111_mo
 
 ---
 
-## Sprint 5: Mobile Optimization & Camera Capture
+## Sprint 6: Advanced Mobile Features
 
-**Goal**: First-class mobile experience with camera capture
+**Goal**: Advanced mobile gestures, offline support, and polish
 **Duration**: 2 weeks
-**Deliverable**: Mobile-optimized annotation and camera integration
+**Deliverable**: Pinch-to-zoom, offline PWA, advanced gestures
+**Note**: Basic mobile features (camera, touch, responsive) are in Sprint 3
 
-### Camera Capture UI
-- ⬜ Create CameraCapture component
-  - ⬜ Implement HTML5 camera access
-    ```html
-    <input type="file" accept="image/*" capture="camera" />
-    ```
-  - ⬜ Add camera permission handling
-  - ⬜ Support front/back camera switching
-  - ⬜ Show live camera preview
-  - ⬜ Implement photo capture
-  - ⬜ Add photo preview before upload
-  - ⬜ Integrate with existing upload flow
-- ⬜ Add camera capture option to Upload page
-- ⬜ Test camera on iOS and Android browsers
+### Advanced Gesture Support
+- ⬜ Implement gesture library integration (Hammer.js or similar)
+- ⬜ Pinch-to-zoom gesture support
+  - ⬜ Two-finger pinch to zoom in/out
+  - ⬜ Smooth zoom transitions
+  - ⬜ Zoom level limits (0.5x - 4x)
+- ⬜ Two-finger pan gesture
+  - ⬜ Pan while zoomed
+  - ⬜ Momentum scrolling
+- ⬜ Long-press for context menu
+- ⬜ Haptic feedback on interactions (where supported)
 
-### Mobile-Optimized Annotation UI
-- ⬜ Create TouchAnnotator component (mobile version)
-  - ⬜ Touch-friendly bounding box creation
-  - ⬜ Pinch-to-zoom gesture support
-  - ⬜ Two-finger pan gesture
-  - ⬜ Large touch targets (44x44px minimum)
-  - ⬜ Corner handles for resizing (12px+ touch area)
-  - ⬜ Tap to select box
-  - ⬜ Long-press for context menu
-  - ⬜ Optional: Haptic feedback
-- ⬜ Implement mobile-specific controls
-  - ⬜ Touch-friendly validation buttons (44x44px)
-  - ⬜ Bottom sheet for annotation form
-  - ⬜ Mobile-optimized keyboard for text input
-- ⬜ Add orientation support (portrait and landscape)
-
-### Responsive Design
-- ⬜ Audit all pages for mobile responsiveness
-- ⬜ Implement mobile-first CSS
-  - ⬜ Mobile (375px - 767px)
-  - ⬜ Tablet (768px - 1023px)
-  - ⬜ Desktop (1024px+)
-- ⬜ Update navigation for mobile (hamburger menu)
-- ⬜ Optimize dashboard for mobile layout
-- ⬜ Test on various device sizes
+### Offline Support (PWA)
+- ⬜ Configure service worker for offline caching
+- ⬜ Cache static assets and app shell
+- ⬜ Queue uploads when offline
+- ⬜ Sync queued items when back online
+- ⬜ Show offline indicator in UI
+- ⬜ Add PWA manifest
+  ```json
+  {
+    "name": "Business OCR Annotator",
+    "short_name": "OCR Annotator",
+    "start_url": "/",
+    "display": "standalone"
+  }
+  ```
 
 ### Performance Optimization for Mobile
 - ⬜ Implement lazy loading for images
-- ⬜ Add service worker for offline support (optional)
 - ⬜ Optimize bundle size
   ```bash
   npm install --save-dev webpack-bundle-analyzer
   ```
+- ⬜ Code splitting for routes
 - ⬜ Test on 3G/4G networks (throttling)
 - ⬜ Measure page load times on mobile devices
+- ⬜ Skeleton loading states for better perceived performance
 
 ### Common Components
 - ⬜ Create NotificationToast component
@@ -892,18 +1076,18 @@ Note: Image compression tasks moved to Sprint 2. See [spec/proposals/20260111_mo
 - ⬜ Create Tooltip component
 - ⬜ Implement ProgressBar
 
-**Sprint 5 Acceptance Criteria:**
-- ✅ Users can capture photos with device camera
-- ✅ Camera works on iOS and Android browsers
-- ✅ Touch annotation works smoothly on mobile
-- ✅ Pinch-to-zoom and pan gestures work
-- ✅ All pages are responsive and mobile-friendly
-- ✅ App performs well on mobile networks
-- ✅ Portrait and landscape orientations supported
+**Sprint 6 Acceptance Criteria:**
+- ✅ Pinch-to-zoom works smoothly
+- ✅ Two-finger pan gesture works while zoomed
+- ✅ App works offline (basic functionality)
+- ✅ Uploads queue when offline and sync when online
+- ✅ PWA installable on mobile devices
+- ✅ App performs well on slow networks
+- ✅ Skeleton loading improves perceived performance
 
 ---
 
-## Sprint 6: Dataset Publishing & PII Handling
+## Sprint 7: Dataset Publishing & PII Handling
 
 **Goal**: Publish datasets to Hugging Face with PII redaction
 **Duration**: 2 weeks
@@ -1007,7 +1191,7 @@ Note: Image compression tasks moved to Sprint 2. See [spec/proposals/20260111_mo
   - ⬜ Usage examples
   - ⬜ Legal context
 
-**Sprint 6 Acceptance Criteria:**
+**Sprint 7 Acceptance Criteria:**
 - ✅ Datasets can be exported in JSON, JSONL, Parquet
 - ✅ Bounding box normalization works correctly
 - ✅ PII detection identifies sensitive data
@@ -1018,7 +1202,7 @@ Note: Image compression tasks moved to Sprint 2. See [spec/proposals/20260111_mo
 
 ---
 
-## Sprint 7: Production Readiness & Polish
+## Sprint 8: Production Readiness & Polish
 
 **Goal**: Production-ready secure and monitored platform
 **Duration**: 2 weeks
@@ -1181,7 +1365,7 @@ Note: Image compression tasks moved to Sprint 2. See [spec/proposals/20260111_mo
 - ⬜ Set up support channels (email, chat)
 - ⬜ Prepare announcement (blog post, social media)
 
-**Sprint 7 Acceptance Criteria:**
+**Sprint 8 Acceptance Criteria:**
 - ✅ Security scan passes with no critical issues
 - ✅ All monitoring dashboards are active
 - ✅ Error tracking is configured
@@ -1402,17 +1586,18 @@ business-ocr-annotator/
 **Last Review Date**: 2026-01-12
 **Next Review Date**: TBD
 **Completed Tasks**: Sprint 0 + Sprint 1 + Sprint 2 completed
-**Current Sprint**: Sprint 3 (Queue-Based W&B Integration)
+**Current Sprint**: Sprint 3 (UX & Mobile UI Optimization)
 
 ### Sprint Completion Status
 - ✅ Sprint 0: Foundation & Deployment
 - ✅ Sprint 1: Image Upload & Manual Annotation (MVP)
 - ✅ Sprint 2: AI-Assisted Annotation
-- ⬜ Sprint 3: Queue-Based W&B Integration
-- ⬜ Sprint 4: Multi-Language Support & Optimization
-- ⬜ Sprint 5: Mobile Optimization & Camera
-- ⬜ Sprint 6: Publishing & PII Handling
-- ⬜ Sprint 7: Production Readiness
+- ⬜ Sprint 3: UX & Mobile UI Optimization
+- ⬜ Sprint 4: Queue-Based W&B Integration
+- ⬜ Sprint 5: Multi-Language Support & Optimization
+- ⬜ Sprint 6: Advanced Mobile Features
+- ⬜ Sprint 7: Publishing & PII Handling
+- ⬜ Sprint 8: Production Readiness
 
 ### Deferred from Sprint 2
 - ⬜ Per-user contribution tracking (REQ-AW-013, REQ-AW-014)
