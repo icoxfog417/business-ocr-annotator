@@ -641,43 +641,48 @@ This task list is organized into **sprints** that deliver working software incre
 
 ### Unit F: Annotation Flow 🔗 (Depends on: Unit A, Unit B, Unit C)
 
-- ⬜ Create `src/components/annotation/ProgressDots.tsx`
+- ✅ Create `src/components/annotation/ProgressDots.tsx`
   - Visual dots for question progress
   - States: pending (○), current (●), completed (✓)
   - Shows "3 of 5" text
 
-- ⬜ Create `src/components/annotation/QuestionNavigator.tsx`
+- ✅ Create `src/components/annotation/QuestionNavigator.tsx`
   - Previous/Next buttons
   - Skip button
   - Progress dots
   - Current question display
   - Keyboard shortcut integration
 
-- ⬜ Create `src/components/annotation/ReadButton.tsx`
+- ✅ Create `src/components/annotation/ReadButton.tsx`
   - [📖 Read] button with loading state
   - Calls Bedrock Lambda with bounding box region
   - Extracts text and fills answer field
   - Captures model ID for tracking
   - Error handling with retry option
 
-- ⬜ Create `src/components/annotation/FinalizeScreen.tsx`
+- ✅ Create `src/components/annotation/FinalizeScreen.tsx`
   - Summary: X questions answered, Y boxes drawn
   - "Upload Next Image" primary button
   - "Back to Gallery" secondary button
   - Session stats (optional)
 
-- ⬜ Create `src/components/annotation/AnnotationFlow.tsx`
+- ✅ Create `src/components/annotation/AnnotationFlow.tsx`
   - Container managing question-by-question flow
   - State: currentQuestionIndex, answers, boxes
   - Box-first workflow enforcement
   - Auto-advance on save
   - Integrates all annotation components
+  - **Responsive layout: stacked (mobile) / side-by-side (desktop)**
+  - **Keyboard shortcuts for desktop (←→ navigate, D draw, S skip, Esc cancel)**
 
-- ⬜ Update `src/pages/AnnotationWorkspace.tsx`
+- ✅ Update `src/pages/AnnotationWorkspace.tsx`
   - Replace current layout with `AnnotationFlow`
   - Remove question add/remove during annotation
   - Add keyboard shortcut support
   - Responsive layout integration
+  - **Load default questions from config when not passed via state**
+  - **Unified UX for both desktop and mobile**
+  - **Proposal**: See [spec/proposals/20260112_align_desktop_ux_with_mobile.md](proposals/20260112_align_desktop_ux_with_mobile.md)
 
 ---
 
