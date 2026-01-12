@@ -145,8 +145,9 @@ export function FileUpload() {
 
       // If only one image uploaded, navigate directly to annotation with questions
       if (uploadedImageIds.length === 1) {
+        console.log('Navigating with selectedQuestions:', selectedQuestions);
         navigate(`/annotate/${uploadedImageIds[0]}`, {
-          state: { selectedQuestions },
+          state: { questions: selectedQuestions },
         });
       } else {
         // Multiple images: go to gallery

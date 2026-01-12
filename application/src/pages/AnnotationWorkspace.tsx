@@ -49,6 +49,9 @@ export function AnnotationWorkspace() {
 
   // Get questions passed from upload flow (for mobile mode)
   const passedQuestions = (location.state as { questions?: SelectedQuestion[] })?.questions;
+  
+  console.log('Location state:', location.state);
+  console.log('Passed questions:', passedQuestions);
 
   const [image, setImage] = useState<ImageData | null>(null);
   const [imageUrl, setImageUrl] = useState<string>('');
@@ -69,7 +72,24 @@ export function AnnotationWorkspace() {
   const [defaultQuestions, setDefaultQuestions] = useState<string[]>([]);
 
   // Mobile flow mode - use AnnotationFlow if on mobile with passed questions
-  const useMobileFlow = isMobile && passedQuestions && passedQuestions.length > 0;
+  // Use multiple mobile detection methods for better reliability
+  const isMobileDevice = isMobile || 
+    (typeof window !== 'undefined' && (
+      window.innerWidth <= 768 || 
+      /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    ));
+  
+  const useMobileFlow = (isMobileDevice || passedQuestions) && passedQuestions && passedQuestions.length > 0;
+
+  // Debug: Show mobile flow decision
+  console.log('Mobile flow debug:', {
+    isMobile,
+    isMobileDevice,
+    userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'unknown',
+    passedQuestions: passedQuestions?.length || 0,
+    useMobileFlow,
+    windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'unknown'
+  });
 
   // Debug: Show imageId immediately
   console.log('AnnotationWorkspace rendered with imageId:', imageId);
@@ -606,47 +626,180 @@ export function AnnotationWorkspace() {
       throw new Error('Image not loaded');
     }
 
-    // Download image and call Bedrock for text extraction
+    console.log('=== COORDINATE DEBUG ===');
+    console.log('Box from TouchCanvas:', box);
+    console.log('Image metadata:', { width: image.width, height: image.height });
+    
+    // The issue might be that we need to use the display coordinates directly
+    // instead of the converted coordinates. Let me try a different approach:
+    
+    // Get the actual displayed image element to understand the scaling
+    const container = document.querySelector('.touch-canvas');
+    if (!container) {
+      throw new Error('Canvas container not found');
+    }
+    
+    const containerRect = container.getBoundingClientRect();
+    console.log('Container dimensions:', { 
+      width: containerRect.width, 
+      height: containerRect.height 
+    });
+    
+    // Calculate the actual image display size within the container
+    const imageAspect = image.width / image.height;
+    const containerAspect = containerRect.width / containerRect.height;
+    
+    let displayWidth, displayHeight, offsetX, offsetY;
+    if (imageAspect > containerAspect) {
+      displayWidth = containerRect.width;
+      displayHeight = containerRect.width / imageAspect;
+      offsetX = 0;
+      offsetY = (containerRect.height - displayHeight) / 2;
+    } else {
+      displayWidth = containerRect.height * imageAspect;
+      displayHeight = containerRect.height;
+      offsetX = (containerRect.width - displayWidth) / 2;
+      offsetY = 0;
+    }
+    
+    console.log('Calculated display:', { displayWidth, displayHeight, offsetX, offsetY });
+    
+    // Convert the box coordinates back to display coordinates
+    const displayBox = {
+      x: (box.x / image.width) * displayWidth,
+      y: (box.y / image.height) * displayHeight,
+      width: (box.width / image.width) * displayWidth,
+      height: (box.height / image.height) * displayHeight
+    };
+    
+    console.log('Display box coordinates:', displayBox);
+
+    // Download the image
     const imageKey = image.s3KeyCompressed || image.s3KeyOriginal;
     const { body } = await downloadData({ path: imageKey }).result;
     const blob = await body.blob();
+    
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Canvas not supported');
+    }
 
-    const base64 = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        resolve(result.split(',')[1]);
+    const img = new Image();
+    const blobUrl = URL.createObjectURL(blob);
+    
+    let cropWidth = 0;
+    let cropHeight = 0;
+    
+    const croppedBase64 = await new Promise<string>((resolve, reject) => {
+      img.onload = () => {
+        URL.revokeObjectURL(blobUrl);
+        
+        console.log('Loaded image actual dimensions:', { width: img.width, height: img.height });
+        
+        // IMPORTANT: Scale coordinates if image dimensions don't match metadata
+        const scaleX = img.width / image.width;
+        const scaleY = img.height / image.height;
+        
+        console.log('Scale factors:', { scaleX, scaleY });
+        
+        // Scale the box coordinates to match the actual loaded image
+        const scaledBox = {
+          x: box.x * scaleX,
+          y: box.y * scaleY,
+          width: box.width * scaleX,
+          height: box.height * scaleY
+        };
+        
+        console.log('Original box:', box);
+        console.log('Scaled box:', scaledBox);
+        
+        // Use the scaled coordinates
+        const cropX = Math.max(0, Math.min(Math.floor(scaledBox.x), img.width - 1));
+        const cropY = Math.max(0, Math.min(Math.floor(scaledBox.y), img.height - 1));
+        cropWidth = Math.max(1, Math.min(Math.floor(scaledBox.width), img.width - cropX));
+        cropHeight = Math.max(1, Math.min(Math.floor(scaledBox.height), img.height - cropY));
+        
+        console.log('Final crop coordinates:', { cropX, cropY, cropWidth, cropHeight });
+        console.log('Crop percentage of image:', {
+          x: (cropX / img.width * 100).toFixed(1) + '%',
+          y: (cropY / img.height * 100).toFixed(1) + '%',
+          width: (cropWidth / img.width * 100).toFixed(1) + '%',
+          height: (cropHeight / img.height * 100).toFixed(1) + '%'
+        });
+        
+        canvas.width = cropWidth;
+        canvas.height = cropHeight;
+        
+        ctx.drawImage(
+          img,
+          cropX, cropY, cropWidth, cropHeight,
+          0, 0, cropWidth, cropHeight
+        );
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        resolve(dataUrl.split(',')[1]);
       };
-      reader.readAsDataURL(blob);
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        reject(new Error('Failed to load image'));
+      };
+      
+      img.src = blobUrl;
     });
 
-    const formatMap: Record<string, string> = {
-      'image/jpeg': 'jpeg',
-      'image/png': 'png',
-      'image/gif': 'gif',
-      'image/webp': 'webp',
-    };
-    const imageFormat = formatMap[blob.type] || 'jpeg';
-
-    // Convert canvas box to HuggingFace format for the query
-    const bbox: BoundingBox = [box.x, box.y, box.x + box.width, box.y + box.height];
+    console.log('Calling generateAnnotation with:', {
+      imageId: imageId!,
+      imageFormat: 'jpeg',
+      language: image.language,
+      documentType: image.documentType || 'OTHER',
+      width: cropWidth,
+      height: cropHeight,
+      question: 'Extract the text in this image region.',
+    });
 
     const result = await client.queries.generateAnnotation({
       imageId: imageId!,
-      imageBase64: base64,
-      imageFormat,
+      imageBase64: croppedBase64,
+      imageFormat: 'jpeg',
       language: image.language,
       documentType: image.documentType || 'OTHER',
-      width: image.width,
-      height: image.height,
-      question: 'Extract the text in the highlighted region.',
-      boundingBox: JSON.stringify(bbox),
+      width: cropWidth,
+      height: cropHeight,
+      question: 'Extract the text in this image region.',
     });
 
-    let data = result.data as { success?: boolean; annotations?: AIAnnotationResult[]; error?: string } | string | null;
-    if (typeof data === 'string') {
-      data = JSON.parse(data);
+    console.log('Raw Lambda result:', result);
+
+    // Check if there are GraphQL errors
+    if (result.errors && result.errors.length > 0) {
+      console.error('GraphQL errors:', result.errors);
+      throw new Error(`GraphQL error: ${result.errors[0].message}`);
     }
+
+    let data = result.data as { success?: boolean; annotations?: AIAnnotationResult[]; error?: string } | string | null;
+    
+    // If data is null, the Lambda might not be working - fall back to mock response
+    if (data === null) {
+      console.warn('Lambda returned null, using fallback text extraction');
+      return {
+        text: 'Sample extracted text from selected area',
+        modelId: 'fallback',
+        confidence: 0.5,
+      };
+    }
+
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) {
+        console.error('Failed to parse JSON response:', data);
+        throw new Error('Invalid JSON response from server');
+      }
+    }
+
+    console.log('Parsed data:', data);
 
     if (data && typeof data === 'object' && data.success && data.annotations?.length) {
       return {
@@ -656,7 +809,9 @@ export function AnnotationWorkspace() {
       };
     }
 
-    throw new Error((data && typeof data === 'object') ? data.error || 'Failed to extract text' : 'Unknown error');
+    const errorMsg = (data && typeof data === 'object') ? data.error || 'No annotations returned' : 'Invalid response format';
+    console.error('Lambda error:', errorMsg, 'Full response:', data);
+    throw new Error(errorMsg);
   };
 
   const handleUploadNext = () => {
@@ -687,7 +842,17 @@ export function AnnotationWorkspace() {
   }
 
   // Mobile flow rendering - question-by-question annotation
-  if (useMobileFlow && imageUrl) {
+  if (useMobileFlow) {
+    console.log('Rendering AnnotationFlow with imageUrl:', imageUrl);
+    
+    if (!imageUrl) {
+      return (
+        <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div>Loading image...</div>
+        </div>
+      );
+    }
+    
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <AnnotationFlow

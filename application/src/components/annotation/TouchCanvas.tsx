@@ -49,28 +49,83 @@ export function TouchCanvas({
   const [currentBox, setCurrentBox] = useState<BoundingBox | null>(null);
   const [isDraggingHandle, setIsDraggingHandle] = useState<string | null>(null);
 
-  // Get position relative to canvas
+  // Get position relative to canvas, accounting for background image positioning
   const getCanvasPosition = useCallback(
     (clientX: number, clientY: number): { x: number; y: number } => {
-      const canvas = canvasRef.current;
-      if (!canvas) return { x: 0, y: 0 };
+      const container = containerRef.current;
+      if (!container) return { x: 0, y: 0 };
 
-      const rect = canvas.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
+      
+      // Calculate the actual image dimensions and position within the container
+      const containerWidth = rect.width;
+      const containerHeight = rect.height;
+      const imageAspect = imageWidth / imageHeight;
+      const containerAspect = containerWidth / containerHeight;
+      
+      let actualImageWidth, actualImageHeight, offsetX, offsetY;
+      
+      if (imageAspect > containerAspect) {
+        // Image is wider - fit to width
+        actualImageWidth = containerWidth;
+        actualImageHeight = containerWidth / imageAspect;
+        offsetX = 0;
+        offsetY = (containerHeight - actualImageHeight) / 2;
+      } else {
+        // Image is taller - fit to height
+        actualImageWidth = containerHeight * imageAspect;
+        actualImageHeight = containerHeight;
+        offsetX = (containerWidth - actualImageWidth) / 2;
+        offsetY = 0;
+      }
+      
+      // Convert client coordinates to image coordinates
+      const relativeX = clientX - rect.left - offsetX;
+      const relativeY = clientY - rect.top - offsetY;
+      
       return {
-        x: (clientX - rect.left) / zoom,
-        y: (clientY - rect.top) / zoom,
+        x: (relativeX / actualImageWidth) * imageWidth,
+        y: (relativeY / actualImageHeight) * imageHeight,
       };
     },
-    [zoom]
+    [imageWidth, imageHeight]
   );
 
-  // Draw canvas
+  // Draw canvas with proper scaling
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Set canvas size to match container
+    const rect = container.getBoundingClientRect();
+    if (canvas.width !== rect.width || canvas.height !== rect.height) {
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    }
+
+    // Calculate image scaling and position
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
+    const imageAspect = imageWidth / imageHeight;
+    const containerAspect = containerWidth / containerHeight;
+    
+    let actualImageWidth, actualImageHeight, offsetX, offsetY;
+    
+    if (imageAspect > containerAspect) {
+      actualImageWidth = containerWidth;
+      actualImageHeight = containerWidth / imageAspect;
+      offsetX = 0;
+      offsetY = (containerHeight - actualImageHeight) / 2;
+    } else {
+      actualImageWidth = containerHeight * imageAspect;
+      actualImageHeight = containerHeight;
+      offsetX = (containerWidth - actualImageWidth) / 2;
+      offsetY = 0;
+    }
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -79,54 +134,54 @@ export function TouchCanvas({
     boxes.forEach((box, index) => {
       const isSelected = index === selectedBoxIndex;
 
+      // Convert image coordinates to canvas coordinates
+      const canvasX = offsetX + (box.x / imageWidth) * actualImageWidth;
+      const canvasY = offsetY + (box.y / imageHeight) * actualImageHeight;
+      const canvasWidth = (box.width / imageWidth) * actualImageWidth;
+      const canvasHeight = (box.height / imageHeight) * actualImageHeight;
+
       // Box outline
       ctx.strokeStyle = isSelected ? '#3b82f6' : '#10b981';
       ctx.lineWidth = isSelected ? 3 : 2;
-      ctx.strokeRect(box.x, box.y, box.width, box.height);
+      ctx.strokeRect(canvasX, canvasY, canvasWidth, canvasHeight);
 
       // Box fill (semi-transparent)
       ctx.fillStyle = isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
-      ctx.fillRect(box.x, box.y, box.width, box.height);
-
-      // Draw corner handles for selected box
-      if (isSelected) {
-        const handleSize = 12;
-        const handles = [
-          { x: box.x, y: box.y }, // top-left
-          { x: box.x + box.width, y: box.y }, // top-right
-          { x: box.x, y: box.y + box.height }, // bottom-left
-          { x: box.x + box.width, y: box.y + box.height }, // bottom-right
-        ];
-
-        ctx.fillStyle = '#3b82f6';
-        handles.forEach((handle) => {
-          ctx.beginPath();
-          ctx.arc(handle.x, handle.y, handleSize / 2, 0, Math.PI * 2);
-          ctx.fill();
-        });
-      }
-
-      // Box index label
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 12px sans-serif';
-      ctx.textBaseline = 'top';
-      const labelWidth = 20;
-      const labelHeight = 18;
-      ctx.fillStyle = isSelected ? '#3b82f6' : '#10b981';
-      ctx.fillRect(box.x, box.y - labelHeight, labelWidth, labelHeight);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(`${index + 1}`, box.x + 5, box.y - labelHeight + 3);
+      ctx.fillRect(canvasX, canvasY, canvasWidth, canvasHeight);
     });
 
-    // Draw current drawing box
+    // Draw current box being drawn
     if (currentBox) {
-      ctx.strokeStyle = '#3b82f6';
+      const canvasX = offsetX + (currentBox.x / imageWidth) * actualImageWidth;
+      const canvasY = offsetY + (currentBox.y / imageHeight) * actualImageHeight;
+      const canvasWidth = (currentBox.width / imageWidth) * actualImageWidth;
+      const canvasHeight = (currentBox.height / imageHeight) * actualImageHeight;
+
+      ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = 2;
       ctx.setLineDash([5, 5]);
-      ctx.strokeRect(currentBox.x, currentBox.y, currentBox.width, currentBox.height);
+      ctx.strokeRect(canvasX, canvasY, canvasWidth, canvasHeight);
       ctx.setLineDash([]);
     }
-  }, [boxes, selectedBoxIndex, currentBox]);
+  }, [boxes, selectedBoxIndex, currentBox, imageWidth, imageHeight]);
+
+  // Update canvas size and redraw when container changes
+  useEffect(() => {
+    const updateCanvas = () => {
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
+
+      const rect = container.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      drawCanvas();
+    };
+
+    updateCanvas();
+    window.addEventListener('resize', updateCanvas);
+    return () => window.removeEventListener('resize', updateCanvas);
+  }, [drawCanvas]);
 
   // Redraw on changes
   useEffect(() => {
@@ -249,28 +304,43 @@ export function TouchCanvas({
     setCurrentBox(null);
   }, [isDraggingHandle, isDrawing, currentBox, onBoxCreated, onModeChange]);
 
-  // Touch event handlers
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (mode !== 'draw') return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    handleStart(touch.clientX, touch.clientY);
-  };
+  // Add native touch event listeners with passive: false
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (mode !== 'draw') return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    handleMove(touch.clientX, touch.clientY);
-  };
+    const handleTouchStart = (e: TouchEvent) => {
+      if (mode !== 'draw') return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleStart(touch.clientX, touch.clientY);
+    };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (mode !== 'draw') return;
-    e.preventDefault();
-    handleEnd();
-  };
+    const handleTouchMove = (e: TouchEvent) => {
+      if (mode !== 'draw') return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleMove(touch.clientX, touch.clientY);
+    };
 
-  // Mouse event handlers
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (mode !== 'draw') return;
+      e.preventDefault();
+      handleEnd();
+    };
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [mode, handleStart, handleMove, handleEnd]);
+
+  // React event handlers for mouse (keep these for desktop)
   const handleMouseDown = (e: React.MouseEvent) => {
     if (mode !== 'draw') return;
     handleStart(e.clientX, e.clientY);
@@ -296,18 +366,21 @@ export function TouchCanvas({
 
   const canvasContainerStyle: React.CSSProperties = {
     position: 'relative',
-    width: imageWidth * zoom,
-    height: imageHeight * zoom,
+    width: '100%',
+    height: '100%',
     backgroundImage: `url(${imageSrc})`,
     backgroundSize: 'contain',
     backgroundRepeat: 'no-repeat',
     backgroundPosition: 'center',
+    minHeight: '300px', // Ensure minimum height for mobile
   };
 
   const canvasStyle: React.CSSProperties = {
     position: 'absolute',
     top: 0,
     left: 0,
+    width: '100%',
+    height: '100%',
     pointerEvents: mode === 'draw' ? 'auto' : 'none',
   };
 
@@ -323,9 +396,6 @@ export function TouchCanvas({
           width={imageWidth}
           height={imageHeight}
           style={canvasStyle}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}

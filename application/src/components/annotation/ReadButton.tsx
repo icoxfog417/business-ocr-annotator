@@ -106,7 +106,7 @@ export function ReadButton({
     alignItems: 'center',
     justifyContent: 'center',
     gap: '8px',
-    padding: '12px 20px',
+    padding: '12px 16px',
     backgroundColor: hasBox && !disabled ? '#6366f1' : '#d1d5db',
     color: '#ffffff',
     border: 'none',
@@ -116,7 +116,7 @@ export function ReadButton({
     cursor: hasBox && !disabled && !isLoading ? 'pointer' : 'not-allowed',
     transition: 'all 0.2s ease',
     minHeight: '48px',
-    minWidth: '100px',
+    width: '100%', // Full width for mobile
     opacity: isLoading ? 0.7 : 1,
   };
 

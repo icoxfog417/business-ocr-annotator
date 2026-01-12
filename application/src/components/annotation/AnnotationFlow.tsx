@@ -332,46 +332,61 @@ export function AnnotationFlow({
           onBoxUpdated={handleBoxUpdated}
           zoom={zoom}
         />
-
-        {/* Zoom Controls */}
-        <FloatingZoomControls
-          zoom={zoom}
-          onZoomIn={zoomIn}
-          onZoomOut={zoomOut}
-          onFit={zoomFit}
-          position={isMobile ? 'bottom-center' : 'bottom-right'}
-        />
       </div>
 
       {/* Controls */}
       <div style={controlsStyle}>
         {/* Answer Section */}
         <div style={answerSectionStyle}>
-          {/* Step 1: Draw Box */}
+          {/* Step 1: Question */}
           <div>
             <div style={stepLabelStyle}>
               <span style={stepNumberStyle}>1</span>
-              {language === 'ja' ? '枠を描画' : 'Draw Box'}
+              {language === 'ja' ? '質問' : 'Question'}
+            </div>
+            <div style={{ 
+              padding: '12px', 
+              backgroundColor: '#f9fafb', 
+              borderRadius: '8px', 
+              marginTop: '8px',
+              fontSize: '16px',
+              fontWeight: '500'
+            }}>
+              {currentQuestion.text}
+            </div>
+          </div>
+
+          {/* Step 2: Select Area */}
+          <div>
+            <div style={stepLabelStyle}>
+              <span style={stepNumberStyle}>2</span>
+              {language === 'ja' ? 'エリアを選択' : 'Select Area'}
             </div>
             <div style={{ marginTop: '8px' }}>
               <DrawBoxButton
-                onClick={toggleMode}
+                onClick={() => {
+                  if (currentAnswer.boundingBox) {
+                    // Clear existing box and allow redraw
+                    updateCurrentAnswer({ boundingBox: null });
+                  }
+                  toggleMode();
+                }}
                 isDrawMode={mode === 'draw'}
                 disabled={false}
                 language={language}
               />
               {currentAnswer.boundingBox && (
                 <span style={{ marginLeft: '12px', color: '#10b981', fontSize: '14px' }}>
-                  ✓ {language === 'ja' ? '描画済み' : 'Done'}
+                  ✓ {language === 'ja' ? '選択済み' : 'Selected'}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Step 2: Answer */}
+          {/* Step 3: Answer */}
           <div>
             <div style={stepLabelStyle}>
-              <span style={stepNumberStyle}>2</span>
+              <span style={stepNumberStyle}>3</span>
               {language === 'ja' ? '回答' : 'Answer'}
             </div>
             <div style={{ ...answerRowStyle, marginTop: '8px' }}>

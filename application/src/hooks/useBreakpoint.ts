@@ -4,7 +4,7 @@ export type Breakpoint = 'mobile' | 'tablet' | 'desktop';
 
 // Breakpoint thresholds (in pixels)
 export const BREAKPOINTS = {
-  mobile: 768, // < 768px
+  mobile: 768, // < 768px (includes most smartphones and small tablets)
   tablet: 1024, // 768px - 1024px
   // desktop: > 1024px
 } as const;

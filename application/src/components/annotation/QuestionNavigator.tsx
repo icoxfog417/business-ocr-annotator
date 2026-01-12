@@ -157,12 +157,6 @@ export function QuestionNavigator({
         showCount={true}
       />
 
-      {/* Current Question */}
-      <div style={questionContainerStyle}>
-        <div style={questionLabelStyle}>Question {currentIndex + 1}</div>
-        <div style={questionTextStyle}>{currentQuestion}</div>
-      </div>
-
       {/* Navigation Buttons */}
       <div style={navigationStyle}>
         <button
