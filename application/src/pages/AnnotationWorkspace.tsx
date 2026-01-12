@@ -120,10 +120,12 @@ export function AnnotationWorkspace() {
 
   // Build questions list: passed > existing annotations > default questions
   const questions: SelectedQuestion[] = (() => {
+    // Priority 1: Questions passed from upload flow
     if (passedQuestions && passedQuestions.length > 0) {
       return passedQuestions;
     }
 
+    // Priority 2: Existing annotations (editing mode from gallery)
     if (annotations.length > 0) {
       return annotations.map((ann) => ({
         id: ann.id,
@@ -133,7 +135,8 @@ export function AnnotationWorkspace() {
       }));
     }
 
-    if (defaultQuestions.length > 0) {
+    // Priority 3: Default questions based on document type (only if image is loaded)
+    if (image && defaultQuestions.length > 0) {
       return [...defaultQuestions, ...optionalQuestions].map((q) => ({
         id: q.id,
         text: q.text,
@@ -142,7 +145,7 @@ export function AnnotationWorkspace() {
       }));
     }
 
-    // Fallback
+    // Fallback: Generic question (only when nothing else available)
     return [
       { id: 'fallback-1', text: 'What is the main content?', type: 'EXTRACTIVE', isCustom: false },
     ];

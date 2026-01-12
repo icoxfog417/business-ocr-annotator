@@ -1,4 +1,5 @@
 import { signInWithRedirect } from 'aws-amplify/auth';
+import './Login.css';
 
 export function Login() {
   const handleGoogleSignIn = async () => {
@@ -10,44 +11,12 @@ export function Login() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        background: '#ffffff',
-      }}
-    >
-      {/* Left side - Branding */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          padding: '4rem',
-          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-        }}
-      >
-        <div style={{ maxWidth: '520px' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '12px',
-              marginBottom: '2rem',
-            }}
-          >
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+    <div className="login-container">
+      {/* Left side - Branding (hidden on mobile) */}
+      <div className="login-branding">
+        <div className="login-branding-content">
+          <div className="login-logo">
+            <div className="login-logo-icon">
               <svg
                 width="24"
                 height="24"
@@ -64,128 +33,61 @@ export function Login() {
                 <path d="M7 17h7" />
               </svg>
             </div>
-            <span style={{ fontSize: '1.5rem', fontWeight: '600', color: '#0f172a' }}>
-              Business OCR Annotator
-            </span>
+            <span className="login-logo-text">Business OCR Annotator</span>
           </div>
 
-          <h1
-            style={{
-              fontSize: '3rem',
-              fontWeight: '700',
-              lineHeight: '1.2',
-              marginBottom: '1.5rem',
-              color: '#0f172a',
-            }}
-          >
-            Build VQA Datasets for Business Documents
-          </h1>
+          <h1 className="login-title">Build VQA Datasets for Business Documents</h1>
 
-          <p
-            style={{
-              fontSize: '1.25rem',
-              color: '#64748b',
-              lineHeight: '1.8',
-              marginBottom: '3rem',
-            }}
-          >
+          <p className="login-description">
             Crowdsourced annotation platform for creating high-quality Visual Question Answering
             datasets. Help evaluate OCR accuracy of AI models.
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div
-                style={{
-                  width: '6px',
-                  height: '6px',
-                  background: '#3b82f6',
-                  borderRadius: '50%',
-                }}
-              />
-              <span style={{ color: '#475569' }}>AI-assisted text extraction with Amazon Bedrock</span>
+          <div className="login-features">
+            <div className="login-feature">
+              <div className="login-feature-dot" />
+              <span>AI-assisted text extraction with Amazon Bedrock</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div
-                style={{
-                  width: '6px',
-                  height: '6px',
-                  background: '#3b82f6',
-                  borderRadius: '50%',
-                }}
-              />
-              <span style={{ color: '#475569' }}>Multi-language support (Japanese, English, Chinese, Korean)</span>
+            <div className="login-feature">
+              <div className="login-feature-dot" />
+              <span>Multi-language support (Japanese, English, Chinese, Korean)</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div
-                style={{
-                  width: '6px',
-                  height: '6px',
-                  background: '#3b82f6',
-                  borderRadius: '50%',
-                }}
-              />
-              <span style={{ color: '#475569' }}>Mobile-friendly with camera capture</span>
+            <div className="login-feature">
+              <div className="login-feature-dot" />
+              <span>Mobile-friendly with camera capture</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Right side - Login form */}
-      <div
-        style={{
-          width: '480px',
-          background: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '4rem 3rem',
-          borderLeft: '1px solid #e5e7eb',
-        }}
-      >
-        <div style={{ width: '100%', maxWidth: '360px' }}>
-          <h2
-            style={{
-              fontSize: '1.875rem',
-              fontWeight: '700',
-              color: '#0f172a',
-              marginBottom: '0.5rem',
-            }}
-          >
-            Welcome back
-          </h2>
-          <p style={{ color: '#64748b', marginBottom: '2.5rem' }}>
-            Sign in to your account to continue
-          </p>
+      <div className="login-form-container">
+        <div className="login-form">
+          {/* Mobile logo (shown only on mobile) */}
+          <div className="login-mobile-logo">
+            <div className="login-logo-icon">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M7 7h10" />
+                <path d="M7 12h10" />
+                <path d="M7 17h7" />
+              </svg>
+            </div>
+          </div>
 
-          <button
-            onClick={handleGoogleSignIn}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              padding: '16px 24px',
-              background: 'white',
-              border: '1px solid #e2e8f0',
-              borderRadius: '12px',
-              fontSize: '0.9375rem',
-              fontWeight: '600',
-              color: '#1e293b',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#3b82f6';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#e2e8f0';
-              e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
-            }}
-          >
+          <h2 className="login-form-title">Welcome back</h2>
+          <p className="login-form-subtitle">Sign in to your account to continue</p>
+
+          <button onClick={handleGoogleSignIn} className="login-google-btn">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
                 d="M19.6 10.227c0-.709-.064-1.39-.182-2.045H10v3.868h5.382a4.6 4.6 0 01-1.996 3.018v2.51h3.232c1.891-1.742 2.982-4.305 2.982-7.35z"
@@ -207,15 +109,7 @@ export function Login() {
             Continue with Google
           </button>
 
-          <p
-            style={{
-              marginTop: '2.5rem',
-              fontSize: '0.8125rem',
-              color: '#94a3b8',
-              textAlign: 'center',
-              lineHeight: '1.6',
-            }}
-          >
+          <p className="login-terms">
             By continuing, you agree to our Terms of Service and Privacy Policy.
           </p>
         </div>
