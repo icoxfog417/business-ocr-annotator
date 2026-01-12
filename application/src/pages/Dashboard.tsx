@@ -149,7 +149,7 @@ export function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '2.5rem 2rem' }}>
+      <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '1.5rem 1rem' }}>
         {/* Welcome Section */}
         <div style={{ marginBottom: '2.5rem' }}>
           <h2
@@ -542,10 +542,10 @@ export function Dashboard() {
             background: 'white',
             border: '1px solid #e5e7eb',
             borderRadius: '12px',
-            padding: '2rem',
+            padding: '1.5rem',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
             <div
               style={{
                 width: '48px',
@@ -571,50 +571,36 @@ export function Dashboard() {
                 <path d="M12 8h.01" />
               </svg>
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
               <h3
                 style={{
-                  fontSize: '1.25rem',
+                  fontSize: '1.125rem',
                   fontWeight: '600',
                   color: '#0f172a',
-                  marginBottom: '0.75rem',
+                  marginBottom: '0.5rem',
                 }}
               >
                 How to Contribute
               </h3>
-              <p style={{ color: '#64748b', lineHeight: '1.7', marginBottom: '1.25rem' }}>
+              <p style={{ color: '#64748b', lineHeight: '1.6', marginBottom: '1rem', fontSize: '0.875rem' }}>
                 Help build a high-quality VQA dataset for business documents.
               </p>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: '0.75rem',
-                }}
-              >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: '#3b82f6', fontWeight: '600' }}>1.</span>
-                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                    Upload business documents
-                  </span>
+                  <span style={{ color: '#3b82f6', fontWeight: '600', fontSize: '0.875rem' }}>1.</span>
+                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>Upload business documents</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: '#3b82f6', fontWeight: '600' }}>2.</span>
-                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                    Draw bounding boxes on answers
-                  </span>
+                  <span style={{ color: '#3b82f6', fontWeight: '600', fontSize: '0.875rem' }}>2.</span>
+                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>Draw bounding boxes on answers</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: '#3b82f6', fontWeight: '600' }}>3.</span>
-                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                    Use AI to extract text
-                  </span>
+                  <span style={{ color: '#3b82f6', fontWeight: '600', fontSize: '0.875rem' }}>3.</span>
+                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>Use AI to extract text</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: '#3b82f6', fontWeight: '600' }}>4.</span>
-                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                    Confirm and submit
-                  </span>
+                  <span style={{ color: '#3b82f6', fontWeight: '600', fontSize: '0.875rem' }}>4.</span>
+                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>Confirm and submit</span>
                 </div>
               </div>
             </div>
