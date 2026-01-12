@@ -457,7 +457,7 @@ export function Dashboard() {
             </div>
             <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{stats.datasets}</div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              Coming in Sprint 3
+              Coming soon
             </p>
           </div>
         </div>
@@ -536,7 +536,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Status Card */}
+        {/* Getting Started Card */}
         <div
           style={{
             background: 'white',
@@ -550,7 +550,7 @@ export function Dashboard() {
               style={{
                 width: '48px',
                 height: '48px',
-                background: 'rgba(34, 197, 94, 0.1)',
+                background: 'rgba(59, 130, 246, 0.1)',
                 borderRadius: '12px',
                 display: 'flex',
                 alignItems: 'center',
@@ -563,11 +563,12 @@ export function Dashboard() {
                 height="24"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#22c55e"
+                stroke="#3b82f6"
                 strokeWidth="2"
               >
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
               </svg>
             </div>
             <div style={{ flex: 1 }}>
@@ -579,10 +580,10 @@ export function Dashboard() {
                   marginBottom: '0.75rem',
                 }}
               >
-                Sprint 0 Complete
+                How to Contribute
               </h3>
               <p style={{ color: '#64748b', lineHeight: '1.7', marginBottom: '1.25rem' }}>
-                Foundation successfully deployed. The platform is ready for core features.
+                Help build a high-quality VQA dataset for business documents.
               </p>
               <div
                 style={{
@@ -592,55 +593,27 @@ export function Dashboard() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div
-                    style={{
-                      width: '4px',
-                      height: '4px',
-                      background: '#3b82f6',
-                      borderRadius: '50%',
-                    }}
-                  />
+                  <span style={{ color: '#3b82f6', fontWeight: '600' }}>1.</span>
                   <span style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                    Image upload & management
+                    Upload business documents
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div
-                    style={{
-                      width: '4px',
-                      height: '4px',
-                      background: '#3b82f6',
-                      borderRadius: '50%',
-                    }}
-                  />
+                  <span style={{ color: '#3b82f6', fontWeight: '600' }}>2.</span>
                   <span style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                    Manual annotation tools
+                    Draw bounding boxes on answers
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div
-                    style={{
-                      width: '4px',
-                      height: '4px',
-                      background: '#3b82f6',
-                      borderRadius: '50%',
-                    }}
-                  />
+                  <span style={{ color: '#3b82f6', fontWeight: '600' }}>3.</span>
                   <span style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                    AI-powered annotation
+                    Use AI to extract text
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div
-                    style={{
-                      width: '4px',
-                      height: '4px',
-                      background: '#3b82f6',
-                      borderRadius: '50%',
-                    }}
-                  />
+                  <span style={{ color: '#3b82f6', fontWeight: '600' }}>4.</span>
                   <span style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                    Dataset export
+                    Confirm and submit
                   </span>
                 </div>
               </div>
