@@ -2,7 +2,7 @@
 
 **Date**: 2026-01-12
 **Author**: Claude Agent
-**Status**: Proposed
+**Status**: Implemented
 
 ## Background
 
@@ -353,17 +353,17 @@ export const getProcessingOpacity = (status?: string): number => {
 ## Acceptance Criteria
 
 ### P0 - Critical
-- [ ] No duplicate null check in AnnotationWorkspace.tsx
+- [x] No duplicate null check in AnnotationWorkspace.tsx
 
 ### P1 - Code Consolidation
-- [ ] Shared API client in `src/lib/apiClient.ts`
-- [ ] Shared constants in `src/lib/constants.ts` (LANGUAGES, DOCUMENT_TYPES)
-- [ ] Shared status styles in `src/lib/statusStyles.ts`
-- [ ] Global animations CSS in `src/styles/animations.css`
-- [ ] All 4 pages updated to use shared utilities
-- [ ] No duplicate `generateClient<Schema>()` calls
-- [ ] No duplicate LANGUAGES constant definitions
-- [ ] No inline @keyframes definitions
+- [x] Shared API client in `src/lib/apiClient.ts`
+- [x] Shared constants in `src/lib/constants.ts` (LANGUAGES, DOCUMENT_TYPES)
+- [x] Shared status styles in `src/lib/statusStyles.ts`
+- [x] Global animations CSS in `src/styles/animations.css`
+- [x] All 4 pages updated to use shared utilities
+- [x] No duplicate `generateClient<Schema>()` calls
+- [x] No duplicate LANGUAGES constant definitions
+- [x] No inline @keyframes definitions
 
 ### P2 - Documentation
 - [ ] design.md removes unimplemented GSIs and FLAGGED status
@@ -371,14 +371,14 @@ export const getProcessingOpacity = (status?: string): number => {
 - [ ] tasks.md reflects actual completion status
 
 ### P3 - Code Quality
-- [ ] Consistent status colors across all pages
-- [ ] No orphaned comments
+- [x] Consistent status colors across all pages
+- [x] No orphaned comments
 
 ### P4 - Cleanup
 - [ ] Review documents show resolution status
 
 ### Verification
-- [ ] Application builds without errors (`npm run build`)
+- [x] Application builds without errors (`npm run build`)
 - [ ] Application runs without errors (`npm run dev`)
 - [ ] All pages load correctly (Dashboard, FileUpload, ImageGallery, AnnotationWorkspace)
 
