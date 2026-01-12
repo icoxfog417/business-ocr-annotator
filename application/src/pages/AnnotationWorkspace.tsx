@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getUrl, downloadData } from 'aws-amplify/storage';
 import { client } from '../lib/apiClient';
 import { LANGUAGES } from '../lib/constants';
 import { getStatusStyle } from '../lib/statusStyles';
 import { CanvasAnnotator } from '../components/CanvasAnnotator';
+import { AnnotationFlow, type AnnotationAnswer } from '../components/annotation';
+import type { SelectedQuestion } from '../components/upload/QuestionSelector';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 import {
   type BoundingBox,
   type CanvasBoundingBox,
@@ -40,6 +43,13 @@ interface ImageData {
 
 export function AnnotationWorkspace() {
   const { imageId } = useParams<{ imageId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isMobile } = useBreakpoint();
+
+  // Get questions passed from upload flow (for mobile mode)
+  const passedQuestions = (location.state as { questions?: SelectedQuestion[] })?.questions;
+
   const [image, setImage] = useState<ImageData | null>(null);
   const [imageUrl, setImageUrl] = useState<string>('');
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -57,6 +67,9 @@ export function AnnotationWorkspace() {
   const [finalizing, setFinalizing] = useState(false);
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [defaultQuestions, setDefaultQuestions] = useState<string[]>([]);
+
+  // Mobile flow mode - use AnnotationFlow if on mobile with passed questions
+  const useMobileFlow = isMobile && passedQuestions && passedQuestions.length > 0;
 
   // Debug: Show imageId immediately
   console.log('AnnotationWorkspace rendered with imageId:', imageId);
@@ -548,6 +561,112 @@ export function AnnotationWorkspace() {
     rejected: annotations.filter((a) => a.validationStatus === 'REJECTED').length,
   };
 
+  // Mobile flow handlers
+  const handleMobileComplete = async (answers: AnnotationAnswer[]) => {
+    if (!imageId) return;
+
+    // Save all annotations from mobile flow
+    for (const answer of answers) {
+      if (answer.skipped || !answer.boundingBox) continue;
+
+      await client.models.Annotation.create({
+        imageId,
+        question: answer.question,
+        answer: answer.answer,
+        language: image?.language || 'ja',
+        boundingBoxes: JSON.stringify([[
+          answer.boundingBox.x,
+          answer.boundingBox.y,
+          answer.boundingBox.x + answer.boundingBox.width,
+          answer.boundingBox.y + answer.boundingBox.height,
+        ]]),
+        questionType: 'EXTRACTIVE',
+        validationStatus: 'PENDING',
+        generatedBy: answer.aiAssisted ? 'AI' : 'HUMAN',
+        aiAssisted: answer.aiAssisted,
+        aiModelId: answer.aiModelId,
+        aiModelProvider: answer.aiModelProvider,
+        aiExtractionTimestamp: answer.aiExtractionTimestamp,
+        confidence: answer.confidence,
+        createdBy: 'current-user',
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    // Update image status
+    await client.models.Image.update({
+      id: imageId,
+      status: 'ANNOTATING',
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const handleMobileReadText = async (box: { x: number; y: number; width: number; height: number }) => {
+    if (!image || !imageUrl) {
+      throw new Error('Image not loaded');
+    }
+
+    // Download image and call Bedrock for text extraction
+    const imageKey = image.s3KeyCompressed || image.s3KeyOriginal;
+    const { body } = await downloadData({ path: imageKey }).result;
+    const blob = await body.blob();
+
+    const base64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.readAsDataURL(blob);
+    });
+
+    const formatMap: Record<string, string> = {
+      'image/jpeg': 'jpeg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+    };
+    const imageFormat = formatMap[blob.type] || 'jpeg';
+
+    // Convert canvas box to HuggingFace format for the query
+    const bbox: BoundingBox = [box.x, box.y, box.x + box.width, box.y + box.height];
+
+    const result = await client.queries.generateAnnotation({
+      imageId: imageId!,
+      imageBase64: base64,
+      imageFormat,
+      language: image.language,
+      documentType: image.documentType || 'OTHER',
+      width: image.width,
+      height: image.height,
+      question: 'Extract the text in the highlighted region.',
+      boundingBox: JSON.stringify(bbox),
+    });
+
+    let data = result.data as { success?: boolean; annotations?: AIAnnotationResult[]; error?: string } | string | null;
+    if (typeof data === 'string') {
+      data = JSON.parse(data);
+    }
+
+    if (data && typeof data === 'object' && data.success && data.annotations?.length) {
+      return {
+        text: data.annotations[0].answer,
+        modelId: 'anthropic.claude-3-5-sonnet',
+        confidence: data.annotations[0].confidence,
+      };
+    }
+
+    throw new Error((data && typeof data === 'object') ? data.error || 'Failed to extract text' : 'Unknown error');
+  };
+
+  const handleUploadNext = () => {
+    navigate('/upload');
+  };
+
+  const handleBackToGallery = () => {
+    navigate('/gallery');
+  };
+
   if (loading) {
     return (
       <div style={{ padding: '2rem' }}>
@@ -567,6 +686,27 @@ export function AnnotationWorkspace() {
     );
   }
 
+  // Mobile flow rendering - question-by-question annotation
+  if (useMobileFlow && imageUrl) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <AnnotationFlow
+          imageId={imageId}
+          imageSrc={imageUrl}
+          imageWidth={image.width}
+          imageHeight={image.height}
+          questions={passedQuestions}
+          language={image.language}
+          onComplete={handleMobileComplete}
+          onReadText={handleMobileReadText}
+          onUploadNext={handleUploadNext}
+          onBackToGallery={handleBackToGallery}
+        />
+      </div>
+    );
+  }
+
+  // Desktop flow - full-featured annotation workspace
   return (
     <div style={{ display: 'flex', height: '100vh' }}>
       {/* Image Viewer */}
