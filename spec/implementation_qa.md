@@ -3,8 +3,8 @@
 This document records questions and answers discovered during sandbox verification of AWS Amplify Gen2 and related technologies for the Business OCR Annotator project.
 
 **Last Updated**: 2026-01-12
-**Total Questions**: 13
-**Total Verified**: 13 / 13
+**Total Questions**: 14
+**Total Verified**: 14 / 14
 
 ## Overview
 
@@ -34,6 +34,7 @@ Each Q&A entry documents:
 | Q11 | Weights & Biases incremental eval | 🟠 High | 3 | ✅ Verified |
 | Q12 | DynamoDB GSI for efficient lookups | 🟠 High | 2 | ✅ Verified |
 | Q13 | Touch bounding box drawing (native) | 🟠 High | 3 | ✅ Verified |
+| Q14 | Cognito custom attributes for consent | 🟠 High | 3 | ✅ Verified |
 
 ---
 
@@ -1620,6 +1621,207 @@ const touchLayerStyle = {
 
 ---
 
+### Q14: How to use Cognito custom attributes for user consent tracking?
+
+**Priority**: 🟠 High (Sprint 3)
+**Affects Design**: ✅ Yes - Consent storage approach (Cognito vs DynamoDB)
+**Status**: ✅ Verified
+
+**Question Details**:
+- How to define custom attributes in Amplify Gen2 auth configuration?
+- How to read custom attributes from the frontend after authentication?
+- How to update custom attributes when user provides consent?
+- What data types are supported for custom attributes?
+- Is this approach simpler than using a separate DynamoDB table?
+
+**Answer**: Cognito custom attributes provide a simpler alternative to DynamoDB for storing user consent data. Custom attributes are defined in `amplify/auth/resource.ts` with the `custom:` prefix, and can be read/written from the frontend using `fetchUserAttributes` and `updateUserAttributes` APIs. The consent data is included in the auth token, providing zero-latency access.
+
+**Code Sample**:
+```typescript
+// amplify/auth/resource.ts - Define custom attributes
+import { defineAuth, secret } from '@aws-amplify/backend';
+
+export const auth = defineAuth({
+  loginWith: {
+    email: true,
+    externalProviders: {
+      google: {
+        clientId: secret('GOOGLE_CLIENT_ID'),
+        clientSecret: secret('GOOGLE_CLIENT_SECRET'),
+        scopes: ['email', 'profile', 'openid'],
+        attributeMapping: { email: 'email' },
+      },
+      callbackUrls: ['http://localhost:5173/'],
+      logoutUrls: ['http://localhost:5173/'],
+    },
+  },
+  userAttributes: {
+    // Consent tracking attributes
+    'custom:contributor': {
+      dataType: 'String',  // "true" when user has consented
+      mutable: true,
+    },
+    'custom:consent_date': {
+      dataType: 'String',  // ISO timestamp of consent
+      mutable: true,
+    },
+    'custom:consent_version': {
+      dataType: 'String',  // Version of consent terms, e.g., "1.0"
+      mutable: true,
+    },
+  },
+});
+```
+
+```typescript
+// src/hooks/useContributorStatus.ts - Frontend hook
+import { useState, useEffect, useCallback } from 'react';
+import {
+  fetchUserAttributes,
+  updateUserAttributes
+} from 'aws-amplify/auth';
+
+interface ContributorStatus {
+  isContributor: boolean;
+  consentDate: string | null;
+  consentVersion: string | null;
+  isLoading: boolean;
+}
+
+export function useContributorStatus() {
+  const [status, setStatus] = useState<ContributorStatus>({
+    isContributor: false,
+    consentDate: null,
+    consentVersion: null,
+    isLoading: true,
+  });
+
+  // Fetch contributor status on mount
+  useEffect(() => {
+    async function loadStatus() {
+      try {
+        const attributes = await fetchUserAttributes();
+        setStatus({
+          isContributor: attributes['custom:contributor'] === 'true',
+          consentDate: attributes['custom:consent_date'] || null,
+          consentVersion: attributes['custom:consent_version'] || null,
+          isLoading: false,
+        });
+      } catch (error) {
+        console.error('Failed to fetch user attributes:', error);
+        setStatus(prev => ({ ...prev, isLoading: false }));
+      }
+    }
+    loadStatus();
+  }, []);
+
+  // Function to become a contributor (after consent)
+  const becomeContributor = useCallback(async (consentVersion: string = '1.0') => {
+    try {
+      await updateUserAttributes({
+        userAttributes: {
+          'custom:contributor': 'true',
+          'custom:consent_date': new Date().toISOString(),
+          'custom:consent_version': consentVersion,
+        },
+      });
+
+      setStatus({
+        isContributor: true,
+        consentDate: new Date().toISOString(),
+        consentVersion,
+        isLoading: false,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to update contributor status:', error);
+      return false;
+    }
+  }, []);
+
+  return { ...status, becomeContributor };
+}
+```
+
+```typescript
+// Usage in component
+function ContributorGate({ children }: { children: React.ReactNode }) {
+  const { isContributor, isLoading, becomeContributor } = useContributorStatus();
+  const [showConsent, setShowConsent] = useState(false);
+
+  if (isLoading) return <Spinner />;
+
+  if (!isContributor) {
+    return (
+      <>
+        <button onClick={() => setShowConsent(true)}>
+          Start Contributing
+        </button>
+        {showConsent && (
+          <ConsentDialog
+            onAccept={async () => {
+              await becomeContributor('1.0');
+              setShowConsent(false);
+            }}
+            onCancel={() => setShowConsent(false)}
+          />
+        )}
+      </>
+    );
+  }
+
+  return <>{children}</>;
+}
+```
+
+**Verified in**: AWS Documentation + Sprint 3 proposal design
+
+**Key Findings**:
+- **Simpler than DynamoDB**: No extra table needed, no additional API calls to check consent
+- **Zero-Latency Access**: Custom attributes come with the auth token after login
+- **Supported Data Types**: String, Number, Boolean, DateTime
+- **Mutable by Default**: Custom attributes can be configured as mutable or immutable
+- **Prefix Required**: All custom attributes must use `custom:` prefix
+- **Max 50 Attributes**: Cognito limits custom attributes to 50 per user pool
+- **No Confirmation Needed**: Unlike email/phone, custom attributes update immediately (no verification code)
+
+**Cognito vs DynamoDB Comparison**:
+| Aspect | Cognito Custom Attributes | DynamoDB Table |
+|--------|---------------------------|----------------|
+| Setup complexity | Low (add to auth config) | Medium (define table + GSI) |
+| API calls to check | 0 (in token) | 1 (query) |
+| Latency | ~0ms (cached) | ~10-50ms |
+| Cost | Included in Cognito | DynamoDB read costs |
+| Data complexity | Simple key-value | Complex/nested data |
+| Query flexibility | Limited (user-level) | Full (GSI, filters) |
+
+**Best Use Cases for Cognito Attributes**:
+- ✅ Boolean flags (contributor status)
+- ✅ Simple strings (consent version, dates)
+- ✅ User preferences
+- ✅ Data needed on every page load
+
+**When to Use DynamoDB Instead**:
+- ❌ Complex nested data structures
+- ❌ Need to query across users
+- ❌ Audit logs or history
+- ❌ More than 50 attributes
+
+**Gotchas**:
+- **Cannot Query Across Users**: Cognito attributes are per-user only, cannot search "all contributors"
+- **Size Limits**: String attributes have `maxLen` constraint (default ~2048 chars)
+- **No Required Custom Attributes**: Custom attributes cannot be marked as required at sign-up (unlike standard attributes)
+- **Immutable Once Set**: If `mutable: false`, attribute can only be set once (during sign-up or first update)
+- **Case Sensitivity**: Attribute names are case-sensitive (`custom:Contributor` ≠ `custom:contributor`)
+
+**References**:
+- [Amplify Gen2 User Attributes](https://docs.amplify.aws/react/build-a-backend/auth/concepts/user-attributes/)
+- [Amplify Gen2 Manage User Attributes](https://docs.amplify.aws/react/build-a-backend/auth/connect-your-frontend/manage-user-attributes/)
+- [Cognito Custom Attributes](https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-attributes.html#user-pool-settings-custom-attributes)
+
+---
+
 ## Verification Workflow
 
 ### Step 1: Critical Questions (Before Sprint 0)
@@ -1640,6 +1842,7 @@ const touchLayerStyle = {
 10. Q10: W&B Incremental Data → Sprint 3 (Dataset Validation)
 11. Q11: W&B Incremental Eval → Sprint 3 (Evaluation)
 12. Q12: DynamoDB GSI → Sprint 2 (Efficient Lookups)
+14. Q14: Cognito Custom Attributes → Sprint 3 (Consent Tracking)
 ```
 
 ### Step 3: Medium Priority Questions (As Needed)
@@ -1665,6 +1868,7 @@ const touchLayerStyle = {
 - [x] **Q10**: Weights & Biases incremental data storage
 - [x] **Q11**: Weights & Biases incremental evaluation
 - [x] **Q12**: DynamoDB GSI for efficient lookups
+- [x] **Q14**: Cognito custom attributes for consent
 
 ### Extended Features (Verify as needed)
 - [x] **Q7**: Sharp image compression in Lambda (moved to Sprint 2)
