@@ -19,4 +19,22 @@ export const auth = defineAuth({
       logoutUrls: ['http://localhost:5173/'],
     },
   },
+  // Custom attributes for contributor consent tracking (Sprint 3)
+  userAttributes: {
+    // "true" when user has consented to contribute data
+    'custom:contributor': {
+      dataType: 'String',
+      mutable: true,
+    },
+    // ISO timestamp of when consent was given
+    'custom:consent_date': {
+      dataType: 'String',
+      mutable: true,
+    },
+    // Version of consent terms accepted (e.g., "1.0")
+    'custom:consent_version': {
+      dataType: 'String',
+      mutable: true,
+    },
+  },
 });
