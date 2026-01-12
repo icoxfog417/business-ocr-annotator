@@ -93,6 +93,7 @@ export function AnnotationFlow({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mode, setMode] = useState<TouchMode>('view');
   const [isFinalized, setIsFinalized] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Direct access
   const box = answers[currentIndex]?.boundingBox;
@@ -119,20 +120,31 @@ export function AnnotationFlow({
   const goNext = useCallback(async () => {
     if (currentIndex < questions.length - 1) {
       goTo(currentIndex + 1);
-    } else if (canGoNext) {
+    } else if (canGoNext && !isSubmitting) {
+      setIsSubmitting(true);
       await onComplete(answers);
       setIsFinalized(true);
     }
-  }, [currentIndex, questions.length, goTo, onComplete, answers, canGoNext]);
+  }, [currentIndex, questions.length, goTo, onComplete, answers, canGoNext, isSubmitting]);
 
   const goPrev = useCallback(() => {
     if (currentIndex > 0) goTo(currentIndex - 1);
   }, [currentIndex, goTo]);
 
   const skip = useCallback(() => {
-    updateAnswer(currentIndex, { skipped: true });
-    goNext();
-  }, [currentIndex, updateAnswer, goNext]);
+    const updatedAnswers = answers.map((a, i) =>
+      i === currentIndex ? { ...a, skipped: true } : a
+    );
+    setAnswers(updatedAnswers);
+
+    // Navigate or finalize with updated answers
+    if (currentIndex < questions.length - 1) {
+      goTo(currentIndex + 1);
+    } else if (!isSubmitting) {
+      setIsSubmitting(true);
+      onComplete(updatedAnswers).then(() => setIsFinalized(true));
+    }
+  }, [currentIndex, answers, questions.length, goTo, isSubmitting, onComplete]);
 
   const toggleDrawMode = useCallback(() => {
     if (box) updateAnswer(currentIndex, { boundingBox: null });
