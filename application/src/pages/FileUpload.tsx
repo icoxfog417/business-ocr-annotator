@@ -22,9 +22,9 @@ export function FileUpload() {
   // Load default questions when document type or language changes
   const { defaultQuestions } = useDefaultQuestions(documentType, language);
 
-  // Initialize selected questions with defaults when they load
+  // Update selected questions when document type or language changes
   useEffect(() => {
-    if (defaultQuestions.length > 0 && selectedQuestions.length === 0) {
+    if (defaultQuestions.length > 0) {
       setSelectedQuestions(
         defaultQuestions.map((q) => ({
           id: q.id,
@@ -34,7 +34,7 @@ export function FileUpload() {
         }))
       );
     }
-  }, [defaultQuestions, selectedQuestions.length]);
+  }, [defaultQuestions]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
