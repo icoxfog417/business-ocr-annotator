@@ -1,10 +1,63 @@
 import { defineBackend } from '@aws-amplify/backend';
+import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
+import { EventType } from 'aws-cdk-lib/aws-s3';
+import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
 import { auth } from './auth/resource';
 import { storage } from './storage/resource';
-import { data } from './data/resource';
+import { data, generateAnnotationHandler } from './data/resource';
+import { processImage } from './functions/process-image/resource';
 
-defineBackend({
+const backend = defineBackend({
   auth,
   storage,
-  data
+  data,
+  generateAnnotationHandler,
+  processImage,
 });
+
+// Grant generateAnnotation Lambda permission to invoke Bedrock
+backend.generateAnnotationHandler.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['bedrock:InvokeModel'],
+    resources: ['arn:aws:bedrock:*::foundation-model/*'],
+  })
+);
+
+// Get storage bucket reference
+const storageBucket = backend.storage.resources.bucket;
+
+// Grant processImage Lambda permission to read/write S3 bucket
+backend.processImage.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['s3:GetObject', 's3:PutObject'],
+    resources: [`${storageBucket.bucketArn}/*`],
+  })
+);
+
+// Grant processImage Lambda permission to DynamoDB (wildcard to avoid cross-stack cycle)
+backend.processImage.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:ListTables'],
+    resources: ['*'],
+  })
+);
+backend.processImage.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:UpdateItem', 'dynamodb:Query'],
+    resources: ['arn:aws:dynamodb:*:*:table/Image-*', 'arn:aws:dynamodb:*:*:table/Image-*/index/*'],
+  })
+);
+
+// Add environment variables for processImage Lambda
+// Note: IMAGE_TABLE_NAME uses pattern matching in handler since we can't reference data stack
+const processImageCfnFunction = backend.processImage.resources.cfnResources
+  .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
+processImageCfnFunction.addPropertyOverride('Environment.Variables.STORAGE_BUCKET_NAME', storageBucket.bucketName);
+processImageCfnFunction.addPropertyOverride('Environment.Variables.IMAGE_TABLE_INDEX_NAME', 'imagesByS3KeyOriginal');
+
+// Add S3 event trigger for processImage Lambda
+storageBucket.addEventNotification(
+  EventType.OBJECT_CREATED,
+  new LambdaDestination(backend.processImage.resources.lambda),
+  { prefix: 'images/original/' }
+);

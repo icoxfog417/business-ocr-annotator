@@ -2,7 +2,7 @@
 
 **Project**: Business OCR Annotator
 **Version**: 1.0
-**Last Updated**: 2026-01-04
+**Last Updated**: 2026-01-12
 
 ## 1. Architecture Overview
 
@@ -131,6 +131,9 @@ enum DatasetStatus {
 ```
 
 #### Image Table
+
+**Updated**: 2026-01-11 - Added 3-tier storage keys, file sizes, compression metadata, and GSI
+
 ```typescript
 interface Image {
   id: string;                    // Partition Key (UUID)
@@ -139,12 +142,22 @@ interface Image {
   datasetId?: string;            // Foreign key to Dataset
   dataset?: Dataset;             // belongsTo relationship
 
-  // S3 Storage - Store KEYS not URLs for flexibility
-  s3Key: string;                 // S3 key (compressed image for annotation)
-  // Note: In future sprints, add s3KeyOriginal and s3KeyThumbnail
+  // S3 Storage - 3-tier storage for optimization
+  s3KeyOriginal: string;         // Original upload (images/original/{id}.{ext}) - GSI partition key
+  s3KeyCompressed?: string;      // Compressed ≤4MB (images/compressed/{id}.jpg)
+  s3KeyThumbnail?: string;       // Thumbnail ≤100KB (images/thumbnail/{id}.jpg)
 
   // File metadata
   fileName: string;              // Original filename
+
+  // File sizes in bytes
+  originalSize?: number;
+  compressedSize?: number;
+  thumbnailSize?: number;
+
+  // Compression metadata
+  compressionRatio?: number;     // originalSize / compressedSize
+  originalFormat?: string;       // Original image format (jpeg, png, webp, etc.)
 
   // Image dimensions (required for coordinate normalization)
   width: number;
@@ -184,10 +197,13 @@ enum DocumentType {
   OTHER = 'OTHER'
 }
 
-// Note: Simplified status enum for MVP
-// UPLOADED: Initial state after upload
-// ANNOTATING: Currently being annotated
+// Note: Status enum for image processing pipeline
+// UPLOADED: Initial state after upload (brief state before processing starts)
+// PROCESSING: Image compression in progress
+// ANNOTATING: Ready for annotation (compression complete)
 // VALIDATED: Annotations have been validated (finalized by annotator)
+//
+// Status Flow: UPLOADED → PROCESSING → ANNOTATING → VALIDATED
 //
 // Status Synchronization:
 // - Image.status = VALIDATED corresponds to all Annotation.validationStatus = APPROVED
@@ -195,6 +211,7 @@ enum DocumentType {
 // - When annotator re-opens, Image.status changes back to ANNOTATING
 enum ImageStatus {
   UPLOADED = 'UPLOADED',
+  PROCESSING = 'PROCESSING',
   ANNOTATING = 'ANNOTATING',
   VALIDATED = 'VALIDATED'
 }
@@ -204,7 +221,10 @@ enum ImageStatus {
 // - Owner (uploadedBy) can create and delete
 // - Curators and Admins can update and delete all images
 
-// Secondary Indexes:
+// Secondary Indexes (Implemented):
+// - imagesByS3KeyOriginal: Query images by s3KeyOriginal (used by process-image Lambda)
+//
+// Future Indexes (Not Yet Implemented):
 // - imagesByUploader: Query images by uploadedBy
 // - imagesByStatus: Query images by status
 // - imagesByDocumentType: Query images by documentType
@@ -269,8 +289,8 @@ enum GenerationSource {
 enum ValidationStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED',
-  FLAGGED = 'FLAGGED'
+  REJECTED = 'REJECTED'
+  // FLAGGED = 'FLAGGED'  // Future: For items needing review
 }
 
 // Authorization Rules:
@@ -374,6 +394,10 @@ enum VersionStatus {
 ```
 
 #### User Table
+
+> **Status**: Future Enhancement - Currently using Cognito directly for authentication.
+> Per-user statistics and role-based access will be implemented in a later sprint.
+
 ```typescript
 interface User {
   id: string;                    // Partition Key (Cognito User ID)

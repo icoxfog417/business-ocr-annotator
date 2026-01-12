@@ -1,0 +1,20 @@
+{
+  "name": "process-image",
+  "version": "1.0.0",
+  "description": "Lambda function for image compression and thumbnail generation",
+  "type": "module",
+  "main": "handler.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.490.0",
+    "@aws-sdk/client-dynamodb": "^3.490.0",
+    "@aws-sdk/lib-dynamodb": "^3.490.0",
+    "sharp": "^0.33.2"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.131",
+    "typescript": "^5.3.0"
+  }
+}

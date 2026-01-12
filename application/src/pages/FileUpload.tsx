@@ -1,36 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { uploadData } from 'aws-amplify/storage';
-import { generateClient } from 'aws-amplify/data';
-import type { Schema } from '../../amplify/data/resource';
-
-const client = generateClient<Schema>();
-
-const LANGUAGES = [
-  { code: 'ja', label: '日本語 (Japanese)' },
-  { code: 'en', label: 'English' },
-  { code: 'zh', label: '中文 (Chinese)' },
-  { code: 'ko', label: '한국어 (Korean)' },
-];
-
-const DOCUMENT_TYPES = [
-  { code: 'RECEIPT', label: 'Receipt' },
-  { code: 'INVOICE', label: 'Invoice' },
-  { code: 'ORDER_FORM', label: 'Order Form' },
-  { code: 'TAX_FORM', label: 'Tax Form' },
-  { code: 'CONTRACT', label: 'Contract' },
-  { code: 'APPLICATION_FORM', label: 'Application Form' },
-  { code: 'OTHER', label: 'Other' },
-];
-
-type DocumentTypeValue = 'RECEIPT' | 'INVOICE' | 'ORDER_FORM' | 'TAX_FORM' | 'CONTRACT' | 'APPLICATION_FORM' | 'OTHER';
+import { client } from '../lib/apiClient';
+import { LANGUAGES, DOCUMENT_TYPES, type DocumentTypeCode } from '../lib/constants';
 
 export function FileUpload() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [language, setLanguage] = useState('ja');
-  const [documentType, setDocumentType] = useState<DocumentTypeValue>('RECEIPT');
+  const [documentType, setDocumentType] = useState<DocumentTypeCode>('RECEIPT');
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -68,23 +47,25 @@ export function FileUpload() {
 
   const uploadFiles = async () => {
     if (files.length === 0) return;
-    
+
     setUploading(true);
     try {
       for (const file of files) {
-        const path = `images/${Date.now()}-${file.name}`;
-        
-        console.log('Uploading file:', file.name, 'to path:', path);
-        
-        // Upload to S3
+        // Upload to images/original/ folder for 3-tier storage
+        const fileId = `${Date.now()}-${file.name}`;
+        const s3KeyOriginal = `images/original/${fileId}`;
+
+        console.log('Uploading file:', file.name, 'to path:', s3KeyOriginal);
+
+        // Upload to S3 original folder
         const uploadResult = await uploadData({
-          path,
+          path: s3KeyOriginal,
           data: file,
           options: {
             contentType: file.type
           }
         }).result;
-        
+
         console.log('Upload successful:', uploadResult);
 
         // Get image dimensions
@@ -94,30 +75,38 @@ export function FileUpload() {
           img.src = URL.createObjectURL(file);
         });
 
-        // Save metadata to DynamoDB with new required fields
+        // Save metadata to DynamoDB with 3-tier storage fields
+        // Status is PROCESSING until the process-image Lambda completes
         console.log('Saving to database...');
         const dbResult = await client.models.Image.create({
           fileName: file.name,
-          s3Key: path,
+          s3KeyOriginal: s3KeyOriginal,
+          // s3KeyCompressed and s3KeyThumbnail will be set by process-image Lambda
           width: dimensions.width,
           height: dimensions.height,
+          originalSize: file.size,
           documentType: documentType,
           language: language,
-          status: 'UPLOADED',
+          status: 'PROCESSING',
           uploadedBy: 'current-user',
           uploadedAt: new Date().toISOString()
         });
-        
+
         console.log('Database result:', dbResult);
-        
+
         if (dbResult.errors) {
           console.error('Database errors:', dbResult.errors);
           throw new Error(dbResult.errors.map(e => e.message).join(', '));
         }
+
+        // Note: The process-image Lambda should be triggered automatically
+        // via S3 event trigger or can be invoked manually
+        // For now, we'll rely on S3 trigger or manual invocation
+        console.log('Image uploaded. Compression will be handled by process-image Lambda.');
       }
-      
+
       setFiles([]);
-      alert('Files uploaded successfully! You can now view them in the gallery.');
+      alert('Files uploaded successfully! Images are being processed. You can view them in the gallery.');
     } catch (error) {
       console.error('Upload failed:', error);
       alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please check the console for details.`);
@@ -214,7 +203,7 @@ export function FileUpload() {
             </label>
             <select
               value={documentType}
-              onChange={(e) => setDocumentType(e.target.value as DocumentTypeValue)}
+              onChange={(e) => setDocumentType(e.target.value as DocumentTypeCode)}
               style={{
                 padding: '0.5rem',
                 borderRadius: '4px',

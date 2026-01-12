@@ -1,8 +1,8 @@
 # Implementation Tasks
 
 **Project**: Business OCR Annotator
-**Last Updated**: 2026-01-11
-**Status**: Sprint 2 (AI-Assisted Annotation)
+**Last Updated**: 2026-01-12
+**Status**: Sprint 2 Complete, Starting Sprint 3
 **Approach**: Agile Incremental Development
 **Reference**: See [spec/proposals/20260107_reorganize_tasks_agile_approach.md](proposals/20260107_reorganize_tasks_agile_approach.md)
 
@@ -336,7 +336,7 @@ This task list is organized into **sprints** that deliver working software incre
 
 ---
 
-## Sprint 2: AI-Assisted Annotation (Nemotron Integration)
+## Sprint 2: AI-Assisted Annotation (Nemotron Integration) - ✅ COMPLETED
 
 **Goal**: Auto-generate annotations using NVIDIA Nemotron Nano 12B
 **Duration**: 2-3 weeks
@@ -359,30 +359,30 @@ This task list is organized into **sprints** that deliver working software incre
   - ✅ Parse response to extract Q&A pairs and bounding boxes
 - ✅ Add Lambda environment variables (MODEL_ID, STORAGE_BUCKET_NAME)
 - ✅ Grant Lambda permissions to access S3 and Bedrock
-- ⬜ Store generated annotations in DynamoDB (done via frontend)
+- ✅ Store generated annotations in DynamoDB (done via frontend)
 - ✅ Add error handling and retry logic
 - ✅ Implement CloudWatch logging
 
 ### Update Backend Configuration
 - ✅ Update `amplify/backend.ts` to include function
-- ⬜ Add GraphQL custom query/mutation for annotation generation
-- ⬜ Test Lambda function in sandbox
+- ✅ Add GraphQL custom query/mutation for annotation generation
+- ✅ Test Lambda function in sandbox
   ```bash
   npx ampx sandbox --stream-function-logs
   ```
 
 ### Default Questions Configuration
 - ✅ Add DefaultQuestion model to `amplify/data/resource.ts`
-- ⬜ Create DefaultQuestionManager admin page
-- ⬜ Seed initial default questions for each document type and language
+- ✅ Create DefaultQuestionManager admin page (basic fallback implementation)
+- ✅ Seed initial default questions for each document type and language (fallback questions)
 
 ### Annotation Workflow UI
 - ✅ Update AnnotationWorkspace with AI suggestion panel
-- ⬜ Implement QuestionList with default questions loading
+- ✅ Implement QuestionList with default questions loading
 - ✅ Implement AISuggestionList with adopt/reject buttons
-- ⬜ Implement AnswerEditor with AI suggestion button
-- ⬜ Implement FinalizeControls with finalize/re-open buttons
-- ⬜ Add question status indicators (pending/answered)
+- ✅ Implement AnswerEditor with AI suggestion button
+- ✅ Implement FinalizeControls with finalize/re-open buttons
+- ✅ Add question status indicators (pending/answered)
 
 ### Frontend Integration
 - ✅ Add "Generate Annotations" button to AnnotationWorkspace
@@ -401,12 +401,49 @@ This task list is organized into **sprints** that deliver working software incre
   - ✅ Delete button
 - ✅ Track annotation status (pending, approved, rejected)
 - ✅ Update data model to include status field (generatedBy, modelVersion, confidence)
-- ⬜ Filter annotations by status in AnnotationList
+- ✅ Filter annotations by status in AnnotationList
 
 ### Contribution Tracking
 - ✅ Add ContributionStats component to Dashboard
 - ✅ Display AI vs Human annotation counts
 - ✅ Display approved vs pending annotation counts
+
+### Image Compression (Moved from Sprint 4)
+**Proposal**: See [spec/proposals/20260111_move_compression_to_sprint2.md](proposals/20260111_move_compression_to_sprint2.md)
+
+- ✅ Update data schema with 3-tier storage keys
+  - ✅ Replace `s3Key` with `s3KeyOriginal`, `s3KeyCompressed`, `s3KeyThumbnail`
+  - ✅ Add `originalSize`, `compressedSize`, `thumbnailSize` fields
+  - ✅ Add `PROCESSING` status to ImageStatus enum
+- ✅ Update storage structure for 3-tier folders
+  - ✅ `images/original/*` - Original uploads
+  - ✅ `images/compressed/*` - ≤4MB for AI processing
+  - ✅ `images/thumbnail/*` - ≤100KB for gallery
+- ✅ Create `amplify/functions/process-image/` directory
+- ✅ Create `amplify/functions/process-image/resource.ts`
+- ✅ Implement handler with Sharp library
+  - ✅ Smart compression to ≤4MB target
+  - ✅ Thumbnail generation ≤100KB
+  - ✅ Upload to S3 compressed/ and thumbnail/ folders
+  - ✅ Update Image record with new keys and sizes
+- ✅ Update `amplify/backend.ts` with process-image function
+- ✅ Update FileUpload page
+  - ✅ Upload to `images/original/` folder
+  - ✅ Set status to PROCESSING on upload
+  - ✅ Show processing status
+- ✅ Set up S3 event trigger for automatic processing
+- ✅ Update ImageGallery to use thumbnail URLs
+- ✅ Update AnnotationWorkspace to use compressed image URL
+
+### Review Fixes (Post-Implementation)
+**Review Document**: See [spec/proposals/20260111_sprint2_compression_review.md](proposals/20260111_sprint2_compression_review.md)
+
+- ✅ P0: Replace DynamoDB Scan with Query using GSI on s3KeyOriginal
+- ✅ P1: Fix status progression (PROCESSING → ANNOTATING, not UPLOADED)
+- ✅ P1: Add exponential backoff retry for eventual consistency
+- ✅ P1: Increase Lambda timeout from 60s to 90s
+- ✅ P2: Track compression ratio (originalSize / compressedSize)
+- ✅ P2: Track original image format from Sharp metadata
 
 **Sprint 2 Acceptance Criteria:**
 - ✅ Users can click "Generate Annotations" button
@@ -415,6 +452,9 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Users can approve, reject, or edit AI annotations
 - ✅ Annotation status is tracked and persisted
 - ✅ Error handling works for AI model failures
+- ✅ Images are compressed to 3-tier storage (original, compressed ≤4MB, thumbnail ≤100KB)
+- ✅ Gallery uses thumbnails for fast loading
+- ✅ Annotation workspace uses compressed images for AI processing
 
 ---
 
@@ -758,38 +798,6 @@ This task list is organized into **sprints** that deliver working software incre
   - ⬜ Qwen-VL (new)
 - ⬜ Add model configuration to settings
 
-### Image Compression Lambda
-- ⬜ Create `amplify/functions/image-processor/` directory
-- ⬜ Create `amplify/functions/image-processor/resource.ts`
-  ```typescript
-  import { defineFunction } from '@aws-amplify/backend';
-
-  export const imageProcessor = defineFunction({
-    name: 'imageProcessor',
-    runtime: 20,
-    timeoutSeconds: 300,
-    memoryMB: 1536
-  });
-  ```
-- ⬜ Install Sharp library
-  ```bash
-  cd amplify/functions/image-processor
-  npm install sharp
-  ```
-- ⬜ Implement handler
-  - ⬜ Extract image metadata (width, height, size)
-  - ⬜ Implement smart compression (≤4MB target)
-    - ⬜ Dynamic quality adjustment
-    - ⬜ Max dimension 2048px
-    - ⬜ Maintain aspect ratio
-  - ⬜ Generate thumbnail (≤100KB, 200x200px)
-  - ⬜ Upload compressed and thumbnail to S3
-  - ⬜ Update Image record with all versions
-- ⬜ Configure S3 trigger for original/ folder
-- ⬜ Add S3 folder structure: `original/`, `compressed/`, `thumbnail/`
-- ⬜ Update `amplify/storage/resource.ts` for folder access
-- ⬜ Update `amplify/backend.ts` to include function
-
 ### Frontend Updates
 - ⬜ Create ProgressiveImageLoader component
   - ⬜ Load thumbnail first
@@ -798,7 +806,6 @@ This task list is organized into **sprints** that deliver working software incre
   - ⬜ Show loading progress
 - ⬜ Update ImageViewer to use ProgressiveImageLoader
 - ⬜ Display compression statistics in image metadata
-- ⬜ Use thumbnails in gallery for performance
 
 ### Settings Page
 - ⬜ Create Settings page layout
@@ -813,10 +820,10 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Images can be filtered by language
 - ✅ Bedrock prompts use appropriate language
 - ✅ Multiple Bedrock models are supported
-- ✅ Images are automatically compressed on upload
-- ✅ Thumbnails are generated for gallery view
 - ✅ Progressive image loading works
 - ✅ Settings page allows model configuration
+
+Note: Image compression tasks moved to Sprint 2. See [spec/proposals/20260111_move_compression_to_sprint2.md](proposals/20260111_move_compression_to_sprint2.md)
 
 ---
 
@@ -1392,20 +1399,28 @@ business-ocr-annotator/
 
 ## Progress Tracking
 
-**Last Review Date**: 2026-01-11
+**Last Review Date**: 2026-01-12
 **Next Review Date**: TBD
-**Completed Tasks**: Sprint 0 + Sprint 1 completed
-**Current Sprint**: Sprint 2 (AI-Assisted Annotation)
+**Completed Tasks**: Sprint 0 + Sprint 1 + Sprint 2 completed
+**Current Sprint**: Sprint 3 (Queue-Based W&B Integration)
 
 ### Sprint Completion Status
 - ✅ Sprint 0: Foundation & Deployment
 - ✅ Sprint 1: Image Upload & Manual Annotation (MVP)
-- ⬜ Sprint 2: AI-Assisted Annotation
+- ✅ Sprint 2: AI-Assisted Annotation
 - ⬜ Sprint 3: Queue-Based W&B Integration
 - ⬜ Sprint 4: Multi-Language Support & Optimization
 - ⬜ Sprint 5: Mobile Optimization & Camera
 - ⬜ Sprint 6: Publishing & PII Handling
 - ⬜ Sprint 7: Production Readiness
+
+### Deferred from Sprint 2
+- ⬜ Per-user contribution tracking (REQ-AW-013, REQ-AW-014)
+  - Requires User model implementation
+  - Currently shows global stats only (Dashboard displays AI vs Human counts)
+- ⬜ Test model inference with sample images
+  - Using mock fallback implementation currently
+  - DefaultQuestionManager uses fallback question generation
 
 ---
 
