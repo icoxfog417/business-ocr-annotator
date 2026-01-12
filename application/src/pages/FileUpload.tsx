@@ -5,6 +5,7 @@ import { client } from '../lib/apiClient';
 import { LANGUAGES, DOCUMENT_TYPES, type DocumentTypeCode } from '../lib/constants';
 import { ContributorGatedButton } from '../components/consent';
 import { QuestionSelector, CameraCapture, type SelectedQuestion } from '../components/upload';
+import { MobileNavSpacer } from '../components/layout';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { useDefaultQuestions } from '../hooks/useDefaultQuestions';
 
@@ -397,6 +398,8 @@ export function FileUpload() {
             ? `${files.length}件のファイルをアップロード`
             : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
       </ContributorGatedButton>
+
+      <MobileNavSpacer />
     </div>
   );
 }

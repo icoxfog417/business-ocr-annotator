@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getUrl } from 'aws-amplify/storage';
 import { client } from '../lib/apiClient';
 import { getStatusStyle, getProcessingOpacity } from '../lib/statusStyles';
+import { MobileNavSpacer } from '../components/layout';
 
 interface ImageWithUrl {
   id: string;
@@ -302,6 +303,8 @@ export function ImageGallery() {
           ))}
         </div>
       )}
+
+      <MobileNavSpacer />
     </div>
   );
 }

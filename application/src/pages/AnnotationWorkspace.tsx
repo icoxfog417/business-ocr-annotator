@@ -5,6 +5,7 @@ import { client } from '../lib/apiClient';
 import { AnnotationFlow, type AnnotationAnswer } from '../components/annotation';
 import type { SelectedQuestion } from '../components/upload/QuestionSelector';
 import { useDefaultQuestions } from '../hooks/useDefaultQuestions';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 import type { BoundingBox, AIAnnotationResult } from '../types';
 
 interface Annotation {
@@ -33,6 +34,7 @@ export function AnnotationWorkspace() {
   const { imageId } = useParams<{ imageId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { isMobile } = useBreakpoint();
 
   // Get questions passed from upload flow
   const passedQuestions = (location.state as { questions?: SelectedQuestion[] })?.questions;
@@ -313,7 +315,13 @@ export function AnnotationWorkspace() {
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{
+        height: isMobile ? 'calc(100vh - 60px - env(safe-area-inset-bottom, 0px))' : '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       <AnnotationFlow
         imageId={imageId}
         imageSrc={imageUrl}
