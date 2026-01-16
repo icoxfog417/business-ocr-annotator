@@ -7,12 +7,12 @@
           { "id": "r-ja-1", "text": "登録番号は?(番号のみ)", "type": "EXTRACTIVE" },
           { "id": "r-ja-2", "text": "レシートの日付は?", "type": "EXTRACTIVE" },
           { "id": "r-ja-3", "text": "合計金額 (8%対象) は?", "type": "EXTRACTIVE" },
-          { "id": "r-ja-4", "text": "合計金額 (10%対象) は?", "type": "EXTRACTIVE" }
+          { "id": "r-ja-4", "text": "合計金額 (10%対象) は?", "type": "EXTRACTIVE" },
           { "id": "r-ja-5", "text": "購入品目 (上から最大10) は?", "type": "EXTRACTIVE" }
         ],
         "optional": [
-          { "id": "r-ja-5", "text": "付与されたポイントは?", "type": "EXTRACTIVE" },
-          { "id": "r-ja-6", "text": "伝票番号は?", "type": "EXTRACTIVE" }
+          { "id": "r-ja-10", "text": "付与されたポイントは?", "type": "EXTRACTIVE" },
+          { "id": "r-ja-11", "text": "伝票番号は?", "type": "EXTRACTIVE" }
         ]
       },
       "en": {
