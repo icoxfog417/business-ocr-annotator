@@ -4,6 +4,7 @@ interface AnnotationSummary {
   totalQuestions: number;
   answeredQuestions: number;
   skippedQuestions: number;
+  unanswerableQuestions: number;
   boundingBoxesDrawn: number;
   aiAssistedCount: number;
 }
@@ -32,6 +33,7 @@ export function FinalizeScreen({
       title: 'Annotation Complete!',
       questionsAnswered: 'Questions answered',
       questionsSkipped: 'Questions skipped',
+      questionsUnanswerable: 'No answer (not on document)',
       boundingBoxes: 'Bounding boxes drawn',
       aiAssisted: 'AI-assisted answers',
       uploadNext: 'Upload Next Image',
@@ -42,6 +44,7 @@ export function FinalizeScreen({
       title: 'アノテーション完了！',
       questionsAnswered: '回答済みの質問',
       questionsSkipped: 'スキップした質問',
+      questionsUnanswerable: '該当なし（書類に記載なし）',
       boundingBoxes: '描画したバウンディングボックス',
       aiAssisted: 'AI支援の回答',
       uploadNext: '次の画像をアップロード',
@@ -52,6 +55,7 @@ export function FinalizeScreen({
       title: '标注完成！',
       questionsAnswered: '已回答的问题',
       questionsSkipped: '跳过的问题',
+      questionsUnanswerable: '无答案（文档中没有）',
       boundingBoxes: '绘制的边界框',
       aiAssisted: 'AI辅助的答案',
       uploadNext: '上传下一张图片',
@@ -62,6 +66,7 @@ export function FinalizeScreen({
       title: '주석 완료!',
       questionsAnswered: '답변한 질문',
       questionsSkipped: '건너뛴 질문',
+      questionsUnanswerable: '해당없음 (문서에 없음)',
       boundingBoxes: '그린 바운딩 박스',
       aiAssisted: 'AI 지원 답변',
       uploadNext: '다음 이미지 업로드',
@@ -178,12 +183,12 @@ export function FinalizeScreen({
           <div style={statLabelStyle}>{t.questionsAnswered}</div>
         </div>
         <div style={statCardStyle}>
-          <div style={statValueStyle}>{summary.skippedQuestions}</div>
-          <div style={statLabelStyle}>{t.questionsSkipped}</div>
+          <div style={{ ...statValueStyle, color: '#6b7280' }}>{summary.unanswerableQuestions}</div>
+          <div style={statLabelStyle}>{t.questionsUnanswerable}</div>
         </div>
         <div style={statCardStyle}>
-          <div style={statValueStyle}>{summary.boundingBoxesDrawn}</div>
-          <div style={statLabelStyle}>{t.boundingBoxes}</div>
+          <div style={statValueStyle}>{summary.skippedQuestions}</div>
+          <div style={statLabelStyle}>{t.questionsSkipped}</div>
         </div>
         <div style={statCardStyle}>
           <div style={{ ...statValueStyle, color: '#6366f1' }}>{summary.aiAssistedCount}</div>

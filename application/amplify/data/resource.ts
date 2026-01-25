@@ -98,6 +98,9 @@ const schema = a.schema({
       aiModelProvider: a.string(), // Provider (e.g., "bedrock")
       aiExtractionTimestamp: a.datetime(), // When AI extraction occurred
 
+      // Unanswerable tracking - when document doesn't contain the answer
+      isUnanswerable: a.boolean().default(false), // True if marked as "No Answer"
+
       // Tracking fields
       createdBy: a.string().required(),
       createdAt: a.datetime().required(),

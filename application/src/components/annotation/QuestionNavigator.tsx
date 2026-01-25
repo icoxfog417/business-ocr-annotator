@@ -10,6 +10,7 @@ interface QuestionNavigatorProps {
   onPrevious: () => void;
   onNext: () => void;
   onSkip: () => void;
+  onNoAnswer: () => void;
   onDotClick?: (index: number) => void;
   canGoPrevious: boolean;
   canGoNext: boolean;
@@ -30,6 +31,7 @@ export function QuestionNavigator({
   onPrevious,
   onNext,
   onSkip,
+  onNoAnswer,
   onDotClick,
   canGoPrevious,
   canGoNext,
@@ -41,24 +43,28 @@ export function QuestionNavigator({
     en: {
       previous: '← Prev',
       skip: 'Skip',
+      noAnswer: 'No Answer',
       next: 'Next →',
       finish: 'Finish →',
     },
     ja: {
       previous: '← 前へ',
       skip: 'スキップ',
+      noAnswer: '該当なし',
       next: '次へ →',
       finish: '完了 →',
     },
     zh: {
       previous: '← 上一个',
       skip: '跳过',
+      noAnswer: '无答案',
       next: '下一个 →',
       finish: '完成 →',
     },
     ko: {
       previous: '← 이전',
       skip: '건너뛰기',
+      noAnswer: '해당없음',
       next: '다음 →',
       finish: '완료 →',
     },
@@ -132,6 +138,13 @@ export function QuestionNavigator({
     color: '#f59e0b',
   };
 
+  const noAnswerButtonStyle: React.CSSProperties = {
+    ...buttonBaseStyle,
+    backgroundColor: '#ffffff',
+    border: '1px solid #6b7280',
+    color: '#6b7280',
+  };
+
   const nextButtonStyle: React.CSSProperties = {
     ...buttonBaseStyle,
     backgroundColor: canGoNext ? '#3b82f6' : '#d1d5db',
@@ -167,6 +180,15 @@ export function QuestionNavigator({
           disabled={!canGoPrevious}
         >
           {t.previous}
+        </button>
+
+        <button
+          type="button"
+          style={noAnswerButtonStyle}
+          onClick={onNoAnswer}
+          title="Mark as unanswerable - document doesn't have this information"
+        >
+          {t.noAnswer}
         </button>
 
         <button

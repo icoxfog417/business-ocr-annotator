@@ -158,14 +158,23 @@ export function AnnotationWorkspace() {
     if (!imageId || !image) return;
 
     for (const answer of answers) {
-      if (answer.skipped || !answer.boundingBox) continue;
+      // Skip if skipped (not unanswerable - those should be saved)
+      if (answer.skipped) continue;
 
-      const bbox = [
-        answer.boundingBox.x,
-        answer.boundingBox.y,
-        answer.boundingBox.x + answer.boundingBox.width,
-        answer.boundingBox.y + answer.boundingBox.height,
-      ];
+      // For unanswerable: save with empty answer and no bounding box
+      const bbox = answer.isUnanswerable
+        ? null
+        : answer.boundingBox
+          ? [
+              answer.boundingBox.x,
+              answer.boundingBox.y,
+              answer.boundingBox.x + answer.boundingBox.width,
+              answer.boundingBox.y + answer.boundingBox.height,
+            ]
+          : null;
+
+      // Skip if not unanswerable and no bounding box
+      if (!answer.isUnanswerable && !bbox) continue;
 
       // Check if updating existing annotation by ID (from gallery edit flow)
       const existingById = annotations.find((a) => a.id === answer.questionId);
@@ -175,7 +184,8 @@ export function AnnotationWorkspace() {
         await client.models.Annotation.update({
           id: existingById.id,
           answer: answer.answer,
-          boundingBoxes: JSON.stringify([bbox]),
+          boundingBoxes: bbox ? JSON.stringify([bbox]) : '[]',
+          isUnanswerable: answer.isUnanswerable,
           aiAssisted: answer.aiAssisted,
           aiModelId: answer.aiModelId,
           aiModelProvider: answer.aiModelProvider,
@@ -189,7 +199,8 @@ export function AnnotationWorkspace() {
           question: answer.question,
           answer: answer.answer,
           language: image.language,
-          boundingBoxes: JSON.stringify([bbox]),
+          boundingBoxes: bbox ? JSON.stringify([bbox]) : '[]',
+          isUnanswerable: answer.isUnanswerable,
           questionType: 'EXTRACTIVE',
           validationStatus: 'PENDING',
           generatedBy: answer.aiAssisted ? 'AI' : 'HUMAN',
