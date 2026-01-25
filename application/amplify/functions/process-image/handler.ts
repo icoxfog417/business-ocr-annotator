@@ -194,6 +194,16 @@ async function processImage(
     const compressedSize = compressedBuffer.length;
     console.log(`Compressed image size: ${(compressedSize / 1024).toFixed(2)} KB`);
 
+    // Get compressed image dimensions
+    const compressedMetadata = await sharp(compressedBuffer).metadata();
+    const compressedWidth = compressedMetadata.width;
+    const compressedHeight = compressedMetadata.height;
+    
+    if (!compressedWidth || !compressedHeight) {
+      throw new Error('Failed to get compressed image dimensions');
+    }
+    console.log(`Compressed dimensions: ${compressedWidth}x${compressedHeight}`);
+
     // Calculate compression ratio
     const compressionRatio = compressedSize > 0 ? originalSize / compressedSize : 1;
     console.log(`Compression ratio: ${compressionRatio.toFixed(2)}x`);
@@ -232,7 +242,7 @@ async function processImage(
     await docClient.send(new UpdateCommand({
       TableName: tableName,
       Key: { id: imageId },
-      UpdateExpression: 'SET s3KeyCompressed = :compressed, s3KeyThumbnail = :thumbnail, originalSize = :origSize, compressedSize = :compSize, thumbnailSize = :thumbSize, compressionRatio = :ratio, originalFormat = :format, #status = :status, updatedAt = :updatedAt',
+      UpdateExpression: 'SET s3KeyCompressed = :compressed, s3KeyThumbnail = :thumbnail, originalSize = :origSize, compressedSize = :compSize, thumbnailSize = :thumbSize, compressedWidth = :compWidth, compressedHeight = :compHeight, compressionRatio = :ratio, originalFormat = :format, #status = :status, updatedAt = :updatedAt',
       ExpressionAttributeNames: {
         '#status': 'status',
       },
@@ -242,6 +252,8 @@ async function processImage(
         ':origSize': originalSize,
         ':compSize': compressedSize,
         ':thumbSize': thumbnailSize,
+        ':compWidth': compressedWidth,
+        ':compHeight': compressedHeight,
         ':ratio': compressionRatio,
         ':format': originalFormat,
         ':status': 'ANNOTATING',

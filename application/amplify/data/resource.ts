@@ -21,6 +21,10 @@ const schema = a.schema({
       width: a.integer().required(),
       height: a.integer().required(),
 
+      // Compressed image dimensions (for coordinate scaling)
+      compressedWidth: a.integer(),
+      compressedHeight: a.integer(),
+
       // File sizes in bytes
       originalSize: a.integer(),
       compressedSize: a.integer(),
