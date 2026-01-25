@@ -373,9 +373,8 @@ export function AnnotationFlow({
         </div>
 
         {/* Answer */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-          <input
-            type="text"
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'flex-start' }}>
+          <textarea
             value={answer}
             onChange={(e) => {
               const newValue = e.target.value;
@@ -385,12 +384,16 @@ export function AnnotationFlow({
               }
             }}
             placeholder={language === 'ja' ? '回答を入力...' : 'Enter answer...'}
+            rows={3}
             style={{
               flex: 1,
               padding: '12px 16px',
               borderRadius: 8,
               border: '1px solid #e5e7eb',
               fontSize: 14,
+              resize: 'vertical',
+              minHeight: 60,
+              fontFamily: 'inherit',
             }}
           />
           <ReadButton
