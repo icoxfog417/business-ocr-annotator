@@ -2,9 +2,9 @@
 
 This document records questions and answers discovered during sandbox verification of AWS Amplify Gen2 and related technologies for the Business OCR Annotator project.
 
-**Last Updated**: 2026-01-12
-**Total Questions**: 14
-**Total Verified**: 14 / 14
+**Last Updated**: 2026-01-25
+**Total Questions**: 15
+**Total Verified**: 15 / 15
 
 ## Overview
 
@@ -35,6 +35,7 @@ Each Q&A entry documents:
 | Q12 | DynamoDB GSI for efficient lookups | 🟠 High | 2 | ✅ Verified |
 | Q13 | Touch bounding box drawing (native) | 🟠 High | 3 | ✅ Verified |
 | Q14 | Cognito custom attributes for consent | 🟠 High | 3 | ✅ Verified |
+| Q15 | Bedrock prompt for value extraction | 🟠 High | 3 | ✅ Verified |
 
 ---
 
@@ -1884,6 +1885,101 @@ function ContributorGate({ children }: { children: React.ReactNode }) {
 - ✅ **Verified**: Successfully tested and documented
 - ⚠️ **Issues Found**: Verified with known issues or limitations
 - 🔄 **Needs Update**: Previously verified but may need re-verification
+
+---
+
+### Q15: How to design Bedrock prompts for clean value extraction with formatting?
+
+**Priority**: 🟠 High (Sprint 3)
+**Affects Design**: ⚠️ Maybe - Affects annotation quality and user experience
+**Status**: ✅ Verified
+
+**Question Details**:
+- How to prompt Bedrock to extract only values (exclude labels like "登録番号:", "日付:")?
+- How to format values based on question type (money, date, registration number, items)?
+- Does the model follow formatting instructions consistently across languages (ja, en, zh, ko)?
+- What's the optimal prompt structure for value extraction vs full text extraction?
+
+**Answer**: [To be determined after sandbox testing]
+
+**Proposed Prompt Structure**:
+```typescript
+const PROMPT = `選択された領域から値を抽出して、以下の質問に答えてください。
+
+質問: {{QUESTION}}
+
+ルール:
+1. 値のみを返す（ラベルやフィールド名は除外）
+2. 質問の種類に応じてフォーマット:
+   - 金額: 数値のみ（例: "1,234"）
+   - 日付: yyyy/MM/dd形式（例: "2024/01/15"）
+   - 商品/リスト: 1行に1項目
+   - 登録番号: 英数字のみ
+   - その他: クリーンなテキスト値
+
+例:
+- 領域に「合計金額: ¥1,234」→ "1,234"を返す
+- 領域に「日付 2024年1月15日」→ "2024/01/15"を返す
+- 領域に「登録番号: T1234567890123」→ "T1234567890123"を返す`;
+```
+
+**Test Cases**:
+1. Money field: `合計金額: ¥1,234` → Expected: `1,234`
+2. Date field: `日付 2024年1月15日` → Expected: `2024/01/15`
+3. Registration: `登録番号: T1234567890123` → Expected: `T1234567890123`
+4. Item list: Multiple items → Expected: One per line
+
+**Verified in**: [`.sandbox/read-prompt-test/`](.sandbox/read-prompt-test/)
+
+**Key Findings**:
+- ✅ Prompt successfully extracts values without labels
+- ✅ Date formatting works correctly (2024年1月15日 → 2024/01/15)
+- ✅ Money formatting works (returns numeric value without ¥ symbol)
+- ⚠️ OCR accuracy depends on image quality (test used simple PIL-generated image)
+
+**Gotchas**:
+- Must use inference profile ID (e.g., `us.anthropic.claude-3-5-sonnet-20241022-v2:0`) not base model ID
+- Simple generated images may have OCR accuracy issues - real receipts should work better
+
+**Test Results (2026-01-25) - NVIDIA Nemotron Nano 12B**:
+
+Test 1: Receipt image (test-receipt.png)
+```
+Money: "800" ✅ Correct, no ¥ symbol
+Date: "2024/01/15" ✅ Correct format
+```
+
+Test 2: Items image (test-items.png) with simplified prompt
+```
+Money: "850" ✅ Correct, no ¥ symbol  
+Date: "2024/01/15" ✅ Correct format
+Items: "500ml" ❌ Only partial extraction
+```
+
+**Final Prompt (Verified)**:
+```
+画像から質問の答えを抽出してください。
+
+質問: {{QUESTION}}
+
+重要: 値のみを出力。説明や前置きは不要。
+
+フォーマット:
+- 金額の場合: 数字のみ (例: 1234)
+- 日付の場合: yyyy/MM/dd (例: 2024/01/15)  
+- 複数項目の場合: 1行に1つ
+```
+
+**Conclusion**: 
+- ✅ Value extraction works (no labels)
+- ✅ Date formatting works (yyyy/MM/dd)
+- ✅ Money formatting works (numeric only)
+- ⚠️ Item list extraction needs real images with clearer visual layout
+- ⚠️ Simple PIL-generated images lack visual context for accurate field identification
+
+**References**:
+- [Proposal: spec/proposals/20260125_improve_read_button_prompt.md](proposals/20260125_improve_read_button_prompt.md)
+- [Bedrock Converse API Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html)
 
 ---
 

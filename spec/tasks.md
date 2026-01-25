@@ -659,6 +659,10 @@ This task list is organized into **sprints** that deliver working software incre
   - Extracts text and fills answer field
   - Captures model ID for tracking
   - Error handling with retry option
+  - ✅ Improved prompt for value extraction (2026-01-25)
+    - Extract value only (exclude labels like 登録番号:, 日付:)
+    - Format: money → numbers only, date → yyyy/MM/dd, items → one per line
+    - See [spec/proposals/20260125_improve_read_button_prompt.md](proposals/20260125_improve_read_button_prompt.md)
 
 - ✅ Create `src/components/annotation/FinalizeScreen.tsx`
   - Summary: X questions answered, Y boxes drawn

@@ -266,6 +266,7 @@ Each entry in `spec/implementation_qa.md` should include:
 - ✅ Include README explaining the test
 - ✅ Use realistic test data
 - ✅ Verify against AWS Amplify Gen2 best practices
+- ✅ Use `.sandbox/venv` for Python dependencies (shared venv for all sandbox tests)
 
 **DON'T**:
 - ❌ Mix multiple features in one sample
@@ -274,6 +275,7 @@ Each entry in `spec/implementation_qa.md` should include:
 - ❌ Commit secrets or credentials
 - ❌ Skip documentation
 - ❌ Leave samples in broken state
+- ❌ Create new Python venvs per test (use shared `.sandbox/venv`)
 
 ### Example Workflow
 

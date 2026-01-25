@@ -103,26 +103,46 @@ JSON 형식으로 반환:
 
 // Single question prompts - for answering a specific question
 const SINGLE_QUESTION_PROMPTS: Record<string, string> = {
-  ja: `この画像を見て、以下の質問に答えてください。
+  ja: `質問に対する答えの値だけを返してください。
 
 質問: {{QUESTION}}
 
-回答のテキストのみを返してください。JSONや特殊な形式は不要です。`,
-  en: `Look at this image and answer the following question.
+【重要】
+- 質問のラベル部分は出力しない
+- 答えの値のみを出力
+- 金額は数字のみ（¥や括弧は除外）
+- 日付はyyyy/MM/dd形式（例: 2026年1月22日 → 2026/01/22）
+- 複数項目は1行に1つ`,
+  en: `Return only the answer value for the question.
 
 Question: {{QUESTION}}
 
-Return only the answer text. No JSON or special formatting needed.`,
-  zh: `查看这张图片并回答以下问题。
+【Important】
+- Do not output the question label
+- Output only the answer value
+- Money: numbers only (exclude $ and parentheses)
+- Date: yyyy/MM/dd format (e.g., Jan 22, 2026 → 2026/01/22)
+- Multiple items: one per line`,
+  zh: `只返回问题的答案值。
 
 问题: {{QUESTION}}
 
-只返回答案文本，不需要JSON或特殊格式。`,
-  ko: `이 이미지를 보고 다음 질문에 답하세요.
+【重要】
+- 不要输出问题标签
+- 仅输出答案值
+- 金额仅数字（排除¥和括号）
+- 日期yyyy/MM/dd格式（例: 2026年1月22日 → 2026/01/22）
+- 多个项目每行一个`,
+  ko: `질문에 대한 답의 값만 반환하세요.
 
 질문: {{QUESTION}}
 
-답변 텍스트만 반환하세요. JSON이나 특별한 형식은 필요하지 않습니다.`,
+【중요】
+- 질문 레이블은 출력하지 않음
+- 답의 값만 출력
+- 금액은 숫자만 (₩와 괄호 제외)
+- 날짜는 yyyy/MM/dd 형식 (예: 2026년 1월 22일 → 2026/01/22)
+- 여러 항목은 한 줄에 하나씩`,
 };
 
 export const handler = async (
@@ -153,6 +173,7 @@ export const handler = async (
       // Single question mode - answer specific question
       prompt = SINGLE_QUESTION_PROMPTS[language] || SINGLE_QUESTION_PROMPTS['en'];
       prompt = prompt.replace('{{QUESTION}}', question);
+      console.log('Using single question mode, question:', question);
     } else {
       // Multi-question mode - generate multiple Q&A pairs
       prompt = PROMPTS[language] || PROMPTS['en'];
@@ -160,6 +181,7 @@ export const handler = async (
 
     // Call Bedrock Converse API
     console.log('Calling Bedrock model:', modelId);
+    console.log('Prompt preview:', prompt.substring(0, 200) + '...');
     const command = new ConverseCommand({
       modelId,
       messages: [
@@ -203,7 +225,8 @@ export const handler = async (
     // Remove common JSON wrapper patterns if model still returns them
     cleanText = cleanText.replace(/^["']|["']$/g, ''); // Remove quotes
     cleanText = cleanText.replace(/^.*"answer":\s*["']([^"']+)["'].*$/s, '$1'); // Extract from JSON if present
-    cleanText = cleanText.replace(/\n+/g, ' ').trim(); // Clean up whitespace
+    // Trim spaces on each line, preserve newlines
+    cleanText = cleanText.split('\n').map(line => line.trim()).join('\n').trim();
 
     // For single question mode, construct the JSON response here
     if (question) {
