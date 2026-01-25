@@ -36,7 +36,7 @@ interface AnnotationFlowProps {
   }>;
   language: string;
   onComplete: (answers: AnnotationAnswer[]) => Promise<void>;
-  onReadText: (box: BoundingBox) => Promise<{
+  onReadText: (box: BoundingBox, question: string) => Promise<{
     text: string;
     modelId: string;
     confidence?: number;
@@ -164,8 +164,9 @@ export function AnnotationFlow({
   const handleReadText = useCallback(async () => {
     const currentBox = answers[currentIndex]?.boundingBox;
     if (!currentBox) throw new Error('No bounding box');
-    return onReadText(currentBox);
-  }, [currentIndex, answers, onReadText]);
+    const currentQuestion = questions[currentIndex]?.text || '';
+    return onReadText(currentBox, currentQuestion);
+  }, [currentIndex, answers, questions, onReadText]);
 
   const handleTextExtracted = useCallback(
     (

@@ -213,7 +213,10 @@ export function AnnotationWorkspace() {
   };
 
   // Read text from bounding box using AI
-  const handleReadText = async (box: { x: number; y: number; width: number; height: number }) => {
+  const handleReadText = async (
+    box: { x: number; y: number; width: number; height: number },
+    question: string
+  ) => {
     if (!image) throw new Error('Image not loaded');
 
     const imageKey = image.s3KeyCompressed || image.s3KeyOriginal;
@@ -266,7 +269,7 @@ export function AnnotationWorkspace() {
       documentType: image.documentType || 'OTHER',
       width: cropWidth,
       height: cropHeight,
-      question: 'Extract the text in this image region.',
+      question: question,
     });
 
     if (result.errors?.length) {
