@@ -584,10 +584,11 @@ interface CanvasAnnotatorProps {
 // - Render image with overlay canvas
 // - Draw bounding boxes with labels
 // - Support drag-to-create new boxes
-// - Support drag corners/edges to resize
-// - Support drag box to move
+// - Support drag corners/edges to resize (✅ Implemented in TouchCanvas)
+// - Support drag box to move (✅ Implemented in TouchCanvas)
 // - Highlight selected box
 // - Zoom and pan controls
+// See: spec/proposals/20260125_bounding_box_move_resize.md
 ```
 
 ##### QuestionList

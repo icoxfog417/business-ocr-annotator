@@ -688,13 +688,16 @@ This task list is organized into **sprints** that deliver working software incre
 
 ### Unit G: Mobile Features 🔗 (Depends on: Unit B, Unit C)
 
-- ⬜ Create `src/components/annotation/TouchCanvas.tsx`
+- ✅ Create `src/components/annotation/TouchCanvas.tsx`
   - Native touch events (touchstart, touchmove, touchend)
   - View mode: scroll/pan pass-through
   - Draw mode: single-finger box creation
   - Box selection by tap
   - Corner handles for resize (32×32px touch area)
   - Visual feedback during interactions
+  - **Move functionality**: drag inside box to reposition
+  - **Resize functionality**: drag corners to resize
+  - **Proposal**: See [spec/proposals/20260125_bounding_box_move_resize.md](proposals/20260125_bounding_box_move_resize.md)
 
 - ⬜ Create `src/components/annotation/ModeBadge.tsx`
   - Fixed position indicator (top-right)
