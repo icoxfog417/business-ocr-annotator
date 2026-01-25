@@ -160,6 +160,14 @@ export function AnnotationFlow({
     [currentIndex, updateAnswer]
   );
 
+  // Box updated (moved or resized)
+  const handleBoxUpdated = useCallback(
+    (_index: number, updatedBox: BoundingBox) => {
+      updateAnswer(currentIndex, { boundingBox: updatedBox });
+    },
+    [currentIndex, updateAnswer]
+  );
+
   // Read text from box
   const handleReadText = useCallback(async () => {
     const currentBox = answers[currentIndex]?.boundingBox;
@@ -302,6 +310,7 @@ export function AnnotationFlow({
           mode={mode}
           onModeChange={setMode}
           onBoxCreated={handleBoxCreated}
+          onBoxUpdated={handleBoxUpdated}
         />
       </div>
 
