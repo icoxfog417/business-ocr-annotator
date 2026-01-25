@@ -734,7 +734,7 @@ This task list is organized into **sprints** that deliver working software incre
   - Hide header nav on mobile
 
 **Testing:**
-- ⬜ Touch target audit
+- ✅ Touch target audit (2026-01-25)
   - All buttons ≥48×48px
   - All form inputs ≥48px height
   - Box corner handles ≥32×32px
@@ -754,8 +754,9 @@ This task list is organized into **sprints** that deliver working software incre
   - Consent flow blocks upload without agreement
   - AI model tracking recorded correctly
 
-- ⬜ Performance check
-  - Lighthouse mobile score >70
+- ✅ Performance check (2026-01-25)
+  - Lighthouse mobile performance: 98 (target >70)
+  - Lighthouse accessibility: 100
 
 ---
 
@@ -775,8 +776,8 @@ This task list is organized into **sprints** that deliver working software incre
 - ✅ Bottom navigation works on mobile
 - ✅ Camera capture works on iOS/Android
 - ✅ Touch bounding box drawing works
-- ⬜ All touch targets ≥48px
-- ⬜ Lighthouse mobile score >70
+- ✅ All touch targets ≥48px
+- ✅ Lighthouse mobile score >70
 
 ---
 
