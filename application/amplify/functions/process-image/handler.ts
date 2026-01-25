@@ -196,8 +196,12 @@ async function processImage(
 
     // Get compressed image dimensions
     const compressedMetadata = await sharp(compressedBuffer).metadata();
-    const compressedWidth = compressedMetadata.width || 0;
-    const compressedHeight = compressedMetadata.height || 0;
+    const compressedWidth = compressedMetadata.width;
+    const compressedHeight = compressedMetadata.height;
+    
+    if (!compressedWidth || !compressedHeight) {
+      throw new Error('Failed to get compressed image dimensions');
+    }
     console.log(`Compressed dimensions: ${compressedWidth}x${compressedHeight}`);
 
     // Calculate compression ratio
