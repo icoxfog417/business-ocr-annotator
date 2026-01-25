@@ -4,7 +4,7 @@ import { QuestionNavigator } from './QuestionNavigator';
 import { ReadButton } from './ReadButton';
 import { TouchCanvas } from './TouchCanvas';
 import type { TouchMode, BoundingBox } from './TouchCanvas';
-import { ModeBadge, DrawBoxButton } from './ModeBadge';
+import { ModeBadge, DrawBoxButton, NoAnswerButton } from './ModeBadge';
 import { FinalizeScreen } from './FinalizeScreen';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import type { QuestionStatus } from './ProgressDots';
@@ -389,21 +389,22 @@ export function AnnotationFlow({
           </div>
         </div>
 
-        {/* Select Area */}
-        <div style={{ marginBottom: 12 }}>
+        {/* Select Area or No Answer */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
           <DrawBoxButton
             onClick={toggleDrawMode}
             isDrawMode={mode === 'draw'}
             disabled={false}
             language={language}
           />
+          <NoAnswerButton onClick={markUnanswerable} language={language} />
           {box && (
-            <span style={{ marginLeft: 12, color: '#10b981', fontSize: 14 }}>
+            <span style={{ color: '#10b981', fontSize: 14 }}>
               ✓ {language === 'ja' ? '選択済み' : 'Selected'}
             </span>
           )}
           {!isMobile && (
-            <span style={{ marginLeft: 8, color: '#9ca3af', fontSize: 12 }}>(D)</span>
+            <span style={{ color: '#9ca3af', fontSize: 12 }}>(D)</span>
           )}
         </div>
 
@@ -449,7 +450,6 @@ export function AnnotationFlow({
           onPrevious={goPrev}
           onNext={goNext}
           onSkip={skip}
-          onNoAnswer={markUnanswerable}
           onDotClick={goTo}
           canGoPrevious={currentIndex > 0}
           canGoNext={canGoNext}
