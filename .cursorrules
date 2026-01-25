@@ -1,0 +1,33 @@
+# Cursor Rules for Business OCR Annotator
+
+**IMPORTANT**: Always read and follow the guidelines in `CLAUDE.md` for all development tasks. This file provides a quick reference, but `CLAUDE.md` is the authoritative source.
+
+## Quick Reference
+
+### Project Structure
+- **Specifications**: All project specs are in `spec/` directory:
+  - `spec/requirements.md` - User experience and features
+  - `spec/design.md` - Architecture and component design
+  - `spec/tasks.md` - Implementation task list
+  - `spec/proposals/` - Design proposal documents (format: `yyyyMMdd_{name}.md`)
+  - `spec/implementation_qa.md` - Technical Q&A from sandbox verification
+
+### Before Making Changes
+1. Review `spec/requirements.md`, `spec/design.md`, and `spec/tasks.md`
+2. For new features: Create a proposal in `spec/proposals/` first
+3. For technical questions: Use sandbox verification workflow (see `CLAUDE.md`)
+
+### Code Quality
+- Zero warnings policy: All code must pass linting
+- Prettier auto-formatting: Single quotes, semicolons, 100 char width
+- TypeScript strict mode: No `any` types without justification
+- Pre-commit hooks enforce quality automatically
+
+### Sandbox Workflow
+- Question First: Document questions in `spec/implementation_qa.md` before creating sandbox
+- Verify in `.sandbox/` before implementing production features
+- Document findings in `spec/implementation_qa.md` with status (⏳ Pending / 🔬 In Progress / ✅ Verified)
+
+## Full Guidelines
+
+For complete workflow guidelines, specification management process, sandbox verification workflow, code quality standards, and all other project rules, **always refer to `CLAUDE.md`**.
