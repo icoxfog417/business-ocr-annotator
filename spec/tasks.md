@@ -805,7 +805,7 @@ This task list is organized into **sprints** that deliver working software incre
 
 #### Unit A: Data Models
 
-- ⬜ Update data schema in `amplify/data/resource.ts`
+- ✅ Update data schema in `amplify/data/resource.ts`
   ```typescript
   DatasetVersion: a.model({
     version: a.string().required(),           // e.g., "v1.0.0"
@@ -881,7 +881,7 @@ This task list is organized into **sprints** that deliver working software incre
 
 #### Unit E: SQS Queue Setup
 
-- ⬜ Set up SQS queue for evaluation jobs in `amplify/backend.ts`
+- ✅ Set up SQS queue for evaluation jobs in `amplify/backend.ts`
   ```typescript
   import * as sqs from 'aws-cdk-lib/aws-sqs';
   import { Duration } from 'aws-cdk-lib';
@@ -895,6 +895,10 @@ This task list is organized into **sprints** that deliver working software incre
     }
   });
   ```
+
+- ✅ Create Dead Letter Queue for failed jobs
+
+- ✅ Export queue URLs for Lambda functions
 
 - ⬜ Grant Lambda functions access to queue
 
