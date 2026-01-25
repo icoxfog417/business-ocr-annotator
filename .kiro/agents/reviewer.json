@@ -32,7 +32,6 @@
     "file:///home/ubuntu/business-ocr-annotator/application/**"
   ],
   "hooks": {},
-  "toolsSettings": {},
   "useLegacyMcpJson": false,
   "model": null
 }
