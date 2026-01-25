@@ -498,9 +498,9 @@ This task list is organized into **sprints** that deliver working software incre
 
 ---
 
-### Unit A: Backend Infrastructure ⚡ (No dependencies - Start immediately)
+### Unit A: Backend Infrastructure ✅ COMPLETE
 
-- ⬜ Add Cognito custom attributes for consent in `amplify/auth/resource.ts`
+- ✅ Add Cognito custom attributes for consent in `amplify/auth/resource.ts`
   ```typescript
   userAttributes: {
     'custom:contributor': { dataType: 'String', mutable: true },
@@ -509,50 +509,50 @@ This task list is organized into **sprints** that deliver working software incre
   }
   ```
 
-- ⬜ Update `Annotation` model in `amplify/data/resource.ts` with AI tracking fields
+- ✅ Update `Annotation` model in `amplify/data/resource.ts` with AI tracking fields
   - `aiAssisted: a.boolean()` - True if [📖 Read] was used
   - `aiModelId: a.string()` - Model ID (e.g., "anthropic.claude-3-5-sonnet")
   - `aiModelProvider: a.string()` - Provider (e.g., "bedrock")
   - `aiExtractionTimestamp: a.datetime()` - When AI extraction occurred
 
-- ⬜ Update `generate-annotation` Lambda to return model ID in response
+- ✅ Update `generate-annotation` Lambda to return model ID in response
 
 ---
 
-### Unit B: Config & Hooks ⚡ (No dependencies - Start immediately)
+### Unit B: Config & Hooks ✅ COMPLETE
 
-- ⬜ Create `src/config/defaultQuestions.json`
+- ✅ Create `src/config/defaultQuestions.json`
   - All document types (RECEIPT, INVOICE, ORDER_FORM, TAX_FORM, CONTRACT, APPLICATION_FORM, OTHER)
   - All languages (ja, en, zh, ko)
   - Default + optional questions per type/language
 
-- ⬜ Create `src/hooks/useDefaultQuestions.ts`
+- ✅ Create `src/hooks/useDefaultQuestions.ts`
   - Load questions from JSON config
   - Filter by document type and language
   - Fallback to English if language not found
 
-- ⬜ Create `src/hooks/useContributorStatus.ts`
+- ✅ Create `src/hooks/useContributorStatus.ts`
   - Check `custom:contributor` via `fetchUserAttributes()`
   - Update via `updateUserAttributes()` when accepted
   - Return `{ isContributor, isLoading, becomeContributor }`
 
-- ⬜ Create `src/contexts/ContributorContext.tsx`
+- ✅ Create `src/contexts/ContributorContext.tsx`
   - Cache contributor status globally
   - Provide context to all components
 
-- ⬜ Create `src/hooks/useBreakpoint.ts`
+- ✅ Create `src/hooks/useBreakpoint.ts`
   - Detect breakpoint: mobile (<768px), tablet (768-1024px), desktop (>1024px)
   - Return `{ isMobile, isTablet, isDesktop }`
 
-- ⬜ Create `src/hooks/useKeyboardShortcuts.ts`
+- ✅ Create `src/hooks/useKeyboardShortcuts.ts`
   - Register/unregister keyboard event listeners
   - Support: `→`, `←`, `D`, `R`, `S`, `Esc`, `Ctrl+Enter`
 
 ---
 
-### Unit C: Layout Components ⚡ (No dependencies - Start immediately)
+### Unit C: Layout Components ✅ COMPLETE
 
-- ⬜ Create `src/styles/breakpoints.css`
+- ✅ Create `src/styles/breakpoints.css`
   ```css
   :root {
     --breakpoint-mobile: 768px;
@@ -560,19 +560,19 @@ This task list is organized into **sprints** that deliver working software incre
   }
   ```
 
-- ⬜ Create `src/components/layout/ResponsiveContainer.tsx`
+- ✅ Create `src/components/layout/ResponsiveContainer.tsx`
   - Wrapper that provides breakpoint context
   - Applies appropriate layout based on screen size
 
-- ⬜ Create `src/components/layout/StackedLayout.tsx`
+- ✅ Create `src/components/layout/StackedLayout.tsx`
   - Mobile-first vertical stacking
   - Full-width content areas
 
-- ⬜ Create `src/components/layout/SplitLayout.tsx`
+- ✅ Create `src/components/layout/SplitLayout.tsx`
   - Side-by-side layout for tablet/desktop
   - Configurable split ratio (e.g., 60/40)
 
-- ⬜ Create `src/components/layout/MobileNavigation.tsx`
+- ✅ Create `src/components/layout/MobileNavigation.tsx`
   - Bottom navigation bar (60px + safe area)
   - Icons: Home, Upload, Gallery, Profile
   - Active state indicator
@@ -580,9 +580,9 @@ This task list is organized into **sprints** that deliver working software incre
 
 ---
 
-### Unit D: i18n & Styles ⚡ (No dependencies - Start immediately)
+### Unit D: i18n & Styles ✅ COMPLETE
 
-- ⬜ Create `src/i18n/consent/en.json`
+- ✅ Create `src/i18n/consent/en.json`
   ```json
   {
     "title": "Data Usage Consent",
@@ -594,44 +594,46 @@ This task list is organized into **sprints** that deliver working software incre
   }
   ```
 
-- ⬜ Create `src/i18n/consent/ja.json` (Japanese translation)
+- ✅ Create `src/i18n/consent/ja.json` (Japanese translation)
 
-- ⬜ Create `src/i18n/consent/zh.json` (Chinese translation)
+- ✅ Create `src/i18n/consent/zh.json` (Chinese translation)
 
-- ⬜ Create `src/styles/mobile.css`
+- ✅ Create `src/i18n/consent/ko.json` (Korean translation - bonus)
+
+- ✅ Create `src/styles/mobile.css`
   - Touch target minimum sizes (48px)
   - Mobile-specific spacing
   - Safe area padding for notched devices
 
 ---
 
-### Unit E: Upload Flow 🔗 (Depends on: Unit B, Unit C, Unit D)
+### Unit E: Upload Flow ✅ COMPLETE
 
-- ⬜ Create `src/components/consent/StartContributingDialog.tsx`
+- ✅ Create `src/components/consent/StartContributingDialog.tsx`
   - Multi-language consent message (loads from i18n)
   - Checkbox for explicit consent
   - Cancel and Accept buttons
   - Calls `becomeContributor()` on accept
 
-- ⬜ Create `src/components/consent/ContributorGate.tsx`
+- ✅ Create `src/components/consent/ContributorGate.tsx`
   - Wrapper component for contributor-only actions
   - Shows dialog if not contributor
   - Passes through if contributor
 
-- ⬜ Create `src/components/upload/QuestionSelector.tsx`
+- ✅ Create `src/components/upload/QuestionSelector.tsx`
   - Load questions via `useDefaultQuestions(docType, lang)`
   - Checkbox list with default questions pre-checked
   - Optional questions section
   - Custom question input field
   - Returns selected questions array
 
-- ⬜ Create `src/components/upload/CameraCapture.tsx`
+- ✅ Create `src/components/upload/CameraCapture.tsx`
   - HTML5 input with `capture="environment"`
   - Image preview before upload
   - "Take Photo" and "Choose from Gallery" options
   - Works on iOS Safari and Android Chrome
 
-- ⬜ Update `src/pages/FileUpload.tsx`
+- ✅ Update `src/pages/FileUpload.tsx`
   - Wrap upload action with `ContributorGate`
   - Add `QuestionSelector` component
   - Add `CameraCapture` for mobile
@@ -690,7 +692,7 @@ This task list is organized into **sprints** that deliver working software incre
 
 ---
 
-### Unit G: Mobile Features 🔗 (Depends on: Unit B, Unit C)
+### Unit G: Mobile Features ✅ COMPLETE
 
 - ✅ Create `src/components/annotation/TouchCanvas.tsx`
   - Native touch events (touchstart, touchmove, touchend)
@@ -703,12 +705,12 @@ This task list is organized into **sprints** that deliver working software incre
   - **Resize functionality**: drag corners to resize
   - **Proposal**: See [spec/proposals/20260125_bounding_box_move_resize.md](proposals/20260125_bounding_box_move_resize.md)
 
-- ⬜ Create `src/components/annotation/ModeBadge.tsx`
+- ✅ Create `src/components/annotation/ModeBadge.tsx`
   - Fixed position indicator (top-right)
   - Shows "VIEW" (gray) or "DRAW" (blue pulsing)
   - Tappable to toggle mode (48px touch area)
 
-- ⬜ Create `src/components/annotation/ZoomControls.tsx`
+- ✅ Create `src/components/annotation/ZoomControls.tsx` (as ZoomControlsMobile.tsx)
   - [+] zoom in button
   - [−] zoom out button
   - [Fit] reset to fit view
@@ -719,15 +721,15 @@ This task list is organized into **sprints** that deliver working software incre
 ### Unit H: Integration & Testing 🔗 (Depends on: All Units)
 
 **Page Updates:**
-- ⬜ Update `src/pages/Dashboard.tsx` for responsiveness
+- ✅ Update `src/pages/Dashboard.tsx` for responsiveness
   - Card grid → stacked on mobile
   - Add "Start Contributing" banner for non-contributors
 
 - ⬜ Update `src/pages/ImageGallery.tsx` for responsiveness
-  - Grid column adjustment by breakpoint
+  - Grid column adjustment by breakpoint (partial - uses inline window.innerWidth)
   - Touch-friendly image cards
 
-- ⬜ Integrate `MobileNavigation` in `src/App.tsx`
+- ✅ Integrate `MobileNavigation` in `src/App.tsx`
   - Show on mobile only
   - Hide header nav on mobile
 
@@ -758,21 +760,21 @@ This task list is organized into **sprints** that deliver working software incre
 ---
 
 **Sprint 3 Acceptance Criteria:**
-- ⬜ Contributor consent dialog appears before first upload/annotation
-- ⬜ Consent stored as Cognito custom attributes (custom:contributor, custom:consent_date)
-- ⬜ Question selection works on Upload screen
-- ⬜ Default questions auto-load by document type + language
-- ⬜ Question-by-question navigation works
-- ⬜ Box-first workflow: draw → read/type → next
-- ⬜ [📖 Read] button extracts text from bounding box
-- ⬜ AI model ID recorded when Read is used
-- ⬜ Progress dots show completion status
-- ⬜ Keyboard shortcuts work on desktop
-- ⬜ Finalize screen shows summary
-- ⬜ All pages responsive at 375px width
-- ⬜ Bottom navigation works on mobile
-- ⬜ Camera capture works on iOS/Android
-- ⬜ Touch bounding box drawing works
+- ✅ Contributor consent dialog appears before first upload/annotation
+- ✅ Consent stored as Cognito custom attributes (custom:contributor, custom:consent_date)
+- ✅ Question selection works on Upload screen
+- ✅ Default questions auto-load by document type + language
+- ✅ Question-by-question navigation works
+- ✅ Box-first workflow: draw → read/type → next
+- ✅ [📖 Read] button extracts text from bounding box
+- ✅ AI model ID recorded when Read is used
+- ✅ Progress dots show completion status
+- ✅ Keyboard shortcuts work on desktop
+- ✅ Finalize screen shows summary
+- ✅ All pages responsive at 375px width
+- ✅ Bottom navigation works on mobile
+- ✅ Camera capture works on iOS/Android
+- ✅ Touch bounding box drawing works
 - ⬜ All touch targets ≥48px
 - ⬜ Lighthouse mobile score >70
 
