@@ -1,8 +1,8 @@
 # Implementation Tasks
 
 **Project**: Business OCR Annotator
-**Last Updated**: 2026-01-12
-**Status**: Sprint 2 Complete, Starting Sprint 3 (UX & Mobile Optimization)
+**Last Updated**: 2026-01-25
+**Status**: Sprint 3 Complete, Starting Sprint 4 (Dataset Export & Evaluation)
 **Approach**: Agile Incremental Development
 **Reference**: See [spec/proposals/20260107_reorganize_tasks_agile_approach.md](proposals/20260107_reorganize_tasks_agile_approach.md)
 
@@ -781,64 +781,114 @@ This task list is organized into **sprints** that deliver working software incre
 
 ---
 
-## Sprint 4: Queue-Based W&B Integration
+## Sprint 4: Dataset Export & Model Evaluation
 
-**Goal**: Queue-based batch processing for W&B dataset builds and evaluations
+**Goal**: Publish datasets to Hugging Face and run parallel model evaluations with ANLS/IoU metrics
 **Duration**: 2-3 weeks
-**Deliverable**: Automated dataset builds, job status tracking, and W&B-based evaluation
-**Proposal**: See [spec/proposals/20260111_queue_based_wandb_integration.md](proposals/20260111_queue_based_wandb_integration.md)
+**Deliverable**: Manual dataset export to HF Hub, parallel model evaluation with W&B tracking
+**Proposal**: See [spec/proposals/20260125_dataset_export_evaluation.md](proposals/20260125_dataset_export_evaluation.md)
 
-### Phase 1: Queue Infrastructure & Data Models
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Dataset Storage | Hugging Face Hub (not S3) | Avoid forcing users to download from our S3; HF handles hosting |
+| Image Format | Compressed images embedded in Parquet | Self-contained dataset, no external dependencies |
+| Coordinate Format | Normalized 0-1 range with width/height provided | Standard for VQA datasets, scale-independent |
+| Primary Metrics | ANLS + IoU | DocVQA standard; ANLS for text, IoU for bounding boxes |
+| Evaluation Config | JSON file in repo | Git-tracked, enables future auto-trigger on change |
+| Trigger Method | Manual (UI buttons) | Simpler initial implementation; auto-trigger deferred |
+
+---
+
+### Phase 1: Foundation (Parallel Units A, B, E)
+
+#### Unit A: Data Models
 
 - ⬜ Update data schema in `amplify/data/resource.ts`
   ```typescript
-  // Add to Annotation model
-  Annotation: a.model({
-    // ... existing fields
-    queuedForDataset: a.boolean().default(false),
-    processedAt: a.datetime()
-  }),
+  DatasetVersion: a.model({
+    version: a.string().required(),           // e.g., "v1.0.0"
+    huggingFaceRepoId: a.string().required(), // e.g., "icoxfog417/biz-doc-vqa"
+    huggingFaceUrl: a.string().required(),    // Full URL
+    annotationCount: a.integer().required(),
+    imageCount: a.integer().required(),
+    status: a.enum(['CREATING', 'READY', 'EVALUATING', 'FINALIZED']),
+    createdAt: a.datetime().required(),
+    finalizedAt: a.datetime(),
+  }).authorization((allow) => [allow.authenticated()]),
 
-  // New job tracking models
-  DatasetBuildJob: a.model({
-    jobId: a.id().required(),
-    status: a.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED']),
-    startedAt: a.datetime(),
-    completedAt: a.datetime(),
-    annotationCount: a.integer(),
-    wandbRunUrl: a.url(),
-    wandbArtifactVersion: a.string(),
-    errorMessage: a.string()
+  DatasetExportProgress: a.model({
+    exportId: a.string().required(),
+    version: a.string().required(),
+    lastProcessedAnnotationId: a.string(),    // Checkpoint for resume
+    processedCount: a.integer().required(),
+    totalCount: a.integer().required(),
+    status: a.enum(['IN_PROGRESS', 'COMPLETED', 'FAILED']),
+    errorMessage: a.string(),
+    startedAt: a.datetime().required(),
+    updatedAt: a.datetime(),
   }).authorization((allow) => [allow.authenticated()]),
 
   EvaluationJob: a.model({
-    jobId: a.id().required(),
-    status: a.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED']),
-    modelName: a.string().required(),
+    jobId: a.string().required(),
     datasetVersion: a.string().required(),
-    exactMatchRate: a.float(),
-    f1Score: a.float(),
-    avgIoU: a.float(),
-    wandbRunUrl: a.url(),
-    errorMessage: a.string()
+    modelId: a.string().required(),
+    status: a.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED']),
+    avgAnls: a.float(),                       // 0-1 scale
+    avgIou: a.float(),                        // 0-1 scale
+    totalSamples: a.integer(),
+    wandbRunUrl: a.string(),
+    errorMessage: a.string(),
+    startedAt: a.datetime(),
+    completedAt: a.datetime(),
   }).authorization((allow) => [allow.authenticated()]),
-
-  QueueStats: a.model({
-    id: a.id().required(),
-    pendingAnnotations: a.integer().default(0),
-    lastDatasetBuild: a.datetime(),
-    nextScheduledBuild: a.datetime()
-  }).authorization((allow) => [allow.authenticated()])
   ```
 
-- ⬜ Set up SQS queue in `amplify/backend.ts`
+- ⬜ Deploy and test schema changes in sandbox
+
+#### Unit B: Configuration File
+
+- ✅ Create `src/config/evaluation-models.json`
+  ```json
+  {
+    "version": "1.0",
+    "models": [
+      {
+        "id": "claude-3-5-sonnet",
+        "name": "Claude 3.5 Sonnet",
+        "provider": "bedrock",
+        "bedrockModelId": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "enabled": true
+      },
+      {
+        "id": "amazon-nova-pro",
+        "name": "Amazon Nova Pro",
+        "provider": "bedrock",
+        "bedrockModelId": "amazon.nova-pro-v1:0",
+        "enabled": true
+      }
+    ],
+    "metrics": {
+      "primary": ["anls", "iou"],
+      "anlsThreshold": 0.5,
+      "iouThreshold": 0.5
+    }
+  }
+  ```
+
+- ⬜ Create `src/hooks/useEvaluationModels.ts` to load config
+
+#### Unit E: SQS Queue Setup
+
+- ⬜ Set up SQS queue for evaluation jobs in `amplify/backend.ts`
   ```typescript
   import * as sqs from 'aws-cdk-lib/aws-sqs';
   import { Duration } from 'aws-cdk-lib';
 
-  const annotationQueue = new sqs.Queue(stack, 'VerifiedAnnotationsQueue', {
+  const evaluationQueue = new sqs.Queue(stack, 'EvaluationJobQueue', {
     visibilityTimeout: Duration.minutes(15),
-    retentionPeriod: Duration.days(14),
+    retentionPeriod: Duration.days(7),
     deadLetterQueue: {
       queue: dlq,
       maxReceiveCount: 3
@@ -846,227 +896,249 @@ This task list is organized into **sprints** that deliver working software incre
   });
   ```
 
-- ⬜ Update annotation approval workflow
-  - ⬜ Add "Queue for Dataset" action on approved annotations
-  - ⬜ Send message to SQS with annotation data
-  - ⬜ Update `queuedForDataset` flag in DynamoDB
-  - ⬜ Show "Queued for dataset build" status in UI
+- ⬜ Grant Lambda functions access to queue
 
-### Phase 2: Batch Processor Lambda
+---
 
-- ⬜ Set up W&B account and create `biz-doc-vqa` project
+### Phase 2: Lambda Functions (Units C, D, F)
+
+#### Unit C: Dataset Export Lambda (Python)
+
+- ⬜ Store Hugging Face API token in AWS Secrets Manager
   ```bash
-  wandb login
-  # Create project: biz-doc-vqa (Business Document Visual Question Answering)
+  printf "your-hf-token" | npx ampx sandbox secret set HF_TOKEN
   ```
+
+- ⬜ Create `amplify/functions/export-dataset/` directory
+
+- ⬜ Create `amplify/functions/export-dataset/resource.ts`
+  ```typescript
+  import { defineFunction, secret } from '@aws-amplify/backend';
+
+  export const exportDataset = defineFunction({
+    name: 'exportDataset',
+    runtime: 20,
+    timeoutSeconds: 900, // 15 minutes
+    memoryMB: 2048,
+    environment: {
+      HF_TOKEN: secret('HF_TOKEN'),
+      STORAGE_BUCKET_NAME: process.env.STORAGE_BUCKET_NAME,
+    }
+  });
+  ```
+
+- ⬜ Implement handler with checkpoint/resume capability
+  - ⬜ Create DatasetExportProgress record at start
+  - ⬜ Query approved annotations (status='APPROVED')
+  - ⬜ Checkpoint every 100 annotations (update lastProcessedAnnotationId)
+  - ⬜ Download compressed images from S3
+  - ⬜ Normalize bounding boxes to 0-1 range
+    ```python
+    normalized_bbox = [
+        bbox[0] / image['compressedWidth'],   # x0
+        bbox[1] / image['compressedHeight'],  # y0
+        bbox[2] / image['compressedWidth'],   # x1
+        bbox[3] / image['compressedHeight'],  # y1
+    ]
+    ```
+  - ⬜ Build dataset with HF datasets schema
+    ```python
+    features = Features({
+        "question_id": Value("string"),
+        "image": Image(),
+        "image_width": Value("int32"),
+        "image_height": Value("int32"),
+        "question": Value("string"),
+        "answers": Sequence(Value("string")),
+        "answer_bbox": Sequence(Value("float32"), length=4),
+        "document_type": Value("string"),
+        "question_type": Value("string"),
+        "language": Value("string"),
+    })
+    ```
+  - ⬜ Push to Hugging Face Hub with version tag
+  - ⬜ Update DatasetVersion record (status=READY)
+  - ⬜ Handle errors and update progress to FAILED
+
+- ⬜ Update `amplify/backend.ts` to include export-dataset function
+
+#### Unit D: Evaluation Lambda (Python)
 
 - ⬜ Store W&B API key in AWS Secrets Manager
   ```bash
   printf "your-wandb-api-key" | npx ampx sandbox secret set WANDB_API_KEY
   ```
 
-- ⬜ Create `amplify/functions/wandb-processor/` directory
+- ⬜ Create `amplify/functions/run-evaluation/` directory
 
-- ⬜ Create `amplify/functions/wandb-processor/resource.ts`
+- ⬜ Create `amplify/functions/run-evaluation/resource.ts`
   ```typescript
   import { defineFunction, secret } from '@aws-amplify/backend';
 
-  export const wandbProcessor = defineFunction({
-    name: 'wandbProcessor',
-    runtime: 20,
-    timeoutSeconds: 900, // 15 minutes
-    memoryMB: 2048,
-    environment: {
-      WANDB_API_KEY: secret('WANDB_API_KEY'),
-      WANDB_PROJECT: 'biz-doc-vqa'
-    }
-  });
-  ```
-
-- ⬜ Install dependencies in function directory
-  ```bash
-  cd amplify/functions/wandb-processor
-  npm install wandb @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
-  ```
-
-- ⬜ Implement handler in `amplify/functions/wandb-processor/handler.ts`
-  - ⬜ Implement SQS handler (batch processing)
-  - ⬜ Initialize W&B with project `biz-doc-vqa`
-  - ⬜ Create DatasetBuildJob record (status=RUNNING)
-  - ⬜ Create/update W&B artifact `business-ocr-vqa-dataset`
-  - ⬜ Log annotations incrementally to W&B Table
-    - ⬜ Include fields: question_id, image, question, answers, answer_bbox
-    - ⬜ Use `json.dumps(data, ensure_ascii=False)` for unicode preservation
-  - ⬜ Mark processed annotations with `processedAt` timestamp
-  - ⬜ Update DatasetBuildJob (status=COMPLETED, wandbRunUrl, artifactVersion)
-  - ⬜ Handle errors and update job status to FAILED
-  - ⬜ Return batch item failures for retry
-
-- ⬜ Configure Lambda SQS trigger in `amplify/backend.ts`
-  ```typescript
-  import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
-
-  wandbProcessorLambda.addEventSource(
-    new SqsEventSource(annotationQueue, {
-      batchSize: 10,
-      maxBatchingWindow: Duration.minutes(5),
-      reportBatchItemFailures: true
-    })
-  );
-  ```
-
-- ⬜ Add EventBridge schedule for daily builds
-  ```typescript
-  import * as events from 'aws-cdk-lib/aws-events';
-  import * as targets from 'aws-cdk-lib/aws-events-targets';
-
-  const dailyBuildSchedule = new events.Rule(stack, 'DailyDatasetBuild', {
-    schedule: events.Schedule.cron({
-      minute: '0',
-      hour: '2', // 2 AM UTC
-      day: '*'
-    })
-  });
-
-  dailyBuildSchedule.addTarget(new targets.LambdaFunction(wandbProcessorLambda));
-  ```
-
-### Phase 3: Status UI
-
-- ⬜ Create `src/pages/DatasetStatus.tsx`
-  - ⬜ Display queue statistics (pending annotations count)
-  - ⬜ Show last dataset build timestamp
-  - ⬜ Show next scheduled build time
-  - ⬜ Add "Trigger Manual Build" button
-  - ⬜ Display recent DatasetBuildJob table
-    - ⬜ Columns: Job ID, Status, Started, Completed, Annotation Count, W&B Link
-    - ⬜ Status badge component (color-coded)
-  - ⬜ Add direct links to W&B `biz-doc-vqa` project
-    - ⬜ Link to datasets: `https://wandb.ai/<entity>/biz-doc-vqa/artifacts`
-    - ⬜ Link to runs: `https://wandb.ai/<entity>/biz-doc-vqa`
-  - ⬜ Poll for status updates (every 30 seconds)
-  - ⬜ Handle manual trigger API call
-
-- ⬜ Create `src/pages/EvaluationStatus.tsx`
-  - ⬜ Display recent EvaluationJob table
-  - ⬜ Show evaluation metrics (EM, F1, IoU)
-  - ⬜ Add links to W&B evaluation dashboards
-  - ⬜ Show evaluation schedule information
-
-- ⬜ Update Dashboard
-  - ⬜ Add "Dataset Status" navigation link
-  - ⬜ Show queue count widget
-  - ⬜ Display last build time
-  - ⬜ Add quick link to W&B project
-
-### Phase 4: Evaluation Runner
-
-- ⬜ Create `amplify/functions/evaluation-runner/` directory
-
-- ⬜ Create `amplify/functions/evaluation-runner/resource.ts`
-  ```typescript
-  import { defineFunction, secret } from '@aws-amplify/backend';
-
-  export const evaluationRunner = defineFunction({
-    name: 'evaluationRunner',
+  export const runEvaluation = defineFunction({
+    name: 'runEvaluation',
     runtime: 20,
     timeoutSeconds: 900,
     memoryMB: 2048,
     environment: {
       WANDB_API_KEY: secret('WANDB_API_KEY'),
-      WANDB_PROJECT: 'biz-doc-vqa'
+      WANDB_PROJECT: 'biz-doc-vqa',
     }
   });
   ```
 
-- ⬜ Install dependencies
-  ```bash
-  cd amplify/functions/evaluation-runner
-  npm install wandb @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+- ⬜ Implement ANLS metric calculation
+  ```python
+  def calculate_anls(prediction: str, ground_truths: list, threshold: float = 0.5) -> float:
+      """ANLS = 1 - NLD (Normalized Levenshtein Distance)"""
+      max_anls = 0
+      pred_norm = prediction.lower().strip()
+      for gt in ground_truths:
+          gt_norm = gt.lower().strip()
+          lev_dist = levenshtein_distance(pred_norm, gt_norm)
+          max_len = max(len(pred_norm), len(gt_norm), 1)
+          anls = 1 - (lev_dist / max_len)
+          if anls < threshold:
+              anls = 0
+          max_anls = max(max_anls, anls)
+      return max_anls
   ```
 
-- ⬜ Implement handler in `amplify/functions/evaluation-runner/handler.ts`
-  - ⬜ Fetch dataset version from W&B
-  - ⬜ Create EvaluationJob record (status=RUNNING)
-  - ⬜ Run evaluation on annotations
-    - ⬜ Calculate Exact Match rate
-    - ⬜ Calculate F1 Score
-    - ⬜ Calculate average IoU (bbox accuracy)
-  - ⬜ Log evaluation results to W&B
-    - ⬜ Create evaluation artifact
-    - ⬜ Log metric visualizations
-    - ⬜ Log bbox overlay images
-  - ⬜ Update EvaluationJob (status=COMPLETED, metrics, wandbRunUrl)
+- ⬜ Implement IoU metric calculation
+  ```python
+  def calculate_iou(pred_bbox: list, gt_bbox: list) -> float:
+      """IoU for bounding boxes in normalized 0-1 coordinates [x0, y0, x1, y1]"""
+      x1 = max(pred_bbox[0], gt_bbox[0])
+      y1 = max(pred_bbox[1], gt_bbox[1])
+      x2 = min(pred_bbox[2], gt_bbox[2])
+      y2 = min(pred_bbox[3], gt_bbox[3])
+      intersection = max(0, x2 - x1) * max(0, y2 - y1)
+      pred_area = (pred_bbox[2] - pred_bbox[0]) * (pred_bbox[3] - pred_bbox[1])
+      gt_area = (gt_bbox[2] - gt_bbox[0]) * (gt_bbox[3] - gt_bbox[1])
+      union = pred_area + gt_area - intersection
+      return intersection / union if union > 0 else 0
+  ```
+
+- ⬜ Implement evaluation handler
+  - ⬜ Update EvaluationJob status to RUNNING
+  - ⬜ Stream dataset from HF Hub
+  - ⬜ Run model predictions via Bedrock (load model from config)
+  - ⬜ Calculate ANLS and IoU per sample
+  - ⬜ Log results incrementally to W&B
+  - ⬜ Update EvaluationJob with final metrics (avgAnls, avgIou)
   - ⬜ Handle errors and update status to FAILED
 
-- ⬜ Add EventBridge schedule for weekly evaluations
+- ⬜ Configure SQS trigger for parallel model evaluation
   ```typescript
-  const weeklyEvalSchedule = new events.Rule(stack, 'WeeklyEvaluation', {
-    schedule: events.Schedule.cron({
-      minute: '0',
-      hour: '3', // 3 AM UTC
-      weekDay: 'SUN'
+  evaluationLambda.addEventSource(
+    new SqsEventSource(evaluationQueue, {
+      batchSize: 1,  // One model per Lambda invocation
+      reportBatchItemFailures: true
     })
-  });
-
-  weeklyEvalSchedule.addTarget(new targets.LambdaFunction(evaluationRunnerLambda));
+  );
   ```
 
-- ⬜ Add manual evaluation trigger API
-  - ⬜ Create API endpoint to trigger evaluation
-  - ⬜ Allow model selection
-  - ⬜ Allow dataset version selection
-  - ⬜ Return evaluation job ID
+#### Unit F: Trigger Lambda (Node.js)
 
-### Phase 5: Testing & Documentation
+- ⬜ Create `amplify/functions/trigger-evaluation/` directory
 
-- ⬜ Test queue processing
-  - ⬜ Submit 10 test annotations to queue
-  - ⬜ Verify batch processing completes
-  - ⬜ Verify DatasetBuildJob status updates
-  - ⬜ Check W&B artifact is created correctly
-  - ⬜ Verify unicode characters preserved (Japanese, Chinese)
+- ⬜ Create `amplify/functions/trigger-evaluation/resource.ts`
 
-- ⬜ Test retry logic
-  - ⬜ Simulate Lambda failure
-  - ⬜ Verify failed messages go to DLQ
-  - ⬜ Test retry mechanism
-  - ⬜ Verify partial batch failure reporting
+- ⬜ Implement handler
+  - ⬜ Read enabled models from `evaluation-models.json`
+  - ⬜ Create EvaluationJob records for each model (status=QUEUED)
+  - ⬜ Send SQS messages for each model
+  - ⬜ Return job IDs to caller
 
-- ⬜ Test scheduled jobs
-  - ⬜ Trigger manual dataset build
-  - ⬜ Verify EventBridge schedules are configured
-  - ⬜ Test cron expression timing
-  - ⬜ Verify status UI updates
+- ⬜ Add GraphQL mutation for manual trigger
+  ```typescript
+  triggerEvaluation: a.mutation()
+    .arguments({
+      datasetVersion: a.string().required(),
+      modelIds: a.string().array(),  // Optional, defaults to all enabled
+    })
+    .returns(a.string().array())  // Returns job IDs
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(triggerEvaluation)),
+  ```
 
-- ⬜ Test evaluation workflow
-  - ⬜ Run manual evaluation on test dataset
-  - ⬜ Verify metrics are calculated correctly
-  - ⬜ Check W&B evaluation dashboard
-  - ⬜ Verify bbox visualizations
+---
+
+### Phase 3: Frontend UI (Unit G)
+
+#### Unit G: Dataset Management Page
+
+- ⬜ Create `src/pages/DatasetManagement.tsx`
+  - ⬜ Dataset Versions section
+    - ⬜ List all DatasetVersion records
+    - ⬜ Show status badge (CREATING, READY, EVALUATING, FINALIZED)
+    - ⬜ Display annotation count and image count
+    - ⬜ Link to Hugging Face dataset page
+  - ⬜ Export section
+    - ⬜ "Create New Version" button
+    - ⬜ Version input field (default: increment from latest)
+    - ⬜ Show export progress (IN_PROGRESS, COMPLETED, FAILED)
+    - ⬜ Display checkpoint info for resume capability
+  - ⬜ Evaluation section
+    - ⬜ Model selector (checkboxes from evaluation-models.json)
+    - ⬜ Dataset version selector
+    - ⬜ "Run Evaluation" button
+    - ⬜ Evaluation jobs table
+      - ⬜ Columns: Model, Status, ANLS, IoU, W&B Link
+      - ⬜ Status badge component (QUEUED, RUNNING, COMPLETED, FAILED)
+    - ⬜ Poll for status updates (every 10 seconds when jobs running)
+
+- ⬜ Add navigation to DatasetManagement page
+  - ⬜ Add link in Dashboard
+  - ⬜ Add route in App.tsx
+
+- ⬜ Update Dashboard
+  - ⬜ Add "Latest Dataset" widget
+  - ⬜ Show recent evaluation results summary
+  - ⬜ Quick link to W&B project
+
+---
+
+### Phase 4: Testing & Documentation
+
+- ⬜ Test dataset export
+  - ⬜ Export 100+ annotations to HF Hub
+  - ⬜ Verify Parquet format is correct
+  - ⬜ Verify images are embedded correctly
+  - ⬜ Verify bounding boxes are normalized (0-1 range)
+  - ⬜ Test resume after simulated failure (checkpoint)
+
+- ⬜ Test evaluation pipeline
+  - ⬜ Run evaluation on test dataset
+  - ⬜ Verify ANLS calculation matches manual check
+  - ⬜ Verify IoU calculation matches manual check
+  - ⬜ Test parallel model evaluation (multiple models)
+  - ⬜ Check W&B dashboard shows comparison
+
+- ⬜ Test error handling
+  - ⬜ Simulate HF Hub upload failure
+  - ⬜ Simulate Bedrock API failure
+  - ⬜ Verify failed jobs show error messages
+  - ⬜ Test DLQ for failed messages
 
 - ⬜ Documentation
-  - ⬜ Update README with queue workflow explanation
-  - ⬜ Document job status meanings (QUEUED, RUNNING, COMPLETED, FAILED)
-  - ⬜ Create W&B navigation guide
-  - ⬜ Document manual trigger process
-  - ⬜ Create troubleshooting guide for failed jobs
-  - ⬜ Document `biz-doc-vqa` project structure in W&B
+  - ⬜ Update README with dataset export workflow
+  - ⬜ Document evaluation metrics (ANLS, IoU)
+  - ⬜ Document evaluation-models.json configuration
+  - ⬜ Create HF Hub dataset card template
+  - ⬜ Document W&B project structure
 
 **Sprint 4 Acceptance Criteria:**
-- ✅ Approved annotations are queued automatically (non-blocking)
-- ✅ SQS queue collects verified annotations successfully
-- ✅ Scheduled batch jobs process 10+ annotations per run
-- ✅ W&B datasets update with proper versioning (v0, v1, v2...)
-- ✅ Job status UI shows real-time progress (QUEUED, RUNNING, COMPLETED, FAILED)
-- ✅ Failed jobs retry automatically via DLQ
-- ✅ Users can trigger manual dataset builds
-- ✅ Users can view datasets in W&B `biz-doc-vqa` project
-- ✅ Unicode characters preserved in W&B (Japanese, Chinese text)
-- ✅ Evaluation runs complete successfully with metrics (EM, F1, IoU)
-- ✅ Evaluation results viewable in W&B dashboard
-- ✅ Queue handles large image files without memory issues
-- ✅ Dashboard shows queue statistics and last build time
+- ⬜ Dataset export works for 1,000+ annotations
+- ⬜ Resume works after simulated failure (checkpoint system)
+- ⬜ ANLS/IoU metrics match manual calculation
+- ⬜ W&B shows model comparison dashboard
+- ⬜ Manual trigger from UI works end-to-end
+- ⬜ Compressed images embedded in Parquet correctly
+- ⬜ Bounding boxes normalized to 0-1 range
+- ⬜ Unicode characters preserved (Japanese, Chinese text)
+- ⬜ HF Hub dataset page accessible with correct schema
+- ⬜ Multiple models can be evaluated in parallel
 
 ---
 
@@ -1711,17 +1783,17 @@ business-ocr-annotator/
 
 ## Progress Tracking
 
-**Last Review Date**: 2026-01-12
+**Last Review Date**: 2026-01-25
 **Next Review Date**: TBD
 **Completed Tasks**: Sprint 0 + Sprint 1 + Sprint 2 completed
-**Current Sprint**: Sprint 3 (UX & Mobile UI Optimization)
+**Current Sprint**: Sprint 4 (Dataset Export & Model Evaluation)
 
 ### Sprint Completion Status
 - ✅ Sprint 0: Foundation & Deployment
 - ✅ Sprint 1: Image Upload & Manual Annotation (MVP)
 - ✅ Sprint 2: AI-Assisted Annotation
-- ⬜ Sprint 3: UX & Mobile UI Optimization
-- ⬜ Sprint 4: Queue-Based W&B Integration
+- ✅ Sprint 3: UX & Mobile UI Optimization
+- ⬜ Sprint 4: Dataset Export & Model Evaluation
 - ⬜ Sprint 5: Multi-Language Support & Optimization
 - ⬜ Sprint 6: Advanced Mobile Features
 - ⬜ Sprint 7: Publishing & PII Handling
