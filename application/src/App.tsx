@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { getCurrentUser, type AuthUser } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 import './App.css';
@@ -10,6 +10,14 @@ import { ImageGallery } from './pages/ImageGallery';
 import { AnnotationWorkspace } from './pages/AnnotationWorkspace';
 import { ContributorProvider } from './contexts/ContributorContext';
 import { MobileNavigation } from './components/layout/MobileNavigation';
+
+// Wrapper to conditionally show MobileNavigation based on route
+function MobileNav({ user }: { user: AuthUser | null }) {
+  const location = useLocation();
+  // Hide on annotation page for better UX
+  if (!user || location.pathname.startsWith('/annotate')) return null;
+  return <MobileNavigation />;
+}
 
 function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -122,8 +130,8 @@ function App() {
             </>
           )}
         </Routes>
-        {/* Mobile navigation - only shown on mobile when authenticated */}
-        {user && <MobileNavigation />}
+        {/* Mobile navigation - hidden on annotation page */}
+        <MobileNav user={user} />
       </ContributorProvider>
     </BrowserRouter>
   );

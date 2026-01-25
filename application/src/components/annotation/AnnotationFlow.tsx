@@ -4,7 +4,7 @@ import { QuestionNavigator } from './QuestionNavigator';
 import { ReadButton } from './ReadButton';
 import { TouchCanvas } from './TouchCanvas';
 import type { TouchMode, BoundingBox } from './TouchCanvas';
-import { ModeBadge, DrawBoxButton } from './ModeBadge';
+import { ModeBadge, DrawBoxButton, NoAnswerButton } from './ModeBadge';
 import { FinalizeScreen } from './FinalizeScreen';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import type { QuestionStatus } from './ProgressDots';
@@ -20,6 +20,7 @@ export interface AnnotationAnswer {
   aiExtractionTimestamp?: string;
   confidence?: number;
   skipped: boolean;
+  isUnanswerable: boolean; // True if marked as "No Answer" (document lacks this info)
 }
 
 interface AnnotationFlowProps {
@@ -86,6 +87,7 @@ export function AnnotationFlow({
         boundingBox: parseBoundingBox(existing?.boundingBoxes),
         aiAssisted: existing?.aiAssisted || false,
         skipped: false,
+        isUnanswerable: false,
       };
     })
   );
@@ -115,7 +117,10 @@ export function AnnotationFlow({
     [questions.length]
   );
 
-  const canGoNext = !!(answers[currentIndex]?.answer) || answers[currentIndex]?.skipped;
+  const canGoNext =
+    !!(answers[currentIndex]?.answer) ||
+    answers[currentIndex]?.skipped ||
+    answers[currentIndex]?.isUnanswerable;
 
   const goNext = useCallback(async () => {
     if (currentIndex < questions.length - 1) {
@@ -138,6 +143,24 @@ export function AnnotationFlow({
     setAnswers(updatedAnswers);
 
     // Navigate or finalize with updated answers
+    if (currentIndex < questions.length - 1) {
+      goTo(currentIndex + 1);
+    } else if (!isSubmitting) {
+      setIsSubmitting(true);
+      onComplete(updatedAnswers).then(() => setIsFinalized(true));
+    }
+  }, [currentIndex, answers, questions.length, goTo, isSubmitting, onComplete]);
+
+  // Mark current question as unanswerable (document doesn't have this info)
+  const markUnanswerable = useCallback(() => {
+    const updatedAnswers = answers.map((a, i) =>
+      i === currentIndex
+        ? { ...a, isUnanswerable: true, answer: '', boundingBox: null, skipped: false }
+        : a
+    );
+    setAnswers(updatedAnswers);
+
+    // Navigate or finalize
     if (currentIndex < questions.length - 1) {
       goTo(currentIndex + 1);
     } else if (!isSubmitting) {
@@ -242,6 +265,7 @@ export function AnnotationFlow({
     () =>
       answers.map((a, i) => {
         if (i === currentIndex) return 'current';
+        if (a.isUnanswerable) return 'unanswerable';
         if (a.skipped) return 'skipped';
         if (a.answer && a.boundingBox) return 'completed';
         return 'pending';
@@ -253,8 +277,9 @@ export function AnnotationFlow({
   const summary = useMemo(
     () => ({
       totalQuestions: questions.length,
-      answeredQuestions: answers.filter((a) => a.answer && !a.skipped).length,
+      answeredQuestions: answers.filter((a) => a.answer && !a.skipped && !a.isUnanswerable).length,
       skippedQuestions: answers.filter((a) => a.skipped).length,
+      unanswerableQuestions: answers.filter((a) => a.isUnanswerable).length,
       boundingBoxesDrawn: answers.filter((a) => a.boundingBox).length,
       aiAssistedCount: answers.filter((a) => a.aiAssisted).length,
     }),
@@ -364,21 +389,22 @@ export function AnnotationFlow({
           </div>
         </div>
 
-        {/* Select Area */}
-        <div style={{ marginBottom: 12 }}>
+        {/* Select Area or No Answer */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
           <DrawBoxButton
             onClick={toggleDrawMode}
             isDrawMode={mode === 'draw'}
             disabled={false}
             language={language}
           />
+          <NoAnswerButton onClick={markUnanswerable} language={language} />
           {box && (
-            <span style={{ marginLeft: 12, color: '#10b981', fontSize: 14 }}>
+            <span style={{ color: '#10b981', fontSize: 14 }}>
               ✓ {language === 'ja' ? '選択済み' : 'Selected'}
             </span>
           )}
           {!isMobile && (
-            <span style={{ marginLeft: 8, color: '#9ca3af', fontSize: 12 }}>(D)</span>
+            <span style={{ color: '#9ca3af', fontSize: 12 }}>(D)</span>
           )}
         </div>
 

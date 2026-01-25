@@ -159,3 +159,58 @@ export function DrawBoxButton({
     </button>
   );
 }
+
+/**
+ * "No Answer" button for marking questions as unanswerable.
+ * Placed next to DrawBoxButton as mutually exclusive choice.
+ */
+interface NoAnswerButtonProps {
+  onClick: () => void;
+  className?: string;
+  language?: string;
+}
+
+export function NoAnswerButton({
+  onClick,
+  className = '',
+  language = 'en',
+}: NoAnswerButtonProps) {
+  const labels = {
+    en: 'No Answer',
+    ja: '該当なし',
+    zh: '无答案',
+    ko: '해당없음',
+  };
+
+  const t = labels[language as keyof typeof labels] || labels.en;
+
+  const buttonStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '12px 20px',
+    backgroundColor: '#ffffff',
+    color: '#6b7280',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    minHeight: '48px',
+  };
+
+  return (
+    <button
+      type="button"
+      className={`no-answer-button ${className}`}
+      style={buttonStyle}
+      onClick={onClick}
+      title="Document doesn't have this information"
+    >
+      <span>∅</span>
+      {t}
+    </button>
+  );
+}

@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 
-export type QuestionStatus = 'pending' | 'current' | 'completed' | 'skipped';
+export type QuestionStatus = 'pending' | 'current' | 'completed' | 'skipped' | 'unanswerable';
 
 interface ProgressDotsProps {
   total: number;
