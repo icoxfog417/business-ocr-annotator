@@ -7,7 +7,6 @@ import type { TouchMode, BoundingBox } from './TouchCanvas';
 import { ModeBadge, DrawBoxButton, NoAnswerButton } from './ModeBadge';
 import { FinalizeScreen } from './FinalizeScreen';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
-import type { QuestionStatus } from './ProgressDots';
 
 export interface AnnotationAnswer {
   questionId: string;
@@ -260,19 +259,6 @@ export function AnnotationFlow({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isMobile, isFinalized, canGoNext, goNext, goPrev, toggleDrawMode, skip, mode]);
 
-  // Question statuses for progress dots
-  const statuses = useMemo<QuestionStatus[]>(
-    () =>
-      answers.map((a, i) => {
-        if (i === currentIndex) return 'current';
-        if (a.isUnanswerable) return 'unanswerable';
-        if (a.skipped) return 'skipped';
-        if (a.answer && a.boundingBox) return 'completed';
-        return 'pending';
-      }),
-    [answers, currentIndex]
-  );
-
   // Summary for finalize screen
   const summary = useMemo(
     () => ({
@@ -443,14 +429,9 @@ export function AnnotationFlow({
 
         {/* Navigation */}
         <QuestionNavigator
-          currentIndex={currentIndex}
-          totalQuestions={questions.length}
-          currentQuestion={questions[currentIndex]?.text || ''}
-          statuses={statuses}
           onPrevious={goPrev}
           onNext={goNext}
           onSkip={skip}
-          onDotClick={goTo}
           canGoPrevious={currentIndex > 0}
           canGoNext={canGoNext}
           isLastQuestion={currentIndex === questions.length - 1}

@@ -1,16 +1,9 @@
 import React from 'react';
-import { ProgressDots } from './ProgressDots';
-import type { QuestionStatus } from './ProgressDots';
 
 interface QuestionNavigatorProps {
-  currentIndex: number;
-  totalQuestions: number;
-  currentQuestion: string;
-  statuses?: QuestionStatus[];
   onPrevious: () => void;
   onNext: () => void;
   onSkip: () => void;
-  onDotClick?: (index: number) => void;
   canGoPrevious: boolean;
   canGoNext: boolean;
   isLastQuestion: boolean;
@@ -20,17 +13,12 @@ interface QuestionNavigatorProps {
 
 /**
  * Navigation component for question-by-question annotation flow.
- * Includes progress dots, question display, and navigation buttons.
+ * Provides Previous, Skip, and Next/Finish buttons.
  */
 export function QuestionNavigator({
-  currentIndex,
-  totalQuestions,
-  // currentQuestion, // Not used in current implementation
-  statuses = [],
   onPrevious,
   onNext,
   onSkip,
-  onDotClick,
   canGoPrevious,
   canGoNext,
   isLastQuestion,
@@ -69,31 +57,10 @@ export function QuestionNavigator({
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
-    padding: '16px',
+    padding: '12px',
     backgroundColor: '#f9fafb',
     borderRadius: '12px',
   };
-
-  // Unused styles (for future implementation)
-  // const questionContainerStyle: React.CSSProperties = {
-  //   textAlign: 'center',
-  // };
-
-  // const questionLabelStyle: React.CSSProperties = {
-  //   fontSize: '12px',
-  //   color: '#6b7280',
-  //   textTransform: 'uppercase',
-  //   letterSpacing: '0.05em',
-  //   marginBottom: '4px',
-  // };
-
-  // const questionTextStyle: React.CSSProperties = {
-  //   fontSize: '18px',
-  //   fontWeight: 600,
-  //   color: '#111827',
-  //   lineHeight: '1.4',
-  // };
 
   const navigationStyle: React.CSSProperties = {
     display: 'flex',
@@ -149,15 +116,6 @@ export function QuestionNavigator({
 
   return (
     <div className={`question-navigator ${className}`} style={containerStyle}>
-      {/* Progress Dots */}
-      <ProgressDots
-        total={totalQuestions}
-        current={currentIndex}
-        statuses={statuses}
-        onDotClick={onDotClick}
-        showCount={true}
-      />
-
       {/* Navigation Buttons */}
       <div style={navigationStyle}>
         <button
