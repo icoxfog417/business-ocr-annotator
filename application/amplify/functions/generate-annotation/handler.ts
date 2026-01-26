@@ -102,47 +102,57 @@ JSON 형식으로 반환:
 };
 
 // Single question prompts - for answering a specific question
+// Updated 2026-01-26: Context-aware prompt to correctly extract text items vs numeric values
+// See: spec/proposals/20260126_context_aware_ocr_prompt.md
 const SINGLE_QUESTION_PROMPTS: Record<string, string> = {
-  ja: `質問に対する答えの値だけを返してください。
+  ja: `画像を見て質問に答えてください。答えのみを簡潔に返してください。
 
 質問: {{QUESTION}}
 
-【重要】
-- 質問のラベル部分は出力しない
-- 答えの値のみを出力
-- 金額は数字のみ（¥や括弧は除外）
-- 日付はyyyy/MM/dd形式（例: 2026年1月22日 → 2026/01/22）
-- 複数項目は1行に1つ`,
-  en: `Return only the answer value for the question.
+回答ルール:
+- 「金額」「合計」「税」「対象」を聞かれたら → 数字のみ出力
+- 「日付」を聞かれたら → yyyy/MM/dd形式で出力
+- 「品目」「商品」「購入したもの」を聞かれたら → 商品の名前のみ出力（価格・数量・「合計」は除外）
+- 「番号」「登録番号」を聞かれたら → Tで始まる番号のみ出力
+- 複数ある場合 → 1行に1つ
+
+説明文は不要。答えのみ。`,
+  en: `Look at the image and answer the question. Return only the answer, concisely.
 
 Question: {{QUESTION}}
 
-【Important】
-- Do not output the question label
-- Output only the answer value
-- Money: numbers only (exclude $ and parentheses)
-- Date: yyyy/MM/dd format (e.g., Jan 22, 2026 → 2026/01/22)
-- Multiple items: one per line`,
-  zh: `只返回问题的答案值。
+Answer rules:
+- If asking for "amount", "total", "tax" → output numbers only
+- If asking for "date" → output in yyyy/MM/dd format
+- If asking for "items", "products", "purchases" → output product names only (exclude prices, quantities, "total")
+- If asking for "number", "registration number" → output the number only (starting with T if applicable)
+- If multiple items → one per line
+
+No explanations needed. Answer only.`,
+  zh: `查看图像并回答问题。只返回答案，简洁明了。
 
 问题: {{QUESTION}}
 
-【重要】
-- 不要输出问题标签
-- 仅输出答案值
-- 金额仅数字（排除¥和括号）
-- 日期yyyy/MM/dd格式（例: 2026年1月22日 → 2026/01/22）
-- 多个项目每行一个`,
-  ko: `질문에 대한 답의 값만 반환하세요.
+回答规则:
+- 询问「金额」「合计」「税」→ 只输出数字
+- 询问「日期」→ 以yyyy/MM/dd格式输出
+- 询问「品目」「商品」「购买的东西」→ 只输出商品名称（排除价格、数量、「合计」）
+- 询问「号码」「登记号」→ 只输出号码（如适用以T开头）
+- 多个项目 → 每行一个
+
+不需要解释。只要答案。`,
+  ko: `이미지를 보고 질문에 답하세요. 답만 간결하게 반환하세요.
 
 질문: {{QUESTION}}
 
-【중요】
-- 질문 레이블은 출력하지 않음
-- 답의 값만 출력
-- 금액은 숫자만 (₩와 괄호 제외)
-- 날짜는 yyyy/MM/dd 형식 (예: 2026년 1월 22일 → 2026/01/22)
-- 여러 항목은 한 줄에 하나씩`,
+답변 규칙:
+- 「금액」「합계」「세금」을 물으면 → 숫자만 출력
+- 「날짜」를 물으면 → yyyy/MM/dd 형식으로 출력
+- 「품목」「상품」「구매한 것」을 물으면 → 상품 이름만 출력 (가격, 수량, 「합계」 제외)
+- 「번호」「등록번호」를 물으면 → 번호만 출력 (해당되면 T로 시작)
+- 여러 항목 → 한 줄에 하나씩
+
+설명 불필요. 답만.`,
 };
 
 export const handler = async (
