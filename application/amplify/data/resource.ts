@@ -131,6 +131,56 @@ const schema = a.schema({
     })
     .authorization((allow) => [allow.authenticated()]),
 
+  // Sprint 4: Dataset Version Management
+  DatasetVersion: a
+    .model({
+      version: a.string().required(), // e.g., "v1.0.0"
+      huggingFaceRepoId: a.string().required(), // e.g., "icoxfog417/biz-doc-vqa"
+      huggingFaceUrl: a.string().required(), // Full URL to HF dataset
+      annotationCount: a.integer().required(),
+      imageCount: a.integer().required(),
+      status: a.enum(['CREATING', 'READY', 'EVALUATING', 'FINALIZED']),
+      createdBy: a.string().required(),
+      createdAt: a.datetime().required(),
+      finalizedAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.authenticated()]),
+
+  // Sprint 4: Dataset Export Progress (Checkpoint for Resume)
+  DatasetExportProgress: a
+    .model({
+      exportId: a.string().required(), // Unique export job ID
+      version: a.string().required(), // Dataset version being exported
+      lastProcessedAnnotationId: a.string(), // Checkpoint for resume
+      processedCount: a.integer().required(),
+      totalCount: a.integer().required(),
+      status: a.enum(['IN_PROGRESS', 'COMPLETED', 'FAILED']),
+      errorMessage: a.string(),
+      startedAt: a.datetime().required(),
+      updatedAt: a.datetime(),
+    })
+    .authorization((allow) => [allow.authenticated()]),
+
+  // Sprint 4: Model Evaluation Jobs
+  EvaluationJob: a
+    .model({
+      jobId: a.string().required(), // Unique job ID
+      datasetVersion: a.string().required(), // e.g., "v1.0.0"
+      modelId: a.string().required(), // From evaluation-models.json
+      modelName: a.string(), // Display name
+      status: a.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED']),
+      // Primary metrics (DocVQA standard) - 0-1 scale
+      avgAnls: a.float(), // Average ANLS (text accuracy)
+      avgIou: a.float(), // Average IoU (bbox accuracy)
+      totalSamples: a.integer(),
+      wandbRunUrl: a.string(), // Link to W&B run
+      errorMessage: a.string(),
+      startedAt: a.datetime(),
+      completedAt: a.datetime(),
+      createdAt: a.datetime().required(),
+    })
+    .authorization((allow) => [allow.authenticated()]),
+
   // Custom query for AI annotation generation
   generateAnnotation: a
     .query()

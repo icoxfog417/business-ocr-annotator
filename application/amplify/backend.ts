@@ -2,6 +2,8 @@ import { defineBackend } from '@aws-amplify/backend';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { EventType } from 'aws-cdk-lib/aws-s3';
 import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
+import { Duration, Stack } from 'aws-cdk-lib';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { auth } from './auth/resource';
 import { storage } from './storage/resource';
 import { data, generateAnnotationHandler } from './data/resource';
@@ -13,6 +15,35 @@ const backend = defineBackend({
   data,
   generateAnnotationHandler,
   processImage,
+});
+
+// Sprint 4: Create SQS queue for evaluation jobs
+const stack = Stack.of(backend.data.resources.graphqlApi);
+
+// Dead Letter Queue for failed evaluation jobs
+const evaluationDLQ = new sqs.Queue(stack, 'EvaluationJobsDLQ', {
+  queueName: 'biz-doc-vqa-evaluation-dlq',
+  retentionPeriod: Duration.days(14),
+});
+
+// Main evaluation queue
+const evaluationQueue = new sqs.Queue(stack, 'EvaluationJobsQueue', {
+  queueName: 'biz-doc-vqa-evaluation-queue',
+  visibilityTimeout: Duration.minutes(15), // Match Lambda timeout
+  retentionPeriod: Duration.days(7),
+  deadLetterQueue: {
+    queue: evaluationDLQ,
+    maxReceiveCount: 3, // Move to DLQ after 3 failures
+  },
+});
+
+// Export queue URLs for Lambda functions
+backend.addOutput({
+  custom: {
+    evaluationQueueUrl: evaluationQueue.queueUrl,
+    evaluationQueueArn: evaluationQueue.queueArn,
+    evaluationDLQUrl: evaluationDLQ.queueUrl,
+  },
 });
 
 // Grant generateAnnotation Lambda permission to invoke Bedrock
