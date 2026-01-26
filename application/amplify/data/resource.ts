@@ -1,8 +1,14 @@
 import { type ClientSchema, a, defineData, defineFunction } from '@aws-amplify/backend';
 
-// Define the function inline to avoid circular dependency
+// Define functions inline to avoid circular dependency
 const generateAnnotationHandler = defineFunction({
   entry: '../functions/generate-annotation/handler.ts',
+  timeoutSeconds: 60,
+  memoryMB: 512,
+});
+
+const triggerEvaluationHandler = defineFunction({
+  entry: '../functions/trigger-evaluation/handler.ts',
   timeoutSeconds: 60,
   memoryMB: 512,
 });
@@ -197,11 +203,22 @@ const schema = a.schema({
     .returns(a.json())
     .authorization((allow) => [allow.authenticated()])
     .handler(a.handler.function(generateAnnotationHandler)),
+
+  // Sprint 4: Trigger model evaluation jobs
+  triggerEvaluation: a
+    .mutation()
+    .arguments({
+      datasetVersion: a.string().required(),
+      modelIds: a.string().array(), // Optional - defaults to all enabled models
+    })
+    .returns(a.json()) // Returns array of job IDs
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(triggerEvaluationHandler)),
 });
 
 export type Schema = ClientSchema<typeof schema>;
 
-export { generateAnnotationHandler };
+export { generateAnnotationHandler, triggerEvaluationHandler };
 export const data = defineData({
   schema,
   authorizationModes: {

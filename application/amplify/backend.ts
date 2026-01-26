@@ -2,19 +2,25 @@ import { defineBackend } from '@aws-amplify/backend';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { EventType } from 'aws-cdk-lib/aws-s3';
 import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
+import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Duration, Stack } from 'aws-cdk-lib';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { auth } from './auth/resource';
 import { storage } from './storage/resource';
-import { data, generateAnnotationHandler } from './data/resource';
+import { data, generateAnnotationHandler, triggerEvaluationHandler } from './data/resource';
 import { processImage } from './functions/process-image/resource';
+import { exportDataset } from './functions/export-dataset/resource';
+import { runEvaluation } from './functions/run-evaluation/resource';
 
 const backend = defineBackend({
   auth,
   storage,
   data,
   generateAnnotationHandler,
+  triggerEvaluationHandler,
   processImage,
+  exportDataset,
+  runEvaluation,
 });
 
 // Sprint 4: Create SQS queue for evaluation jobs
@@ -91,4 +97,94 @@ storageBucket.addEventNotification(
   EventType.OBJECT_CREATED,
   new LambdaDestination(backend.processImage.resources.lambda),
   { prefix: 'images/original/' }
+);
+
+// ============================================
+// Sprint 4 Phase 2: Lambda Function Integration
+// ============================================
+
+// --- exportDataset Lambda permissions ---
+backend.exportDataset.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['s3:GetObject'],
+    resources: [`${storageBucket.bucketArn}/*`],
+  })
+);
+backend.exportDataset.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:ListTables'],
+    resources: ['*'],
+  })
+);
+backend.exportDataset.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:Scan', 'dynamodb:Query', 'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem'],
+    resources: [
+      'arn:aws:dynamodb:*:*:table/Annotation-*',
+      'arn:aws:dynamodb:*:*:table/Image-*',
+      'arn:aws:dynamodb:*:*:table/DatasetVersion-*',
+      'arn:aws:dynamodb:*:*:table/DatasetExportProgress-*',
+    ],
+  })
+);
+
+// Add environment variables for exportDataset
+const exportDatasetCfnFunction = backend.exportDataset.resources.cfnResources
+  .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
+exportDatasetCfnFunction.addPropertyOverride('Environment.Variables.STORAGE_BUCKET_NAME', storageBucket.bucketName);
+
+// --- triggerEvaluation Lambda permissions ---
+backend.triggerEvaluationHandler.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['sqs:SendMessage'],
+    resources: [evaluationQueue.queueArn],
+  })
+);
+backend.triggerEvaluationHandler.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:ListTables'],
+    resources: ['*'],
+  })
+);
+backend.triggerEvaluationHandler.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:PutItem', 'dynamodb:GetItem', 'dynamodb:Query'],
+    resources: [
+      'arn:aws:dynamodb:*:*:table/EvaluationJob-*',
+      'arn:aws:dynamodb:*:*:table/DatasetVersion-*',
+    ],
+  })
+);
+
+// Add environment variables for triggerEvaluation
+const triggerEvaluationCfnFunction = backend.triggerEvaluationHandler.resources.cfnResources
+  .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
+triggerEvaluationCfnFunction.addPropertyOverride('Environment.Variables.EVALUATION_QUEUE_URL', evaluationQueue.queueUrl);
+
+// --- runEvaluation Lambda permissions ---
+backend.runEvaluation.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['bedrock:InvokeModel'],
+    resources: ['arn:aws:bedrock:*::foundation-model/*'],
+  })
+);
+backend.runEvaluation.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:ListTables'],
+    resources: ['*'],
+  })
+);
+backend.runEvaluation.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:UpdateItem', 'dynamodb:GetItem'],
+    resources: ['arn:aws:dynamodb:*:*:table/EvaluationJob-*'],
+  })
+);
+
+// Add SQS event trigger for runEvaluation Lambda
+backend.runEvaluation.resources.lambda.addEventSource(
+  new SqsEventSource(evaluationQueue, {
+    batchSize: 1, // Process one evaluation job at a time
+    reportBatchItemFailures: true,
+  })
 );
