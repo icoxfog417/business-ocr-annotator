@@ -1,36 +1,15 @@
 import { useMemo } from 'react';
-import evaluationModels from '../config/evaluation-models.json';
+import {
+  EVALUATION_CONFIG,
+  type EvaluationModel,
+  type EvaluationConfig,
+  type MetricsConfig,
+} from '../../amplify/shared/evaluation-config';
 
-/**
- * Evaluation model configuration from evaluation-models.json
- */
-export interface EvaluationModel {
-  id: string;
-  name: string;
-  provider: string;
-  bedrockModelId: string;
-  enabled: boolean;
-}
+// Re-export types for convenience
+export type { EvaluationModel, EvaluationConfig, MetricsConfig };
 
-/**
- * Metrics configuration for evaluation
- */
-export interface MetricsConfig {
-  primary: string[];
-  anlsThreshold: number;
-  iouThreshold: number;
-}
-
-/**
- * Full evaluation configuration
- */
-export interface EvaluationConfig {
-  version: string;
-  models: EvaluationModel[];
-  metrics: MetricsConfig;
-}
-
-const config = evaluationModels as EvaluationConfig;
+const config = EVALUATION_CONFIG;
 
 // ============================================================================
 // Standalone utility functions (for use outside of React components)

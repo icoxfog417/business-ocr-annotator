@@ -1,27 +1,10 @@
 import { DynamoDBClient, PutItemCommand, ListTablesCommand } from '@aws-sdk/client-dynamodb';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import { randomUUID } from 'crypto';
-
-/**
- * Evaluation model configuration from evaluation-models.json
- */
-interface EvaluationModel {
-  id: string;
-  name: string;
-  provider: string;
-  bedrockModelId: string;
-  enabled: boolean;
-}
-
-interface EvaluationConfig {
-  version: string;
-  models: EvaluationModel[];
-  metrics: {
-    primary: string[];
-    anlsThreshold: number;
-    iouThreshold: number;
-  };
-}
+import {
+  EVALUATION_CONFIG,
+  type EvaluationModel,
+} from '../../shared/evaluation-config.js';
 
 /**
  * Input arguments for the trigger evaluation function
@@ -51,61 +34,6 @@ interface TriggerEvaluationResponse {
   jobIds?: string[];
   error?: string;
 }
-
-// Embedded evaluation models config (loaded from evaluation-models.json at build time)
-// This avoids runtime file system access in Lambda
-const EVALUATION_CONFIG: EvaluationConfig = {
-  version: '1.0',
-  models: [
-    {
-      id: 'amazon-nova-pro',
-      name: 'Amazon Nova Pro',
-      provider: 'bedrock',
-      bedrockModelId: 'amazon.nova-pro-v1:0',
-      enabled: true,
-    },
-    {
-      id: 'claude-sonnet-4-5',
-      name: 'Claude Sonnet 4.5',
-      provider: 'bedrock',
-      bedrockModelId: 'global.anthropic.claude-sonnet-4-5-20250929-v1:0',
-      enabled: true,
-    },
-    {
-      id: 'claude-haiku-4-5',
-      name: 'Claude Haiku 4.5',
-      provider: 'bedrock',
-      bedrockModelId: 'global.anthropic.claude-haiku-4-5-20251001-v1:0',
-      enabled: true,
-    },
-    {
-      id: 'qwen3-vl-235b',
-      name: 'Qwen3 VL 235B',
-      provider: 'bedrock',
-      bedrockModelId: 'qwen.qwen3-vl-235b-a22b',
-      enabled: true,
-    },
-    {
-      id: 'gemma-3-27b',
-      name: 'Google Gemma 3 27B',
-      provider: 'bedrock',
-      bedrockModelId: 'google.gemma-3-27b-it',
-      enabled: true,
-    },
-    {
-      id: 'nemotron-nano-12b',
-      name: 'NVIDIA Nemotron Nano 12B',
-      provider: 'bedrock',
-      bedrockModelId: 'nvidia.nemotron-nano-12b-v2',
-      enabled: true,
-    },
-  ],
-  metrics: {
-    primary: ['anls', 'iou'],
-    anlsThreshold: 0.5,
-    iouThreshold: 0.5,
-  },
-};
 
 /**
  * Find the EvaluationJob table name by pattern matching
