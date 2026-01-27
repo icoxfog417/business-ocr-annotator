@@ -7,6 +7,13 @@ const generateAnnotationHandler = defineFunction({
   memoryMB: 512,
 });
 
+// Sprint 4 Phase 2: Trigger evaluation orchestrator (Node.js)
+const triggerEvaluationHandler = defineFunction({
+  entry: '../functions/trigger-evaluation/handler.ts',
+  timeoutSeconds: 30,
+  memoryMB: 512,
+});
+
 const schema = a.schema({
   Image: a
     .model({
@@ -107,6 +114,7 @@ const schema = a.schema({
       updatedBy: a.string(),
       updatedAt: a.datetime(),
     })
+    .secondaryIndexes((index) => [index('validationStatus')])
     .authorization((allow) => [allow.authenticated()]),
 
   DefaultQuestion: a
@@ -197,11 +205,23 @@ const schema = a.schema({
     .returns(a.json())
     .authorization((allow) => [allow.authenticated()])
     .handler(a.handler.function(generateAnnotationHandler)),
+
+  // Sprint 4 Phase 2: Trigger parallel model evaluation
+  triggerEvaluation: a
+    .mutation()
+    .arguments({
+      datasetVersion: a.string().required(),
+      huggingFaceRepoId: a.string().required(),
+      modelIds: a.string().array(),
+    })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(triggerEvaluationHandler)),
 });
 
 export type Schema = ClientSchema<typeof schema>;
 
-export { generateAnnotationHandler };
+export { generateAnnotationHandler, triggerEvaluationHandler };
 export const data = defineData({
   schema,
   authorizationModes: {
