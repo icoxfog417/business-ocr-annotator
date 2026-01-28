@@ -1,8 +1,8 @@
 # Implementation Tasks
 
 **Project**: Business OCR Annotator
-**Last Updated**: 2026-01-25
-**Status**: Sprint 3 Complete, Starting Sprint 4 (Dataset Export & Evaluation)
+**Last Updated**: 2026-01-28
+**Status**: Sprint 4 Phase 1 & 2 Complete, Starting Phase 3 (Frontend UI)
 **Approach**: Agile Incremental Development
 **Reference**: See [spec/proposals/20260107_reorganize_tasks_agile_approach.md](proposals/20260107_reorganize_tasks_agile_approach.md)
 
@@ -845,7 +845,7 @@ This task list is organized into **sprints** that deliver working software incre
   }).authorization((allow) => [allow.authenticated()]),
   ```
 
-- ⬜ Deploy and test schema changes in sandbox
+- ✅ Deploy and test schema changes in sandbox
 
 #### Unit B: Configuration File
 
@@ -877,7 +877,7 @@ This task list is organized into **sprints** that deliver working software incre
   }
   ```
 
-- ⬜ Create `src/hooks/useEvaluationModels.ts` to load config
+- ✅ Create `src/hooks/useEvaluationModels.ts` to load config
 
 #### Unit E: SQS Queue Setup
 
@@ -900,7 +900,7 @@ This task list is organized into **sprints** that deliver working software incre
 
 - ✅ Export queue URLs for Lambda functions
 
-- ⬜ Grant Lambda functions access to queue
+- ✅ Grant Lambda functions access to queue
 
 ---
 
@@ -908,14 +908,14 @@ This task list is organized into **sprints** that deliver working software incre
 
 #### Unit C: Dataset Export Lambda (Python)
 
-- ⬜ Store Hugging Face API token in AWS Secrets Manager
+- ✅ Store Hugging Face API token in AWS Secrets Manager
   ```bash
   printf "your-hf-token" | npx ampx sandbox secret set HF_TOKEN
   ```
 
-- ⬜ Create `amplify/functions/export-dataset/` directory
+- ✅ Create `amplify/functions/export-dataset/` directory
 
-- ⬜ Create `amplify/functions/export-dataset/resource.ts`
+- ✅ Create `amplify/functions/export-dataset/resource.ts`
   ```typescript
   import { defineFunction, secret } from '@aws-amplify/backend';
 
@@ -931,12 +931,12 @@ This task list is organized into **sprints** that deliver working software incre
   });
   ```
 
-- ⬜ Implement handler with checkpoint/resume capability
-  - ⬜ Create DatasetExportProgress record at start
-  - ⬜ Query approved annotations (status='APPROVED')
-  - ⬜ Checkpoint every 100 annotations (update lastProcessedAnnotationId)
-  - ⬜ Download compressed images from S3
-  - ⬜ Normalize bounding boxes to 0-1 range
+- ✅ Implement handler with checkpoint/resume capability
+  - ✅ Create DatasetExportProgress record at start
+  - ✅ Query approved annotations (status='APPROVED')
+  - ✅ Checkpoint every 100 annotations (update lastProcessedAnnotationId)
+  - ✅ Download compressed images from S3
+  - ✅ Normalize bounding boxes to 0-1 range
     ```python
     normalized_bbox = [
         bbox[0] / image['compressedWidth'],   # x0
@@ -945,10 +945,10 @@ This task list is organized into **sprints** that deliver working software incre
         bbox[3] / image['compressedHeight'],  # y1
     ]
     ```
-  - ⬜ Build dataset with HF datasets schema
+  - ✅ Build dataset with HF datasets schema
     ```python
     features = Features({
-        "question_id": Value("string"),
+        "annotation_id": Value("string"),
         "image": Image(),
         "image_width": Value("int32"),
         "image_height": Value("int32"),
@@ -960,22 +960,22 @@ This task list is organized into **sprints** that deliver working software incre
         "language": Value("string"),
     })
     ```
-  - ⬜ Push to Hugging Face Hub with version tag
-  - ⬜ Update DatasetVersion record (status=READY)
-  - ⬜ Handle errors and update progress to FAILED
+  - ✅ Push to Hugging Face Hub with version tag
+  - ✅ Update DatasetVersion record (status=READY)
+  - ✅ Handle errors and update progress to FAILED
 
-- ⬜ Update `amplify/backend.ts` to include export-dataset function
+- ✅ Update `amplify/backend.ts` to include export-dataset function
 
 #### Unit D: Evaluation Lambda (Python)
 
-- ⬜ Store W&B API key in AWS Secrets Manager
+- ✅ Store W&B API key in AWS Secrets Manager
   ```bash
   printf "your-wandb-api-key" | npx ampx sandbox secret set WANDB_API_KEY
   ```
 
-- ⬜ Create `amplify/functions/run-evaluation/` directory
+- ✅ Create `amplify/functions/run-evaluation/` directory
 
-- ⬜ Create `amplify/functions/run-evaluation/resource.ts`
+- ✅ Create `amplify/functions/run-evaluation/resource.ts`
   ```typescript
   import { defineFunction, secret } from '@aws-amplify/backend';
 
@@ -991,7 +991,7 @@ This task list is organized into **sprints** that deliver working software incre
   });
   ```
 
-- ⬜ Implement ANLS metric calculation
+- ✅ Implement ANLS metric calculation
   ```python
   def calculate_anls(prediction: str, ground_truths: list, threshold: float = 0.5) -> float:
       """ANLS = 1 - NLD (Normalized Levenshtein Distance)"""
@@ -1008,7 +1008,7 @@ This task list is organized into **sprints** that deliver working software incre
       return max_anls
   ```
 
-- ⬜ Implement IoU metric calculation
+- ✅ Implement IoU metric calculation
   ```python
   def calculate_iou(pred_bbox: list, gt_bbox: list) -> float:
       """IoU for bounding boxes in normalized 0-1 coordinates [x0, y0, x1, y1]"""
@@ -1023,16 +1023,16 @@ This task list is organized into **sprints** that deliver working software incre
       return intersection / union if union > 0 else 0
   ```
 
-- ⬜ Implement evaluation handler
-  - ⬜ Update EvaluationJob status to RUNNING
-  - ⬜ Stream dataset from HF Hub
-  - ⬜ Run model predictions via Bedrock (load model from config)
-  - ⬜ Calculate ANLS and IoU per sample
-  - ⬜ Log results incrementally to W&B
-  - ⬜ Update EvaluationJob with final metrics (avgAnls, avgIou)
-  - ⬜ Handle errors and update status to FAILED
+- ✅ Implement evaluation handler
+  - ✅ Update EvaluationJob status to RUNNING
+  - ✅ Stream dataset from HF Hub
+  - ✅ Run model predictions via Bedrock (load model from config)
+  - ✅ Calculate ANLS and IoU per sample
+  - ✅ Log results incrementally to W&B
+  - ✅ Update EvaluationJob with final metrics (avgAnls, avgIou)
+  - ✅ Handle errors and update status to FAILED
 
-- ⬜ Configure SQS trigger for parallel model evaluation
+- ✅ Configure SQS trigger for parallel model evaluation
   ```typescript
   evaluationLambda.addEventSource(
     new SqsEventSource(evaluationQueue, {
@@ -1044,17 +1044,17 @@ This task list is organized into **sprints** that deliver working software incre
 
 #### Unit F: Trigger Lambda (Node.js)
 
-- ⬜ Create `amplify/functions/trigger-evaluation/` directory
+- ✅ Create `amplify/functions/trigger-evaluation/` directory
 
-- ⬜ Create `amplify/functions/trigger-evaluation/resource.ts`
+- ✅ Create `amplify/functions/trigger-evaluation/resource.ts`
 
-- ⬜ Implement handler
-  - ⬜ Read enabled models from `evaluation-models.json`
-  - ⬜ Create EvaluationJob records for each model (status=QUEUED)
-  - ⬜ Send SQS messages for each model
-  - ⬜ Return job IDs to caller
+- ✅ Implement handler
+  - ✅ Read enabled models from `evaluation-models.json`
+  - ✅ Create EvaluationJob records for each model (status=QUEUED)
+  - ✅ Send SQS messages for each model
+  - ✅ Return job IDs to caller
 
-- ⬜ Add GraphQL mutation for manual trigger
+- ✅ Add GraphQL mutation for manual trigger
   ```typescript
   triggerEvaluation: a.mutation()
     .arguments({
@@ -1787,10 +1787,10 @@ business-ocr-annotator/
 
 ## Progress Tracking
 
-**Last Review Date**: 2026-01-25
+**Last Review Date**: 2026-01-28
 **Next Review Date**: TBD
-**Completed Tasks**: Sprint 0 + Sprint 1 + Sprint 2 completed
-**Current Sprint**: Sprint 4 (Dataset Export & Model Evaluation)
+**Completed Tasks**: Sprint 0 + Sprint 1 + Sprint 2 + Sprint 3 completed, Sprint 4 Phase 1 & 2 completed
+**Current Sprint**: Sprint 4 Phase 3 (Frontend UI)
 
 ### Sprint Completion Status
 - ✅ Sprint 0: Foundation & Deployment

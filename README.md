@@ -70,6 +70,25 @@ npx ampx sandbox
 npm run dev
 ```
 
+### Admin Setup
+
+The Dataset Management page is restricted to administrators. To add admin users:
+
+1. **Open AWS Console** → Cognito → User Pools
+2. **Select your user pool** (e.g., `amplify-xxxxx-main-branch-xxxxx`)
+3. **Create the Admins group** (if not exists):
+   - Go to "Groups" tab → "Create group"
+   - Group name: `Admins`
+   - Description: "Dataset management administrators"
+4. **Add users to the group**:
+   - Go to "Users" tab → Select user
+   - Click "Add user to group" → Select "Admins"
+
+Users in the `Admins` group can access:
+- Dataset Management page
+- Export datasets to HuggingFace
+- Trigger model evaluations
+
 ### Production Deployment
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.

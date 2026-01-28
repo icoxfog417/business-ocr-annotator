@@ -4,31 +4,47 @@ import { EventType } from 'aws-cdk-lib/aws-s3';
 import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
 import { Duration, Stack } from 'aws-cdk-lib';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { auth } from './auth/resource';
 import { storage } from './storage/resource';
-import { data, generateAnnotationHandler } from './data/resource';
+import {
+  data,
+  generateAnnotationHandler,
+  exportDatasetHandler,
+  triggerEvaluationHandler,
+} from './data/resource';
 import { processImage } from './functions/process-image/resource';
+import { exportDataset } from './functions/export-dataset/resource';
+import { runEvaluation } from './functions/run-evaluation/resource';
 
 const backend = defineBackend({
   auth,
   storage,
   data,
   generateAnnotationHandler,
+  exportDatasetHandler,
+  triggerEvaluationHandler,
   processImage,
+  exportDataset,
+  runEvaluation,
 });
 
-// Sprint 4: Create SQS queue for evaluation jobs
-const stack = Stack.of(backend.data.resources.graphqlApi);
+// =============================================================================
+// SQS Queues (Sprint 4 Phase 1 - already provisioned)
+// Place in function stack to avoid circular dependency with data stack
+// (data stack references handler functions, handler functions reference SQS queues)
+// =============================================================================
+const stack = Stack.of(backend.exportDataset.resources.lambda);
 
 // Dead Letter Queue for failed evaluation jobs
+// Note: queueName omitted to let CloudFormation auto-generate unique names,
+// avoiding naming conflicts when queues move between nested stacks.
 const evaluationDLQ = new sqs.Queue(stack, 'EvaluationJobsDLQ', {
-  queueName: 'biz-doc-vqa-evaluation-dlq',
   retentionPeriod: Duration.days(14),
 });
 
 // Main evaluation queue
 const evaluationQueue = new sqs.Queue(stack, 'EvaluationJobsQueue', {
-  queueName: 'biz-doc-vqa-evaluation-queue',
   visibilityTimeout: Duration.minutes(15), // Match Lambda timeout
   retentionPeriod: Duration.days(7),
   deadLetterQueue: {
@@ -37,7 +53,7 @@ const evaluationQueue = new sqs.Queue(stack, 'EvaluationJobsQueue', {
   },
 });
 
-// Export queue URLs for Lambda functions
+// Export queue URLs for frontend and Lambda functions
 backend.addOutput({
   custom: {
     evaluationQueueUrl: evaluationQueue.queueUrl,
@@ -46,7 +62,9 @@ backend.addOutput({
   },
 });
 
-// Grant generateAnnotation Lambda permission to invoke Bedrock
+// =============================================================================
+// generateAnnotation Lambda (Sprint 2)
+// =============================================================================
 backend.generateAnnotationHandler.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['bedrock:InvokeModel'],
@@ -54,10 +72,11 @@ backend.generateAnnotationHandler.resources.lambda.addToRolePolicy(
   })
 );
 
-// Get storage bucket reference
+// =============================================================================
+// processImage Lambda (Sprint 2)
+// =============================================================================
 const storageBucket = backend.storage.resources.bucket;
 
-// Grant processImage Lambda permission to read/write S3 bucket
 backend.processImage.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['s3:GetObject', 's3:PutObject'],
@@ -65,7 +84,6 @@ backend.processImage.resources.lambda.addToRolePolicy(
   })
 );
 
-// Grant processImage Lambda permission to DynamoDB (wildcard to avoid cross-stack cycle)
 backend.processImage.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:ListTables'],
@@ -79,16 +97,163 @@ backend.processImage.resources.lambda.addToRolePolicy(
   })
 );
 
-// Add environment variables for processImage Lambda
-// Note: IMAGE_TABLE_NAME uses pattern matching in handler since we can't reference data stack
 const processImageCfnFunction = backend.processImage.resources.cfnResources
   .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
-processImageCfnFunction.addPropertyOverride('Environment.Variables.STORAGE_BUCKET_NAME', storageBucket.bucketName);
-processImageCfnFunction.addPropertyOverride('Environment.Variables.IMAGE_TABLE_INDEX_NAME', 'imagesByS3KeyOriginal');
+processImageCfnFunction.addPropertyOverride(
+  'Environment.Variables.STORAGE_BUCKET_NAME',
+  storageBucket.bucketName
+);
+processImageCfnFunction.addPropertyOverride(
+  'Environment.Variables.IMAGE_TABLE_INDEX_NAME',
+  'imagesByS3KeyOriginal'
+);
 
-// Add S3 event trigger for processImage Lambda
 storageBucket.addEventNotification(
   EventType.OBJECT_CREATED,
   new LambdaDestination(backend.processImage.resources.lambda),
   { prefix: 'images/original/' }
+);
+
+// =============================================================================
+// exportDataset Lambda (Sprint 4 Phase 2) - Python CDK Function
+// Environment variables are set in resource.ts Function constructor
+// (addPropertyOverride via node.defaultChild does not work for custom functions)
+// STORAGE_BUCKET_NAME is forwarded via event payload from the Node.js handler
+// =============================================================================
+const exportDatasetLambda = backend.exportDataset.resources.lambda;
+
+// DynamoDB permissions: table discovery + read/write
+exportDatasetLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:ListTables'],
+    resources: ['*'],
+  })
+);
+exportDatasetLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:Query', 'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem'],
+    resources: [
+      'arn:aws:dynamodb:*:*:table/Annotation-*',
+      'arn:aws:dynamodb:*:*:table/Annotation-*/index/*',
+      'arn:aws:dynamodb:*:*:table/Image-*',
+      'arn:aws:dynamodb:*:*:table/DatasetVersion-*',
+      'arn:aws:dynamodb:*:*:table/DatasetExportProgress-*',
+    ],
+  })
+);
+
+// S3 read permission for downloading images
+exportDatasetLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['s3:GetObject'],
+    resources: [`${storageBucket.bucketArn}/*`],
+  })
+);
+
+// SSM Parameter Store read permission for HF_TOKEN secret
+exportDatasetLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['ssm:GetParameter'],
+    resources: ['arn:aws:ssm:*:*:parameter/business-ocr/*'],
+  })
+);
+
+// =============================================================================
+// exportDatasetHandler Lambda (Sprint 4 Phase 2) - Node.js async dispatcher
+// Risk 6 fix: Thin wrapper that invokes the Python export Lambda asynchronously
+// =============================================================================
+const exportDatasetHandlerLambda = backend.exportDatasetHandler.resources.lambda;
+
+// Pass the Python Lambda's function name so the wrapper can invoke it
+const exportDatasetHandlerCfnFunction = backend.exportDatasetHandler.resources.cfnResources
+  .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.EXPORT_DATASET_FUNCTION_NAME',
+  exportDatasetLambda.functionName
+);
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.STORAGE_BUCKET_NAME',
+  storageBucket.bucketName
+);
+
+// Grant the wrapper permission to invoke the Python Lambda
+exportDatasetLambda.grantInvoke(exportDatasetHandlerLambda);
+
+// =============================================================================
+// triggerEvaluation Lambda (Sprint 4 Phase 2) - Node.js GraphQL mutation handler
+// Risk 4 fix: Grant SQS send permission
+// =============================================================================
+const triggerEvaluationLambda = backend.triggerEvaluationHandler.resources.lambda;
+
+// Environment variable: SQS queue URL
+const triggerEvalCfnFunction = backend.triggerEvaluationHandler.resources.cfnResources
+  .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
+triggerEvalCfnFunction.addPropertyOverride(
+  'Environment.Variables.EVALUATION_QUEUE_URL',
+  evaluationQueue.queueUrl
+);
+
+// DynamoDB permissions: table discovery + write
+triggerEvaluationLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:ListTables'],
+    resources: ['*'],
+  })
+);
+triggerEvaluationLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:PutItem', 'dynamodb:Scan', 'dynamodb:UpdateItem'],
+    resources: ['arn:aws:dynamodb:*:*:table/EvaluationJob-*'],
+  })
+);
+
+// SQS send permission (Risk 4 fix)
+evaluationQueue.grantSendMessages(triggerEvaluationLambda);
+
+// =============================================================================
+// runEvaluation Lambda (Sprint 4 Phase 2) - Python CDK Function, SQS triggered
+// Environment variables are set in resource.ts Function constructor
+// (addPropertyOverride via node.defaultChild does not work for custom functions)
+// =============================================================================
+const runEvaluationLambda = backend.runEvaluation.resources.lambda;
+
+// SQS event source (Risk 4 fix: event source mapping)
+runEvaluationLambda.addEventSource(
+  new SqsEventSource(evaluationQueue, {
+    batchSize: 1, // One model evaluation per invocation
+    reportBatchItemFailures: true,
+  })
+);
+
+// DynamoDB permissions: table discovery + read/write
+runEvaluationLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:ListTables'],
+    resources: ['*'],
+  })
+);
+runEvaluationLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:GetItem', 'dynamodb:UpdateItem'],
+    resources: ['arn:aws:dynamodb:*:*:table/EvaluationJob-*'],
+  })
+);
+
+// Bedrock permissions for model invocation (foundation models + cross-region inference profiles)
+runEvaluationLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['bedrock:InvokeModel'],
+    resources: [
+      'arn:aws:bedrock:*::foundation-model/*',
+      'arn:aws:bedrock:*:*:inference-profile/*',
+    ],
+  })
+);
+
+// SSM Parameter Store read permission for WANDB_API_KEY secret
+runEvaluationLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['ssm:GetParameter'],
+    resources: ['arn:aws:ssm:*:*:parameter/business-ocr/*'],
+  })
 );
