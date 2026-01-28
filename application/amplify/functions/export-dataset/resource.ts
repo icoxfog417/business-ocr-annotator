@@ -11,7 +11,7 @@ const functionDir = path.dirname(fileURLToPath(import.meta.url));
 // - main branch: production repo
 // - other branches / local sandbox: development repo
 const HF_REPO_ID =
-  process.env.AWS_BRANCH === 'main' ? 'icoxfog417/biz-doc-vqa' : 'icoxfog417/biz-doc-vqa-dev';
+  process.env.AWS_BRANCH === 'main' ? 'icoxfog417/biz-doc-vqa' : 'icoxfog417/biz-doc-vqa-test';
 
 export const exportDataset = defineFunction(
   (scope) =>

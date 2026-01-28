@@ -311,6 +311,24 @@ export function DatasetManagement() {
   };
 
   // -------------------------------------------------------------------------
+  // Delete version action
+  // -------------------------------------------------------------------------
+  const handleDeleteVersion = async (version: DatasetVersion) => {
+    const confirmMsg = `Delete dataset version "${version.version}"?\n\nThis will remove the version record from the database. The dataset on HuggingFace will not be affected.`;
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    try {
+      await client.models.DatasetVersion.delete({ id: version.id });
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to delete version:', err);
+      alert('Failed to delete version: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  };
+
+  // -------------------------------------------------------------------------
   // Model checkbox toggle
   // -------------------------------------------------------------------------
   const toggleModel = (modelId: string) => {
@@ -457,6 +475,7 @@ export function DatasetManagement() {
                       <th>Images</th>
                       <th>Created</th>
                       <th>HuggingFace</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -480,6 +499,15 @@ export function DatasetManagement() {
                           >
                             {v.huggingFaceRepoId}
                           </a>
+                        </td>
+                        <td>
+                          <button
+                            className="dm-delete-btn"
+                            onClick={() => handleDeleteVersion(v)}
+                            title="Delete version"
+                          >
+                            ✕
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -509,7 +537,7 @@ export function DatasetManagement() {
                       <span className="dm-card-label">Created</span>
                       <span className="dm-card-value">{formatDate(v.createdAt)}</span>
                     </div>
-                    <div style={{ marginTop: '0.5rem' }}>
+                    <div className="dm-card-actions">
                       <a
                         href={v.huggingFaceUrl}
                         target="_blank"
@@ -518,6 +546,13 @@ export function DatasetManagement() {
                       >
                         View on HuggingFace
                       </a>
+                      <button
+                        className="dm-delete-btn"
+                        onClick={() => handleDeleteVersion(v)}
+                        title="Delete version"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 ))}

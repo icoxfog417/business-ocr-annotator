@@ -365,6 +365,9 @@ def process_annotation(annotation: Dict, image_table, bucket_name: str) -> Optio
             raw = None
 
         if raw:
+            # Convert to float (DynamoDB returns decimal.Decimal)
+            raw = [float(v) for v in raw]
+
             # Scale bbox from original to compressed coordinate space if dimensions differ
             if original_width and original_height and original_width != compressed_width:
                 scale_x = compressed_width / original_width

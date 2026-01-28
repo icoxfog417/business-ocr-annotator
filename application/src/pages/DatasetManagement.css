@@ -470,7 +470,6 @@
 
 /* Metric inline */
 .dm-metric-inline {
-  display: inline-block;
   font-variant-numeric: tabular-nums;
 }
 
@@ -633,4 +632,31 @@
   border-top: 1px solid #e5e7eb;
   background: #f8fafc;
   border-radius: 0 0 12px 12px;
+}
+
+/* Delete button */
+.dm-delete-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.dm-delete-btn:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+/* Card actions row */
+.dm-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f1f5f9;
 }

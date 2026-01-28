@@ -19,6 +19,6 @@ const isProduction = import.meta.env.PROD;
 export const exportConfig: ExportConfig = {
   huggingFaceRepoId: isProduction
     ? 'icoxfog417/biz-doc-vqa'
-    : 'icoxfog417/biz-doc-vqa-dev',
+    : 'icoxfog417/biz-doc-vqa-test',
   isRepoIdLocked: true, // Always locked - users cannot change
 };
