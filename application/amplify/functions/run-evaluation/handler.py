@@ -336,6 +336,8 @@ def invoke_model(bedrock_model_id: str, image, question: str, language: str) -> 
         'Look at this document image and answer the question.\n'
         'Return your answer as JSON: {"answer": "your answer text", '
         '"bbox": [x0, y0, x1, y1]} where bbox is normalized 0-1 coordinates.\n\n'
+        'If the answer contains multiple items, separate each item with a newline (\\n).\n'
+        'Example: {"answer": "Item A\\nItem B\\nItem C", "bbox": [0.1, 0.2, 0.5, 0.8]}\n\n'
         f'Question: {question}\n\n'
         'Return ONLY valid JSON, no explanation.'
     )
@@ -419,8 +421,6 @@ def calculate_anls(prediction: str, ground_truths: List[str], threshold: float =
     # Multiple answers (list items): model must output ALL items
     # Split prediction into items by newline
     pred_items = [line.strip() for line in prediction.split('\n') if line.strip()]
-    if not pred_items:
-        pred_items = [prediction.strip()] if prediction.strip() else []
 
     if not pred_items:
         return 0.0
