@@ -2,6 +2,7 @@ import { type ClientSchema, a, defineData, defineFunction } from '@aws-amplify/b
 
 // Define the function inline to avoid circular dependency
 const generateAnnotationHandler = defineFunction({
+  name: 'generateAnnotationHandler',
   entry: '../functions/generate-annotation/handler.ts',
   timeoutSeconds: 60,
   memoryMB: 512,
@@ -9,6 +10,7 @@ const generateAnnotationHandler = defineFunction({
 
 // Sprint 4 Phase 2: Export dataset dispatcher (Node.js wrapper for Python Lambda)
 const exportDatasetHandler = defineFunction({
+  name: 'exportDatasetHandler',
   entry: '../functions/export-dataset-handler/handler.ts',
   timeoutSeconds: 30,
   memoryMB: 256,
@@ -16,6 +18,7 @@ const exportDatasetHandler = defineFunction({
 
 // Sprint 4 Phase 2: Trigger evaluation orchestrator (Node.js)
 const triggerEvaluationHandler = defineFunction({
+  name: 'triggerEvaluationHandler',
   entry: '../functions/trigger-evaluation/handler.ts',
   timeoutSeconds: 30,
   memoryMB: 512,

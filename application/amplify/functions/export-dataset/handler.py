@@ -1,7 +1,8 @@
 """
 Dataset Export Lambda Handler
 
-Exports approved annotations to Hugging Face Hub in Parquet format.
+Exports approved annotations to Hugging Face Hub in ImageFolder format
+(metadata.jsonl + image files). Compatible with `datasets.load_dataset()`.
 Implements checkpoint/resume capability for large datasets.
 
 Risk 1 fix: Uses GSI query instead of full table scan.
@@ -9,12 +10,11 @@ Risk 2 fix: Uses table discovery pattern (ListTables) for DynamoDB table names.
 """
 import json
 import os
+import tempfile
 import boto3
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Dict, List, Optional
-from datasets import Dataset, Features, Value, Sequence, Image as HFImage
-from huggingface_hub import login
+from huggingface_hub import HfApi
 from PIL import Image
 from io import BytesIO
 
@@ -25,7 +25,6 @@ s3 = boto3.client('s3')
 ssm = boto3.client('ssm')
 
 # Environment variables
-STORAGE_BUCKET_NAME = os.environ.get('STORAGE_BUCKET_NAME', '')
 ANNOTATION_INDEX_NAME = os.environ.get('ANNOTATION_INDEX_NAME', 'annotationsByValidationStatus')
 
 # Module-level caches
@@ -53,11 +52,10 @@ def get_hf_token() -> str:
     global _hf_token
     if _hf_token is None:
         param_name = os.environ.get('HF_TOKEN_SSM_PARAM', '')
-        if param_name:
-            response = ssm.get_parameter(Name=param_name, WithDecryption=True)
-            _hf_token = response['Parameter']['Value']
-        else:
-            _hf_token = os.environ.get('HF_TOKEN', '')
+        if not param_name:
+            raise ValueError('HF_TOKEN_SSM_PARAM environment variable is not set')
+        response = ssm.get_parameter(Name=param_name, WithDecryption=True)
+        _hf_token = response['Parameter']['Value']
     return _hf_token
 
 
@@ -71,6 +69,7 @@ def handler(event, context):
         "datasetVersion": "v1.0.0",
         "huggingFaceRepoId": "icoxfog417/biz-doc-vqa",
         "exportId": "export-uuid",
+        "storageBucketName": "amplify-...-bucket-...",
         "resumeFrom": "annotation-id"  // Optional checkpoint
     }
     """
@@ -82,13 +81,13 @@ def handler(event, context):
         dataset_version = event['datasetVersion']
         hf_repo_id = event['huggingFaceRepoId']
         export_id = event['exportId']
+        storage_bucket = event['storageBucketName']
         resume_from = event.get('resumeFrom')
 
         print(f'Starting export: {export_id} for version {dataset_version}')
 
-        # Login to Hugging Face
+        # Get Hugging Face token (passed directly to HfApi, no login() needed)
         hf_token = get_hf_token()
-        login(token=hf_token)
 
         # Discover DynamoDB tables
         annotation_table = get_table('Annotation')
@@ -127,52 +126,93 @@ def handler(event, context):
             ExpressionAttributeValues={':total': total_count, ':now': now},
         )
 
-        # Process annotations incrementally
-        dataset_records = []
-        processed_count = 0
-        image_ids_seen = set()
+        # Process annotations and build ImageFolder dataset in /tmp
+        with tempfile.TemporaryDirectory() as tmpdir:
+            metadata_rows: List[Dict] = []
+            processed_count = 0
+            image_ids_seen: set = set()
 
-        for annotation in annotations:
-            try:
-                record = process_annotation(annotation, image_table)
-                if record:
-                    dataset_records.append(record)
-                    image_ids_seen.add(annotation.get('imageId', ''))
-                processed_count += 1
+            for annotation in annotations:
+                try:
+                    record = process_annotation(annotation, image_table, storage_bucket)
+                    if record:
+                        # Save image as JPEG
+                        img_filename = f"{record['annotation_id']}.jpg"
+                        img_path = os.path.join(tmpdir, img_filename)
+                        pil_image = record['image']
+                        if pil_image.mode == 'RGBA':
+                            pil_image = pil_image.convert('RGB')
+                        pil_image.save(img_path, format='JPEG', quality=85)
 
-                # Checkpoint every 100 annotations
-                if processed_count % 100 == 0:
-                    checkpoint_now = datetime.now(timezone.utc).isoformat()
-                    progress_table.update_item(
-                        Key={'id': export_id},
-                        UpdateExpression='SET processedCount = :count, lastProcessedAnnotationId = :aid, updatedAt = :now',
-                        ExpressionAttributeValues={
-                            ':count': processed_count,
-                            ':aid': annotation['id'],
-                            ':now': checkpoint_now,
-                        },
-                    )
-                    print(f'Checkpoint: {processed_count}/{total_count}')
+                        # Build metadata row (file_name is the HF ImageFolder key)
+                        metadata_rows.append({
+                            'file_name': img_filename,
+                            'annotation_id': record['annotation_id'],
+                            'image_width': record['image_width'],
+                            'image_height': record['image_height'],
+                            'question': record['question'],
+                            'answers': record['answers'],
+                            'answer_bbox': record['answer_bbox'],
+                            'document_type': record['document_type'],
+                            'question_type': record['question_type'],
+                            'language': record['language'],
+                        })
+                        image_ids_seen.add(annotation.get('imageId', ''))
 
-            except Exception as e:
-                print(f"Error processing annotation {annotation.get('id', 'unknown')}: {str(e)}")
-                continue
+                    processed_count += 1
 
-        if not dataset_records:
-            raise ValueError('No valid records to export')
+                    # Checkpoint every 100 annotations
+                    if processed_count % 100 == 0:
+                        checkpoint_now = datetime.now(timezone.utc).isoformat()
+                        progress_table.update_item(
+                            Key={'id': export_id},
+                            UpdateExpression='SET processedCount = :count, lastProcessedAnnotationId = :aid, updatedAt = :now',
+                            ExpressionAttributeValues={
+                                ':count': processed_count,
+                                ':aid': annotation['id'],
+                                ':now': checkpoint_now,
+                            },
+                        )
+                        print(f'Checkpoint: {processed_count}/{total_count}')
 
-        # Create Hugging Face dataset
-        print('Creating Hugging Face dataset...')
-        features = define_dataset_features()
-        dataset = Dataset.from_list(dataset_records, features=features)
+                except Exception as e:
+                    print(f"Error processing annotation {annotation.get('id', 'unknown')}: {str(e)}")
+                    continue
 
-        # Push to Hugging Face Hub
-        print(f'Pushing {len(dataset_records)} records to {hf_repo_id}...')
-        dataset.push_to_hub(
-            hf_repo_id,
-            commit_message=f'Export {dataset_version} ({processed_count} annotations)',
-            private=False,
-        )
+            if not metadata_rows:
+                raise ValueError('No valid records to export')
+
+            # Write metadata.jsonl (HuggingFace ImageFolder format)
+            metadata_path = os.path.join(tmpdir, 'metadata.jsonl')
+            with open(metadata_path, 'w', encoding='utf-8') as f:
+                for row in metadata_rows:
+                    f.write(json.dumps(row, ensure_ascii=False) + '\n')
+
+            # Upload to Hugging Face Hub
+            print(f'Uploading {len(metadata_rows)} records to {hf_repo_id}...')
+            api = HfApi(token=hf_token)
+            api.create_repo(hf_repo_id, repo_type='dataset', exist_ok=True)
+            api.upload_folder(
+                folder_path=tmpdir,
+                repo_id=hf_repo_id,
+                repo_type='dataset',
+                path_in_repo='data',
+                delete_patterns='*.parquet',
+                commit_message=f'Export {dataset_version} ({processed_count} annotations)',
+            )
+
+            # Generate and upload dataset card (README.md) so HF viewer works
+            card = generate_dataset_card(
+                dataset_version, hf_repo_id, processed_count,
+                len(image_ids_seen), metadata_rows,
+            )
+            api.upload_file(
+                path_or_fileobj=card.encode('utf-8'),
+                path_in_repo='README.md',
+                repo_id=hf_repo_id,
+                repo_type='dataset',
+                commit_message=f'Update dataset card for {dataset_version}',
+            )
 
         hf_url = f'https://huggingface.co/datasets/{hf_repo_id}'
 
@@ -270,7 +310,7 @@ def fetch_approved_annotations(table, resume_from: Optional[str] = None) -> List
     return all_annotations
 
 
-def process_annotation(annotation: Dict, image_table) -> Optional[Dict]:
+def process_annotation(annotation: Dict, image_table, bucket_name: str) -> Optional[Dict]:
     """Process a single annotation into dataset format."""
     image_id = annotation.get('imageId')
     if not image_id:
@@ -289,7 +329,7 @@ def process_annotation(annotation: Dict, image_table) -> Optional[Dict]:
         print(f"No compressed image for annotation {annotation['id']}")
         return None
 
-    image_obj = s3.get_object(Bucket=STORAGE_BUCKET_NAME, Key=s3_key)
+    image_obj = s3.get_object(Bucket=bucket_name, Key=s3_key)
     image_bytes = image_obj['Body'].read()
     image = Image.open(BytesIO(image_bytes))
 
@@ -348,17 +388,89 @@ def normalize_bbox(bbox: List, width: int, height: int) -> List[float]:
     ]
 
 
-def define_dataset_features() -> Features:
-    """Define Hugging Face dataset schema."""
-    return Features({
-        'annotation_id': Value('string'),
-        'image': HFImage(),
-        'image_width': Value('int32'),
-        'image_height': Value('int32'),
-        'question': Value('string'),
-        'answers': Sequence(Value('string')),
-        'answer_bbox': Sequence(Value('float32'), length=4),
-        'document_type': Value('string'),
-        'question_type': Value('string'),
-        'language': Value('string'),
-    })
+def generate_dataset_card(
+    version: str, hf_repo_id: str, annotation_count: int,
+    image_count: int, metadata_rows: List[Dict],
+) -> str:
+    """Generate a HuggingFace dataset card (README.md) with YAML frontmatter."""
+    languages = sorted({row.get('language', 'en') for row in metadata_rows})
+    doc_types = sorted({row.get('document_type', 'OTHER') for row in metadata_rows})
+    lang_yaml = '\n'.join(f'- {lang}' for lang in languages)
+
+    return f"""---
+license: cc-by-sa-4.0
+task_categories:
+- document-question-answering
+- visual-question-answering
+language:
+{lang_yaml}
+size_categories:
+- n<1K
+configs:
+- config_name: default
+  data_files:
+  - split: train
+    path: data/*
+  default: true
+dataset_info:
+  features:
+  - name: image
+    dtype: image
+  - name: annotation_id
+    dtype: string
+  - name: image_width
+    dtype: int32
+  - name: image_height
+    dtype: int32
+  - name: question
+    dtype: string
+  - name: answers
+    sequence: string
+  - name: answer_bbox
+    sequence: float32
+    length: 4
+  - name: document_type
+    dtype: string
+  - name: question_type
+    dtype: string
+  - name: language
+    dtype: string
+  splits:
+  - name: train
+    num_examples: {annotation_count}
+---
+
+# Business Document VQA Dataset
+
+Visual Question Answering dataset for business document OCR evaluation.
+
+## Version: {version}
+
+- **Annotations**: {annotation_count}
+- **Images**: {image_count}
+- **Languages**: {', '.join(languages)}
+- **Document Types**: {', '.join(doc_types)}
+
+## Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| image | Image | Document image |
+| annotation_id | string | Annotation ID |
+| question | string | Question about the document |
+| answers | list[string] | Correct answers |
+| answer_bbox | list[float] | Bounding box [x0, y0, x1, y1] (0-1 range) |
+| document_type | string | Type of business document |
+| question_type | string | Category of question |
+| language | string | ISO 639-1 language code |
+
+## Usage
+
+```python
+from datasets import load_dataset
+
+ds = load_dataset("{hf_repo_id}")
+print(ds["train"][0])
+# Image will be automatically loaded as PIL.Image
+```
+"""

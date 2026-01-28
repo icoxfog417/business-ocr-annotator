@@ -28,6 +28,11 @@ export const handler = async (
 
     const exportId = crypto.randomUUID();
 
+    const storageBucketName = process.env.STORAGE_BUCKET_NAME;
+    if (!storageBucketName) {
+      throw new Error('STORAGE_BUCKET_NAME not configured');
+    }
+
     // Invoke the Python Lambda asynchronously (fire-and-forget)
     await lambdaClient.send(
       new InvokeCommand({
@@ -38,6 +43,7 @@ export const handler = async (
           datasetVersion: args.datasetVersion,
           huggingFaceRepoId: args.huggingFaceRepoId,
           exportId,
+          storageBucketName,
           resumeFrom: args.resumeFrom,
         }),
       })

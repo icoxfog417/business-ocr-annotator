@@ -14,6 +14,11 @@ export const runEvaluation = defineFunction(
       runtime: Runtime.PYTHON_3_12,
       timeout: Duration.seconds(900), // 15 minutes
       memorySize: 2048,
+      environment: {
+        HF_HOME: '/tmp/hf_home',
+        WANDB_PROJECT: 'biz-doc-vqa',
+        WANDB_API_KEY_SSM_PARAM: '/business-ocr/wandb-api-key',
+      },
       code: Code.fromAsset(functionDir, {
         bundling: {
           image: DockerImage.fromRegistry('public.ecr.aws/sam/build-python3.12:latest'),

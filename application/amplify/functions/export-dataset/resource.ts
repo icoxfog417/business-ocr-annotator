@@ -14,6 +14,11 @@ export const exportDataset = defineFunction(
       runtime: Runtime.PYTHON_3_12,
       timeout: Duration.seconds(900), // 15 minutes
       memorySize: 2048,
+      environment: {
+        HF_HOME: '/tmp/hf_home',
+        HF_TOKEN_SSM_PARAM: '/business-ocr/hf-token',
+        ANNOTATION_INDEX_NAME: 'annotationsByValidationStatus',
+      },
       code: Code.fromAsset(functionDir, {
         bundling: {
           image: DockerImage.fromRegistry('public.ecr.aws/sam/build-python3.12:latest'),

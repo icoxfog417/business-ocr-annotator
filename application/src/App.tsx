@@ -8,6 +8,7 @@ import { Login } from './pages/Login';
 import { FileUpload } from './pages/FileUpload';
 import { ImageGallery } from './pages/ImageGallery';
 import { AnnotationWorkspace } from './pages/AnnotationWorkspace';
+import { DatasetManagement } from './pages/DatasetManagement';
 import { ContributorProvider } from './contexts/ContributorContext';
 import { MobileNavigation } from './components/layout/MobileNavigation';
 
@@ -116,6 +117,7 @@ function App() {
               <Route path="/upload" element={<FileUpload />} />
               <Route path="/gallery" element={<ImageGallery />} />
               <Route path="/annotate/:imageId" element={<AnnotationWorkspace />} />
+              <Route path="/datasets" element={<DatasetManagement />} />
               <Route path="/profile" element={<Dashboard />} />
               <Route path="/callback" element={<Navigate to="/" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -31,18 +31,20 @@ const backend = defineBackend({
 
 // =============================================================================
 // SQS Queues (Sprint 4 Phase 1 - already provisioned)
+// Place in function stack to avoid circular dependency with data stack
+// (data stack references handler functions, handler functions reference SQS queues)
 // =============================================================================
-const stack = Stack.of(backend.data.resources.graphqlApi);
+const stack = Stack.of(backend.exportDataset.resources.lambda);
 
 // Dead Letter Queue for failed evaluation jobs
+// Note: queueName omitted to let CloudFormation auto-generate unique names,
+// avoiding naming conflicts when queues move between nested stacks.
 const evaluationDLQ = new sqs.Queue(stack, 'EvaluationJobsDLQ', {
-  queueName: 'biz-doc-vqa-evaluation-dlq',
   retentionPeriod: Duration.days(14),
 });
 
 // Main evaluation queue
 const evaluationQueue = new sqs.Queue(stack, 'EvaluationJobsQueue', {
-  queueName: 'biz-doc-vqa-evaluation-queue',
   visibilityTimeout: Duration.minutes(15), // Match Lambda timeout
   retentionPeriod: Duration.days(7),
   deadLetterQueue: {
@@ -114,14 +116,11 @@ storageBucket.addEventNotification(
 
 // =============================================================================
 // exportDataset Lambda (Sprint 4 Phase 2) - Python CDK Function
-// Risk 2 fix: Wire all environment variables and IAM permissions
+// Environment variables are set in resource.ts Function constructor
+// (addPropertyOverride via node.defaultChild does not work for custom functions)
+// STORAGE_BUCKET_NAME is forwarded via event payload from the Node.js handler
 // =============================================================================
 const exportDatasetLambda = backend.exportDataset.resources.lambda;
-
-// Environment variables
-exportDatasetLambda.addEnvironment('STORAGE_BUCKET_NAME', storageBucket.bucketName);
-exportDatasetLambda.addEnvironment('ANNOTATION_INDEX_NAME', 'annotationsByValidationStatus');
-exportDatasetLambda.addEnvironment('HF_TOKEN_SSM_PARAM', '/business-ocr/hf-token');
 
 // DynamoDB permissions: table discovery + read/write
 exportDatasetLambda.addToRolePolicy(
@@ -166,9 +165,15 @@ exportDatasetLambda.addToRolePolicy(
 const exportDatasetHandlerLambda = backend.exportDatasetHandler.resources.lambda;
 
 // Pass the Python Lambda's function name so the wrapper can invoke it
-exportDatasetHandlerLambda.addEnvironment(
-  'EXPORT_DATASET_FUNCTION_NAME',
+const exportDatasetHandlerCfnFunction = backend.exportDatasetHandler.resources.cfnResources
+  .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.EXPORT_DATASET_FUNCTION_NAME',
   exportDatasetLambda.functionName
+);
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.STORAGE_BUCKET_NAME',
+  storageBucket.bucketName
 );
 
 // Grant the wrapper permission to invoke the Python Lambda
@@ -207,17 +212,10 @@ evaluationQueue.grantSendMessages(triggerEvaluationLambda);
 
 // =============================================================================
 // runEvaluation Lambda (Sprint 4 Phase 2) - Python CDK Function, SQS triggered
-// Risk 3 fix: Full evaluation pipeline
-// Risk 4 fix: SQS event source mapping + permissions
+// Environment variables are set in resource.ts Function constructor
+// (addPropertyOverride via node.defaultChild does not work for custom functions)
 // =============================================================================
 const runEvaluationLambda = backend.runEvaluation.resources.lambda;
-
-// Environment variables
-runEvaluationLambda.addEnvironment('WANDB_PROJECT', 'biz-doc-vqa');
-runEvaluationLambda.addEnvironment(
-  'WANDB_API_KEY',
-  '/business-ocr/wandb-api-key'
-);
 
 // SQS event source (Risk 4 fix: event source mapping)
 runEvaluationLambda.addEventSource(

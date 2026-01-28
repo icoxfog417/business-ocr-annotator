@@ -12,6 +12,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/', icon: '🏠', label: 'Home' },
   { path: '/upload', icon: '📷', label: 'Upload' },
   { path: '/gallery', icon: '📋', label: 'Gallery' },
+  { path: '/datasets', icon: '📊', label: 'Datasets' },
   { path: '/profile', icon: '👤', label: 'Profile' },
 ];
 

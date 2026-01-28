@@ -15,7 +15,8 @@ import wandb
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
-from datasets import load_dataset
+from huggingface_hub import snapshot_download
+from PIL import Image
 from io import BytesIO
 
 # AWS clients
@@ -47,18 +48,19 @@ def get_table(prefix: str):
     return _table_cache[prefix]
 
 
-def get_secret(env_key: str) -> str:
+def get_secret(ssm_param_env_key: str) -> str:
     """Read secret from SSM Parameter Store with caching.
 
-    The environment variable value is the SSM parameter path.
+    The environment variable contains the SSM parameter path (e.g. '/business-ocr/wandb-api-key').
     """
-    ssm_param = os.environ.get(env_key, '')
-    if ssm_param:
-        if ssm_param not in _secrets_cache:
-            response = ssm_client.get_parameter(Name=ssm_param, WithDecryption=True)
-            _secrets_cache[ssm_param] = response['Parameter']['Value']
-        return _secrets_cache[ssm_param]
-    return ''
+    ssm_param = os.environ.get(ssm_param_env_key, '')
+    if not ssm_param:
+        print(f'Warning: {ssm_param_env_key} environment variable is not set')
+        return ''
+    if ssm_param not in _secrets_cache:
+        response = ssm_client.get_parameter(Name=ssm_param, WithDecryption=True)
+        _secrets_cache[ssm_param] = response['Parameter']['Value']
+    return _secrets_cache[ssm_param]
 
 
 def handler(event, context):
@@ -114,7 +116,7 @@ def process_evaluation_job(message: Dict):
 
     try:
         # Initialize W&B
-        wandb_api_key = get_secret('WANDB_API_KEY')
+        wandb_api_key = get_secret('WANDB_API_KEY_SSM_PARAM')
         if wandb_api_key:
             wandb.login(key=wandb_api_key)
             wandb_run = wandb.init(
@@ -131,9 +133,14 @@ def process_evaluation_job(message: Dict):
                 tags=['evaluation', model_id, dataset_version],
             )
 
-        # Load dataset from HF Hub
-        print(f'Loading dataset from {hf_repo_id}...')
-        dataset = load_dataset(hf_repo_id, split='train')
+        # Download dataset from HF Hub (ImageFolder format)
+        print(f'Downloading dataset from {hf_repo_id}...')
+        dataset_dir = snapshot_download(
+            hf_repo_id,
+            repo_type='dataset',
+            local_dir='/tmp/hf_dataset',
+        )
+        dataset = load_imagefolder_dataset(dataset_dir)
         total_samples = len(dataset)
         print(f'Loaded {total_samples} samples')
 
@@ -145,9 +152,10 @@ def process_evaluation_job(message: Dict):
 
         for i, sample in enumerate(dataset):
             try:
+                image = Image.open(sample['_image_path'])
                 prediction = invoke_model(
                     bedrock_model_id,
-                    sample['image'],
+                    image,
                     sample['question'],
                     sample.get('language', 'en'),
                 )
@@ -252,6 +260,30 @@ def process_evaluation_job(message: Dict):
     finally:
         if wandb_run:
             wandb.finish()
+
+
+def load_imagefolder_dataset(repo_dir: str) -> List[Dict]:
+    """Load ImageFolder dataset from downloaded HF repo directory.
+
+    Parses data/metadata.jsonl and returns list of samples with image file paths.
+    """
+    metadata_path = os.path.join(repo_dir, 'data', 'metadata.jsonl')
+    if not os.path.exists(metadata_path):
+        raise FileNotFoundError(f'metadata.jsonl not found at {metadata_path}')
+
+    data_dir = os.path.join(repo_dir, 'data')
+    samples: List[Dict] = []
+
+    with open(metadata_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            row['_image_path'] = os.path.join(data_dir, row['file_name'])
+            samples.append(row)
+
+    return samples
 
 
 def invoke_model(bedrock_model_id: str, image, question: str, language: str) -> Dict:

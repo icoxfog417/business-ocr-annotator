@@ -28,9 +28,10 @@ export function Dashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [imagesResult, annotationsResult] = await Promise.all([
+        const [imagesResult, annotationsResult, datasetsResult] = await Promise.all([
           client.models.Image.list(),
           client.models.Annotation.list(),
+          client.models.DatasetVersion.list(),
         ]);
 
         const annotations = annotationsResult.data;
@@ -46,7 +47,7 @@ export function Dashboard() {
         setStats({
           images: imagesResult.data.length,
           annotations: annotations.length,
-          datasets: 0,
+          datasets: datasetsResult.data.length,
           aiAnnotations,
           humanAnnotations,
           approvedAnnotations,
@@ -274,6 +275,53 @@ export function Dashboard() {
               </p>
             </div>
           </Link>
+
+          <Link
+            to="/datasets"
+            style={{
+              textDecoration: 'none',
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+              e.currentTarget.style.borderColor = '#22c55e';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.borderColor = '#e5e7eb';
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                background: 'rgba(34, 197, 94, 0.1)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              </svg>
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#0f172a', margin: 0 }}>
+                Manage Datasets
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.875rem', margin: '0.25rem 0 0 0' }}>
+                Export and evaluate datasets
+              </p>
+            </div>
+          </Link>
         </div>
 
         {/* Metrics Grid */}
@@ -458,7 +506,7 @@ export function Dashboard() {
             </div>
             <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{stats.datasets}</div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              Coming soon
+              {stats.datasets === 0 ? 'No datasets exported yet' : 'Dataset versions'}
             </p>
           </div>
         </div>
