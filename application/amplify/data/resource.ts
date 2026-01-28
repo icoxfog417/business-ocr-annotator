@@ -7,6 +7,13 @@ const generateAnnotationHandler = defineFunction({
   memoryMB: 512,
 });
 
+// Sprint 4 Phase 2: Export dataset dispatcher (Node.js wrapper for Python Lambda)
+const exportDatasetHandler = defineFunction({
+  entry: '../functions/export-dataset-handler/handler.ts',
+  timeoutSeconds: 30,
+  memoryMB: 256,
+});
+
 // Sprint 4 Phase 2: Trigger evaluation orchestrator (Node.js)
 const triggerEvaluationHandler = defineFunction({
   entry: '../functions/trigger-evaluation/handler.ts',
@@ -206,6 +213,19 @@ const schema = a.schema({
     .authorization((allow) => [allow.authenticated()])
     .handler(a.handler.function(generateAnnotationHandler)),
 
+  // Sprint 4 Phase 2: Export dataset to Hugging Face (async dispatch)
+  exportDataset: a
+    .mutation()
+    .arguments({
+      datasetVersionId: a.string().required(),
+      datasetVersion: a.string().required(),
+      huggingFaceRepoId: a.string().required(),
+      resumeFrom: a.string(),
+    })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(exportDatasetHandler)),
+
   // Sprint 4 Phase 2: Trigger parallel model evaluation
   triggerEvaluation: a
     .mutation()
@@ -221,7 +241,7 @@ const schema = a.schema({
 
 export type Schema = ClientSchema<typeof schema>;
 
-export { generateAnnotationHandler, triggerEvaluationHandler };
+export { generateAnnotationHandler, exportDatasetHandler, triggerEvaluationHandler };
 export const data = defineData({
   schema,
   authorizationModes: {

@@ -6,54 +6,8 @@ const dynamoClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 const sqsClient = new SQSClient({});
 
-// Evaluation models configuration (from src/config/evaluation-models.json)
-const EVALUATION_MODELS = {
-  version: '1.0',
-  models: [
-    {
-      id: 'amazon-nova-pro',
-      name: 'Amazon Nova Pro',
-      provider: 'bedrock',
-      bedrockModelId: 'amazon.nova-pro-v1:0',
-      enabled: true,
-    },
-    {
-      id: 'claude-sonnet-4-5',
-      name: 'Claude Sonnet 4.5',
-      provider: 'bedrock',
-      bedrockModelId: 'global.anthropic.claude-sonnet-4-5-20250929-v1:0',
-      enabled: true,
-    },
-    {
-      id: 'claude-haiku-4-5',
-      name: 'Claude Haiku 4.5',
-      provider: 'bedrock',
-      bedrockModelId: 'global.anthropic.claude-haiku-4-5-20251001-v1:0',
-      enabled: true,
-    },
-    {
-      id: 'qwen3-vl-235b',
-      name: 'Qwen3 VL 235B',
-      provider: 'bedrock',
-      bedrockModelId: 'qwen.qwen3-vl-235b-a22b',
-      enabled: true,
-    },
-    {
-      id: 'gemma-3-27b',
-      name: 'Google Gemma 3 27B',
-      provider: 'bedrock',
-      bedrockModelId: 'google.gemma-3-27b-it',
-      enabled: true,
-    },
-    {
-      id: 'nemotron-nano-12b',
-      name: 'NVIDIA Nemotron Nano 12B',
-      provider: 'bedrock',
-      bedrockModelId: 'nvidia.nemotron-nano-12b-v2',
-      enabled: true,
-    },
-  ],
-};
+// Risk 7 fix: Import from single source of truth instead of hardcoding
+import EVALUATION_MODELS from '../../../src/config/evaluation-models.json';
 
 // Table name cache
 let evaluationJobTableName: string | null = null;

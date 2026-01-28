@@ -177,7 +177,7 @@ def process_evaluation_job(message: Dict):
                     })
 
                 results_data.append({
-                    'question_id': sample.get('question_id', f'q{i}'),
+                    'annotation_id': sample.get('annotation_id', f'a{i}'),
                     'question': sample['question'],
                     'ground_truth': sample['answers'][0] if sample['answers'] else '',
                     'prediction': prediction.get('answer', ''),
@@ -198,7 +198,7 @@ def process_evaluation_job(message: Dict):
         # Log final results table to W&B
         wandb_run_url = ''
         if wandb_run and results_data:
-            columns = ['question_id', 'question', 'ground_truth', 'prediction', 'anls', 'iou']
+            columns = ['annotation_id', 'question', 'ground_truth', 'prediction', 'anls', 'iou']
             table = wandb.Table(columns=columns)
             for row in results_data:
                 table.add_data(*[row[c] for c in columns])

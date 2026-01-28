@@ -16,7 +16,7 @@ export const exportDataset = defineFunction(
       memorySize: 2048,
       code: Code.fromAsset(functionDir, {
         bundling: {
-          image: DockerImage.fromRegistry('dummy'),
+          image: DockerImage.fromRegistry('public.ecr.aws/sam/build-python3.12:latest'),
           local: {
             tryBundle(outputDir: string) {
               try {

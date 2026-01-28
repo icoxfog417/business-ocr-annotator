@@ -322,7 +322,7 @@ def process_annotation(annotation: Dict, image_table) -> Optional[Dict]:
     answers = [answer] if answer else ['']
 
     return {
-        'question_id': annotation['id'],
+        'annotation_id': annotation['id'],
         'image': image,
         'image_width': image_width,
         'image_height': image_height,
@@ -351,7 +351,7 @@ def normalize_bbox(bbox: List, width: int, height: int) -> List[float]:
 def define_dataset_features() -> Features:
     """Define Hugging Face dataset schema."""
     return Features({
-        'question_id': Value('string'),
+        'annotation_id': Value('string'),
         'image': HFImage(),
         'image_width': Value('int32'),
         'image_height': Value('int32'),
