@@ -24,6 +24,7 @@ const triggerEvaluationHandler = defineFunction({
   memoryMB: 512,
 });
 
+
 const schema = a.schema({
   Image: a
     .model({
@@ -190,9 +191,10 @@ const schema = a.schema({
       // Primary metrics (DocVQA standard) - 0-1 scale
       avgAnls: a.float(), // Average ANLS (text accuracy)
       avgIou: a.float(), // Average IoU (bbox accuracy)
-      totalSamples: a.integer(),
+      totalSamples: a.integer(), // Successfully evaluated samples
+      failedSamples: a.integer(), // Samples that failed to evaluate
       wandbRunUrl: a.string(), // Link to W&B run
-      errorMessage: a.string(),
+      errorMessage: a.string(), // Error details (for FAILED status or partial failures)
       startedAt: a.datetime(),
       completedAt: a.datetime(),
       createdAt: a.datetime().required(),
@@ -240,6 +242,7 @@ const schema = a.schema({
     .returns(a.json())
     .authorization((allow) => [allow.authenticated()])
     .handler(a.handler.function(triggerEvaluationHandler)),
+
 });
 
 export type Schema = ClientSchema<typeof schema>;

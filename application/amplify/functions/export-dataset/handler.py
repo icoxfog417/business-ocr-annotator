@@ -357,9 +357,15 @@ def process_annotation(annotation: Dict, image_table, bucket_name: str) -> Optio
             ]
             normalized_bbox = normalize_bbox(raw, image_width, image_height)
 
-    # Build answers list
+    # Build answers list - split multi-line answers into separate items
     answer = annotation.get('answer', '')
-    answers = [answer] if answer else ['']
+    if answer:
+        # Split by newline and filter empty lines
+        answers = [line.strip() for line in answer.split('\n') if line.strip()]
+        if not answers:
+            answers = ['']
+    else:
+        answers = ['']
 
     return {
         'annotation_id': annotation['id'],

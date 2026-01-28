@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { client } from '../lib/apiClient';
 import { useEvaluationModels } from '../hooks/useEvaluationModels';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useIsAdmin } from '../hooks/useIsAdmin';
+import { useApprovedAnnotationStats } from '../hooks/useApprovedAnnotationStats';
+import { exportConfig } from '../config/exportConfig';
 import { MobileNavSpacer } from '../components/layout';
 import './DatasetManagement.css';
 
@@ -102,6 +105,15 @@ function formatMetric(value: number | null | undefined): string {
 export function DatasetManagement() {
   const { enabledModels, getModelById } = useEvaluationModels();
   const { isMobile } = useBreakpoint();
+  const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
+  const {
+    annotationCount: approvedAnnotationCount,
+    imageCount: approvedImageCount,
+    refetch: refetchStats,
+  } = useApprovedAnnotationStats();
+
+  // Export configuration (preset repo ID based on build environment)
+  const { huggingFaceRepoId: presetRepoId, isRepoIdLocked } = exportConfig;
 
   // Data state
   const [datasetVersions, setDatasetVersions] = useState<DatasetVersion[]>([]);
@@ -115,6 +127,9 @@ export function DatasetManagement() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
+  // Confirmation dialog state
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
   // Evaluation form
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [selectedDatasetVersion, setSelectedDatasetVersion] = useState('');
@@ -122,6 +137,13 @@ export function DatasetManagement() {
   const [evalError, setEvalError] = useState<string | null>(null);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Set repo ID from preset when loaded
+  useEffect(() => {
+    if (presetRepoId && !repoId) {
+      setRepoId(presetRepoId);
+    }
+  }, [presetRepoId, repoId]);
 
   // -------------------------------------------------------------------------
   // Data fetching
@@ -149,7 +171,10 @@ export function DatasetManagement() {
       if (versions.length > 0) {
         const latest = versions[0];
         setNewVersion((prev) => prev || incrementVersion(latest.version));
-        setRepoId((prev) => prev || latest.huggingFaceRepoId);
+        // Only auto-fill repo ID if not preset via config
+        if (!isRepoIdLocked) {
+          setRepoId((prev) => prev || latest.huggingFaceRepoId);
+        }
       } else {
         setNewVersion((prev) => prev || 'v1.0.0');
       }
@@ -158,7 +183,7 @@ export function DatasetManagement() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isRepoIdLocked]);
 
   // Initial fetch
   useEffect(() => {
@@ -307,9 +332,27 @@ export function DatasetManagement() {
   );
 
   // -------------------------------------------------------------------------
+  // Confirmation dialog handlers
+  // -------------------------------------------------------------------------
+  const handleCreateVersionClick = () => {
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmExport = async () => {
+    setShowConfirmDialog(false);
+    await handleExport();
+    // Refresh stats after export starts
+    refetchStats();
+  };
+
+  const handleCancelExport = () => {
+    setShowConfirmDialog(false);
+  };
+
+  // -------------------------------------------------------------------------
   // Loading state
   // -------------------------------------------------------------------------
-  if (loading) {
+  if (loading || isAdminLoading) {
     return (
       <div className="dm-page">
         <header className="dm-header">
@@ -324,6 +367,52 @@ export function DatasetManagement() {
           </div>
         </header>
         <div className="dm-loading">Loading dataset data...</div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Admin access check
+  // -------------------------------------------------------------------------
+  if (!isAdmin) {
+    return (
+      <div className="dm-page">
+        <header className="dm-header">
+          <div className="dm-header-content">
+            <Link to="/" className="dm-back-btn" aria-label="Back to dashboard">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
+              </svg>
+            </Link>
+            <h1 className="dm-header-title">Dataset Management</h1>
+          </div>
+        </header>
+        <main className="dm-main">
+          <div className="dm-access-denied">
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              style={{ marginBottom: '1rem', color: '#dc2626' }}
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+            </svg>
+            <h2>Access Denied</h2>
+            <p>
+              This page is restricted to administrators only.
+              <br />
+              Please contact your administrator if you need access.
+            </p>
+            <Link to="/" className="dm-btn dm-btn-primary" style={{ marginTop: '1rem' }}>
+              Return to Dashboard
+            </Link>
+          </div>
+        </main>
       </div>
     );
   }
@@ -443,6 +532,18 @@ export function DatasetManagement() {
         <section className="dm-section">
           <h2 className="dm-section-title">Export to HuggingFace</h2>
 
+          {/* Approved annotations summary */}
+          <div className="dm-stats-summary">
+            <div className="dm-stat-item">
+              <span className="dm-stat-value">{approvedAnnotationCount}</span>
+              <span className="dm-stat-label">Approved Annotations</span>
+            </div>
+            <div className="dm-stat-item">
+              <span className="dm-stat-value">{approvedImageCount}</span>
+              <span className="dm-stat-label">Unique Images</span>
+            </div>
+          </div>
+
           <div className="dm-form-row">
             <div className="dm-form-group">
               <label className="dm-form-label" htmlFor="export-version">
@@ -461,21 +562,27 @@ export function DatasetManagement() {
             <div className="dm-form-group">
               <label className="dm-form-label" htmlFor="export-repo">
                 HuggingFace Repo ID
+                {isRepoIdLocked && (
+                  <span className="dm-locked-badge" title="Preset by administrator">
+                    (Preset)
+                  </span>
+                )}
               </label>
               <input
                 id="export-repo"
-                className="dm-form-input"
+                className={`dm-form-input ${isRepoIdLocked ? 'dm-input-locked' : ''}`}
                 type="text"
                 placeholder="org/dataset-name"
                 value={repoId}
                 onChange={(e) => setRepoId(e.target.value)}
-                disabled={isExporting}
+                disabled={isExporting || isRepoIdLocked}
+                readOnly={isRepoIdLocked}
               />
             </div>
             <button
               className="dm-btn dm-btn-primary"
-              disabled={isExporting || !newVersion || !repoId}
-              onClick={() => handleExport()}
+              disabled={isExporting || !newVersion || !repoId || approvedAnnotationCount === 0}
+              onClick={handleCreateVersionClick}
             >
               {isExporting ? 'Exporting...' : 'Create New Version'}
             </button>
@@ -701,6 +808,44 @@ export function DatasetManagement() {
 
         <MobileNavSpacer />
       </main>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="dm-dialog-overlay" onClick={handleCancelExport}>
+          <div className="dm-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3 className="dm-dialog-title">Create Dataset Version {newVersion}</h3>
+            <div className="dm-dialog-content">
+              <p>Ready to export the following to HuggingFace:</p>
+              <div className="dm-dialog-stats">
+                <div className="dm-dialog-stat">
+                  <span className="dm-dialog-stat-value">{approvedAnnotationCount}</span>
+                  <span className="dm-dialog-stat-label">Approved Annotations</span>
+                </div>
+                <div className="dm-dialog-stat">
+                  <span className="dm-dialog-stat-value">{approvedImageCount}</span>
+                  <span className="dm-dialog-stat-label">Unique Images</span>
+                </div>
+              </div>
+              <div className="dm-dialog-destination">
+                <span className="dm-dialog-dest-label">Destination:</span>
+                <span className="dm-dialog-dest-value">{repoId}</span>
+              </div>
+            </div>
+            <div className="dm-dialog-actions">
+              <button className="dm-btn dm-btn-outline" onClick={handleCancelExport}>
+                Cancel
+              </button>
+              <button
+                className="dm-btn dm-btn-primary"
+                onClick={handleConfirmExport}
+                disabled={approvedAnnotationCount === 0}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

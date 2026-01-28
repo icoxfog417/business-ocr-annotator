@@ -473,3 +473,164 @@
   display: inline-block;
   font-variant-numeric: tabular-nums;
 }
+
+/* Access denied state */
+.dm-access-denied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: #64748b;
+}
+
+.dm-access-denied h2 {
+  color: #0f172a;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+}
+
+.dm-access-denied p {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Stats summary */
+.dm-stats-summary {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.dm-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.dm-stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-stat-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* Locked input badge */
+.dm-locked-badge {
+  margin-left: 0.375rem;
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.dm-input-locked {
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+/* Confirmation dialog */
+.dm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.dm-dialog {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.dm-dialog-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dm-dialog-content {
+  padding: 1.25rem 1.5rem;
+}
+
+.dm-dialog-content p {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.dm-dialog-stats {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1rem;
+}
+
+.dm-dialog-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.dm-dialog-stat-value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-dialog-stat-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.dm-dialog-destination {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+}
+
+.dm-dialog-dest-label {
+  color: #64748b;
+}
+
+.dm-dialog-dest-value {
+  color: #0f172a;
+  font-weight: 500;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+}
+
+.dm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 0 0 12px 12px;
+}

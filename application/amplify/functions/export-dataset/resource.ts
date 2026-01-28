@@ -7,6 +7,12 @@ import { Code, Function, Runtime } from 'aws-cdk-lib/aws-lambda';
 
 const functionDir = path.dirname(fileURLToPath(import.meta.url));
 
+// Branch-based HuggingFace repo ID configuration
+// - main branch: production repo
+// - other branches / local sandbox: development repo
+const HF_REPO_ID =
+  process.env.AWS_BRANCH === 'main' ? 'icoxfog417/biz-doc-vqa' : 'icoxfog417/biz-doc-vqa-dev';
+
 export const exportDataset = defineFunction(
   (scope) =>
     new Function(scope, 'export-dataset', {
@@ -18,6 +24,7 @@ export const exportDataset = defineFunction(
         HF_HOME: '/tmp/hf_home',
         HF_TOKEN_SSM_PARAM: '/business-ocr/hf-token',
         ANNOTATION_INDEX_NAME: 'annotationsByValidationStatus',
+        HF_REPO_ID, // Preset HuggingFace repo ID (branch-based)
       },
       code: Code.fromAsset(functionDir, {
         bundling: {
