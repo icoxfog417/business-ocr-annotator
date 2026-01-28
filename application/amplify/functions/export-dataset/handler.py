@@ -334,8 +334,14 @@ def process_annotation(annotation: Dict, image_table, bucket_name: str) -> Optio
     image = Image.open(BytesIO(image_bytes))
 
     # Get image dimensions
-    image_width = int(image_record.get('compressedWidth', 0) or image.width)
-    image_height = int(image_record.get('compressedHeight', 0) or image.height)
+    # BBoxes are stored in ORIGINAL image coordinates (width/height from upload).
+    # We export the COMPRESSED image, so we need to:
+    # 1. Scale bbox from original to compressed coordinate space
+    # 2. Normalize by compressed dimensions
+    original_width = int(image_record.get('width', 0))
+    original_height = int(image_record.get('height', 0))
+    compressed_width = int(image_record.get('compressedWidth', 0) or image.width)
+    compressed_height = int(image_record.get('compressedHeight', 0) or image.height)
 
     # Parse bounding boxes (stored as JSON in DynamoDB)
     bboxes = annotation.get('boundingBoxes')
@@ -347,15 +353,25 @@ def process_annotation(annotation: Dict, image_table, bucket_name: str) -> Optio
     if bboxes and len(bboxes) > 0:
         bbox = bboxes[0]
         if isinstance(bbox, list) and len(bbox) == 4:
-            normalized_bbox = normalize_bbox(bbox, image_width, image_height)
+            raw = bbox
         elif isinstance(bbox, dict):
             raw = [
                 bbox.get('x0', 0),
                 bbox.get('y0', 0),
-                bbox.get('x1', image_width),
-                bbox.get('y1', image_height),
+                bbox.get('x1', compressed_width),
+                bbox.get('y1', compressed_height),
             ]
-            normalized_bbox = normalize_bbox(raw, image_width, image_height)
+        else:
+            raw = None
+
+        if raw:
+            # Scale bbox from original to compressed coordinate space if dimensions differ
+            if original_width and original_height and original_width != compressed_width:
+                scale_x = compressed_width / original_width
+                scale_y = compressed_height / original_height
+                raw = [raw[0] * scale_x, raw[1] * scale_y, raw[2] * scale_x, raw[3] * scale_y]
+
+            normalized_bbox = normalize_bbox(raw, compressed_width, compressed_height)
 
     # Build answers list - split multi-line answers into separate items
     answer = annotation.get('answer', '')
@@ -370,8 +386,8 @@ def process_annotation(annotation: Dict, image_table, bucket_name: str) -> Optio
     return {
         'annotation_id': annotation['id'],
         'image': image,
-        'image_width': image_width,
-        'image_height': image_height,
+        'image_width': compressed_width,
+        'image_height': compressed_height,
         'question': annotation.get('question', ''),
         'answers': answers,
         'answer_bbox': normalized_bbox,

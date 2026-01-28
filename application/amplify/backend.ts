@@ -202,7 +202,7 @@ triggerEvaluationLambda.addToRolePolicy(
 );
 triggerEvaluationLambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ['dynamodb:PutItem'],
+    actions: ['dynamodb:PutItem', 'dynamodb:Scan', 'dynamodb:UpdateItem'],
     resources: ['arn:aws:dynamodb:*:*:table/EvaluationJob-*'],
   })
 );
@@ -239,11 +239,14 @@ runEvaluationLambda.addToRolePolicy(
   })
 );
 
-// Bedrock permissions for model invocation
+// Bedrock permissions for model invocation (foundation models + cross-region inference profiles)
 runEvaluationLambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['bedrock:InvokeModel'],
-    resources: ['arn:aws:bedrock:*::foundation-model/*'],
+    resources: [
+      'arn:aws:bedrock:*::foundation-model/*',
+      'arn:aws:bedrock:*:*:inference-profile/*',
+    ],
   })
 );
 

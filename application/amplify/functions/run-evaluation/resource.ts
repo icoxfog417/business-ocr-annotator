@@ -15,8 +15,12 @@ export const runEvaluation = defineFunction(
       timeout: Duration.seconds(900), // 15 minutes
       memorySize: 2048,
       environment: {
+        HOME: '/tmp', // Required for libraries that write to home directory
         HF_HOME: '/tmp/hf_home',
-        WANDB_PROJECT: 'biz-doc-vqa',
+        HF_TOKEN_SSM_PARAM: '/business-ocr/hf-token',
+        WANDB_DIR: '/tmp/wandb',
+        WANDB_CONFIG_DIR: '/tmp/.config/wandb',
+        WANDB_PROJECT: process.env.AWS_BRANCH === 'main' ? 'biz-doc-vqa' : 'biz-doc-vqa-dev',
         WANDB_API_KEY_SSM_PARAM: '/business-ocr/wandb-api-key',
       },
       code: Code.fromAsset(functionDir, {
