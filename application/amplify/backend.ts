@@ -121,6 +121,7 @@ const exportDatasetLambda = backend.exportDataset.resources.lambda;
 // Environment variables
 exportDatasetLambda.addEnvironment('STORAGE_BUCKET_NAME', storageBucket.bucketName);
 exportDatasetLambda.addEnvironment('ANNOTATION_INDEX_NAME', 'annotationsByValidationStatus');
+exportDatasetLambda.addEnvironment('HF_TOKEN_SSM_PARAM', '/business-ocr/hf-token');
 
 // DynamoDB permissions: table discovery + read/write
 exportDatasetLambda.addToRolePolicy(
