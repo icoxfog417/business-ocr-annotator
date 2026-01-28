@@ -18,6 +18,8 @@ from typing import Dict, List, Optional
 from huggingface_hub import snapshot_download
 from PIL import Image
 from io import BytesIO
+from metrics import calculate_anls, calculate_iou
+from prompts import get_evaluation_prompt
 
 # AWS clients
 dynamodb = boto3.resource('dynamodb')
@@ -324,7 +326,11 @@ def load_imagefolder_dataset(repo_dir: str) -> List[Dict]:
 
 
 def invoke_model(bedrock_model_id: str, image, question: str, language: str) -> Dict:
-    """Invoke Bedrock model with image and question, return parsed answer + bbox."""
+    """Invoke Bedrock model with image and question, return parsed answer + bbox.
+
+    Uses language-specific prompts synchronized with annotation prompts
+    for consistent answer formatting (see prompts.py).
+    """
     # Convert PIL Image to JPEG bytes
     img_buffer = BytesIO()
     if image.mode == 'RGBA':
@@ -332,15 +338,8 @@ def invoke_model(bedrock_model_id: str, image, question: str, language: str) -> 
     image.save(img_buffer, format='JPEG', quality=85)
     img_bytes = img_buffer.getvalue()
 
-    prompt = (
-        'Look at this document image and answer the question.\n'
-        'Return your answer as JSON: {"answer": "your answer text", '
-        '"bbox": [x0, y0, x1, y1]} where bbox is normalized 0-1 coordinates.\n\n'
-        'If the answer contains multiple items, separate each item with a newline (\\n).\n'
-        'Example: {"answer": "Item A\\nItem B\\nItem C", "bbox": [0.1, 0.2, 0.5, 0.8]}\n\n'
-        f'Question: {question}\n\n'
-        'Return ONLY valid JSON, no explanation.'
-    )
+    # Use language-specific prompt for consistent formatting with annotation
+    prompt = get_evaluation_prompt(question, language)
 
     response = bedrock_client.converse(
         modelId=bedrock_model_id,
@@ -398,110 +397,4 @@ def parse_model_response(response_text: str) -> Dict:
     return result
 
 
-def calculate_anls(prediction: str, ground_truths: List[str], threshold: float = 0.5) -> float:
-    """
-    Calculate ANLS (Average Normalized Levenshtein Similarity).
-
-    Standard metric for DocVQA evaluation.
-    ANLS = 1 - NLD (Normalized Levenshtein Distance).
-    If ANLS < threshold, return 0 (penalize very wrong answers).
-
-    For single ground truth: Standard ANLS comparison
-    For multiple ground truths (list items): Average ANLS across all items
-      - Model must output ALL items to score high
-      - Prediction is split by newlines and matched against each ground truth
-    """
-    if not ground_truths:
-        return 0.0
-
-    # Single answer: standard ANLS comparison
-    if len(ground_truths) == 1:
-        return calculate_single_anls(prediction, ground_truths[0], threshold)
-
-    # Multiple answers (list items): model must output ALL items
-    # Split prediction into items by newline
-    pred_items = [line.strip() for line in prediction.split('\n') if line.strip()]
-
-    if not pred_items:
-        return 0.0
-
-    # For each ground truth item, find best matching prediction item
-    total_anls = 0.0
-    for gt in ground_truths:
-        best_anls = 0.0
-        for pred in pred_items:
-            anls = calculate_single_anls(pred, gt, threshold)
-            best_anls = max(best_anls, anls)
-        total_anls += best_anls
-
-    # Average across all ground truth items
-    return total_anls / len(ground_truths)
-
-
-def calculate_single_anls(prediction: str, ground_truth: str, threshold: float = 0.5) -> float:
-    """Calculate ANLS between a single prediction and single ground truth."""
-    pred_norm = prediction.lower().strip()
-    gt_norm = ground_truth.lower().strip()
-
-    if not pred_norm and not gt_norm:
-        return 1.0
-
-    if not pred_norm or not gt_norm:
-        return 0.0
-
-    lev_dist = levenshtein_distance(pred_norm, gt_norm)
-    max_len = max(len(pred_norm), len(gt_norm))
-    anls = 1.0 - (lev_dist / max_len)
-
-    if anls < threshold:
-        anls = 0.0
-
-    return anls
-
-
-def levenshtein_distance(s1: str, s2: str) -> int:
-    """Compute Levenshtein distance between two strings using dynamic programming."""
-    if len(s1) < len(s2):
-        return levenshtein_distance(s2, s1)
-
-    if len(s2) == 0:
-        return len(s1)
-
-    prev_row = list(range(len(s2) + 1))
-
-    for i, c1 in enumerate(s1):
-        curr_row = [i + 1]
-        for j, c2 in enumerate(s2):
-            insertions = prev_row[j + 1] + 1
-            deletions = curr_row[j] + 1
-            substitutions = prev_row[j] + (c1 != c2)
-            curr_row.append(min(insertions, deletions, substitutions))
-        prev_row = curr_row
-
-    return prev_row[-1]
-
-
-def calculate_iou(pred_bbox: List[float], gt_bbox: List[float]) -> float:
-    """
-    Calculate IoU (Intersection over Union) for bounding boxes.
-    Coordinates are normalized [x0, y0, x1, y1] in 0-1 range.
-    """
-    if len(pred_bbox) != 4 or len(gt_bbox) != 4:
-        return 0.0
-
-    x1 = max(pred_bbox[0], gt_bbox[0])
-    y1 = max(pred_bbox[1], gt_bbox[1])
-    x2 = min(pred_bbox[2], gt_bbox[2])
-    y2 = min(pred_bbox[3], gt_bbox[3])
-
-    intersection = max(0.0, x2 - x1) * max(0.0, y2 - y1)
-
-    pred_area = (pred_bbox[2] - pred_bbox[0]) * (pred_bbox[3] - pred_bbox[1])
-    gt_area = (gt_bbox[2] - gt_bbox[0]) * (gt_bbox[3] - gt_bbox[1])
-
-    union = pred_area + gt_area - intersection
-
-    if union <= 0:
-        return 0.0
-
-    return intersection / union
+# Metrics functions (calculate_anls, calculate_iou) are imported from metrics.py
