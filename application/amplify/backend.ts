@@ -7,7 +7,12 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { auth } from './auth/resource';
 import { storage } from './storage/resource';
-import { data, generateAnnotationHandler, triggerEvaluationHandler } from './data/resource';
+import {
+  data,
+  generateAnnotationHandler,
+  exportDatasetHandler,
+  triggerEvaluationHandler,
+} from './data/resource';
 import { processImage } from './functions/process-image/resource';
 import { exportDataset } from './functions/export-dataset/resource';
 import { runEvaluation } from './functions/run-evaluation/resource';
@@ -17,6 +22,7 @@ const backend = defineBackend({
   storage,
   data,
   generateAnnotationHandler,
+  exportDatasetHandler,
   triggerEvaluationHandler,
   processImage,
   exportDataset,
@@ -153,6 +159,21 @@ exportDatasetLambda.addToRolePolicy(
 );
 
 // =============================================================================
+// exportDatasetHandler Lambda (Sprint 4 Phase 2) - Node.js async dispatcher
+// Risk 6 fix: Thin wrapper that invokes the Python export Lambda asynchronously
+// =============================================================================
+const exportDatasetHandlerLambda = backend.exportDatasetHandler.resources.lambda;
+
+// Pass the Python Lambda's function name so the wrapper can invoke it
+exportDatasetHandlerLambda.addEnvironment(
+  'EXPORT_DATASET_FUNCTION_NAME',
+  exportDatasetLambda.functionName
+);
+
+// Grant the wrapper permission to invoke the Python Lambda
+exportDatasetLambda.grantInvoke(exportDatasetHandlerLambda);
+
+// =============================================================================
 // triggerEvaluation Lambda (Sprint 4 Phase 2) - Node.js GraphQL mutation handler
 // Risk 4 fix: Grant SQS send permission
 // =============================================================================
@@ -192,6 +213,10 @@ const runEvaluationLambda = backend.runEvaluation.resources.lambda;
 
 // Environment variables
 runEvaluationLambda.addEnvironment('WANDB_PROJECT', 'biz-doc-vqa');
+runEvaluationLambda.addEnvironment(
+  'WANDB_API_KEY',
+  '/business-ocr/wandb-api-key'
+);
 
 // SQS event source (Risk 4 fix: event source mapping)
 runEvaluationLambda.addEventSource(

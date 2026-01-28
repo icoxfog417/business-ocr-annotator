@@ -48,14 +48,17 @@ def get_table(prefix: str):
 
 
 def get_secret(env_key: str) -> str:
-    """Read secret from SSM Parameter Store or environment variable with caching."""
-    ssm_param = os.environ.get(f'{env_key}_SSM_PARAM', '')
+    """Read secret from SSM Parameter Store with caching.
+
+    The environment variable value is the SSM parameter path.
+    """
+    ssm_param = os.environ.get(env_key, '')
     if ssm_param:
         if ssm_param not in _secrets_cache:
             response = ssm_client.get_parameter(Name=ssm_param, WithDecryption=True)
             _secrets_cache[ssm_param] = response['Parameter']['Value']
         return _secrets_cache[ssm_param]
-    return os.environ.get(env_key, '')
+    return ''
 
 
 def handler(event, context):
@@ -205,7 +208,7 @@ def process_evaluation_job(message: Dict):
             wandb.summary['final_iou'] = running_iou
             wandb.summary['total_samples'] = samples_evaluated
 
-            wandb_run_url = wandb_run.get_url() or ''
+            wandb_run_url = wandb_run.url or ''
 
         # Update job status to COMPLETED
         now = datetime.now(timezone.utc).isoformat()
