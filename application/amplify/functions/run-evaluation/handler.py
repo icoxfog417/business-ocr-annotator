@@ -135,10 +135,12 @@ def process_evaluation_job(message: Dict):
 
         # Download dataset from HF Hub (ImageFolder format)
         print(f'Downloading dataset from {hf_repo_id}...')
+        hf_token = get_secret('HF_TOKEN_SSM_PARAM')
         dataset_dir = snapshot_download(
             hf_repo_id,
             repo_type='dataset',
             local_dir='/tmp/hf_dataset',
+            token=hf_token if hf_token else None,
         )
         dataset = load_imagefolder_dataset(dataset_dir)
         total_samples = len(dataset)
@@ -148,6 +150,8 @@ def process_evaluation_job(message: Dict):
         running_anls = 0.0
         running_iou = 0.0
         samples_evaluated = 0
+        samples_failed = 0
+        failed_sample_errors: List[str] = []
         results_data: List[Dict] = []
 
         for i, sample in enumerate(dataset):
@@ -178,6 +182,7 @@ def process_evaluation_job(message: Dict):
                 if wandb_run:
                     wandb.log({
                         'progress/samples_evaluated': samples_evaluated,
+                        'progress/samples_failed': samples_failed,
                         'progress/running_anls': running_anls,
                         'progress/running_iou': running_iou,
                         'sample/anls': anls,
@@ -200,8 +205,20 @@ def process_evaluation_job(message: Dict):
                     )
 
             except Exception as e:
+                samples_failed += 1
+                error_msg = f'Sample {i}: {str(e)[:100]}'
                 print(f'Error evaluating sample {i}: {str(e)}')
+                # Keep first 10 error messages for diagnostics
+                if len(failed_sample_errors) < 10:
+                    failed_sample_errors.append(error_msg)
                 continue
+
+        # Log failure summary
+        if samples_failed > 0:
+            print(
+                f'Warning: {samples_failed}/{total_samples} samples failed to evaluate. '
+                f'First errors: {failed_sample_errors[:3]}'
+            )
 
         # Log final results table to W&B
         wandb_run_url = ''
@@ -215,16 +232,33 @@ def process_evaluation_job(message: Dict):
             wandb.summary['final_anls'] = running_anls
             wandb.summary['final_iou'] = running_iou
             wandb.summary['total_samples'] = samples_evaluated
+            wandb.summary['failed_samples'] = samples_failed
 
             wandb_run_url = wandb_run.url or ''
 
+        # Determine final status based on sample failures
+        # COMPLETED: at least some samples evaluated successfully
+        # FAILED: no samples evaluated (all failed)
+        if samples_evaluated == 0 and total_samples > 0:
+            raise RuntimeError(
+                f'All {total_samples} samples failed to evaluate. '
+                f'Errors: {"; ".join(failed_sample_errors[:3])}'
+            )
+
         # Update job status to COMPLETED
         now = datetime.now(timezone.utc).isoformat()
+        error_summary = (
+            f'{samples_failed} samples failed: {"; ".join(failed_sample_errors[:3])}'
+            if samples_failed > 0
+            else None
+        )
         job_table.update_item(
             Key={'id': evaluation_job_id},
             UpdateExpression=(
                 'SET #s = :status, avgAnls = :anls, avgIou = :iou, '
-                'totalSamples = :total, wandbRunUrl = :url, completedAt = :now, updatedAt = :now'
+                'totalSamples = :total, failedSamples = :failed, '
+                'wandbRunUrl = :url, completedAt = :now, updatedAt = :now'
+                + (', errorMessage = :error' if error_summary else '')
             ),
             ExpressionAttributeNames={'#s': 'status'},
             ExpressionAttributeValues={
@@ -232,14 +266,17 @@ def process_evaluation_job(message: Dict):
                 ':anls': Decimal(str(round(running_anls, 6))),
                 ':iou': Decimal(str(round(running_iou, 6))),
                 ':total': samples_evaluated,
+                ':failed': samples_failed,
                 ':url': wandb_run_url,
                 ':now': now,
+                **(({':error': error_summary}) if error_summary else {}),
             },
         )
 
         print(
             f'Evaluation complete for {model_id}: '
-            f'ANLS={running_anls:.4f}, IoU={running_iou:.4f}, Samples={samples_evaluated}'
+            f'ANLS={running_anls:.4f}, IoU={running_iou:.4f}, '
+            f'Samples={samples_evaluated}, Failed={samples_failed}'
         )
 
     except Exception as e:
@@ -366,33 +403,60 @@ def calculate_anls(prediction: str, ground_truths: List[str], threshold: float =
     Standard metric for DocVQA evaluation.
     ANLS = 1 - NLD (Normalized Levenshtein Distance).
     If ANLS < threshold, return 0 (penalize very wrong answers).
+
+    For single ground truth: Standard ANLS comparison
+    For multiple ground truths (list items): Average ANLS across all items
+      - Model must output ALL items to score high
+      - Prediction is split by newlines and matched against each ground truth
     """
     if not ground_truths:
         return 0.0
 
-    pred_norm = prediction.lower().strip()
-    max_anls = 0.0
+    # Single answer: standard ANLS comparison
+    if len(ground_truths) == 1:
+        return calculate_single_anls(prediction, ground_truths[0], threshold)
 
+    # Multiple answers (list items): model must output ALL items
+    # Split prediction into items by newline
+    pred_items = [line.strip() for line in prediction.split('\n') if line.strip()]
+    if not pred_items:
+        pred_items = [prediction.strip()] if prediction.strip() else []
+
+    if not pred_items:
+        return 0.0
+
+    # For each ground truth item, find best matching prediction item
+    total_anls = 0.0
     for gt in ground_truths:
-        gt_norm = gt.lower().strip()
+        best_anls = 0.0
+        for pred in pred_items:
+            anls = calculate_single_anls(pred, gt, threshold)
+            best_anls = max(best_anls, anls)
+        total_anls += best_anls
 
-        if not pred_norm and not gt_norm:
-            max_anls = 1.0
-            break
+    # Average across all ground truth items
+    return total_anls / len(ground_truths)
 
-        if not pred_norm or not gt_norm:
-            continue
 
-        lev_dist = levenshtein_distance(pred_norm, gt_norm)
-        max_len = max(len(pred_norm), len(gt_norm))
-        anls = 1.0 - (lev_dist / max_len)
+def calculate_single_anls(prediction: str, ground_truth: str, threshold: float = 0.5) -> float:
+    """Calculate ANLS between a single prediction and single ground truth."""
+    pred_norm = prediction.lower().strip()
+    gt_norm = ground_truth.lower().strip()
 
-        if anls < threshold:
-            anls = 0.0
+    if not pred_norm and not gt_norm:
+        return 1.0
 
-        max_anls = max(max_anls, anls)
+    if not pred_norm or not gt_norm:
+        return 0.0
 
-    return max_anls
+    lev_dist = levenshtein_distance(pred_norm, gt_norm)
+    max_len = max(len(pred_norm), len(gt_norm))
+    anls = 1.0 - (lev_dist / max_len)
+
+    if anls < threshold:
+        anls = 0.0
+
+    return anls
 
 
 def levenshtein_distance(s1: str, s2: str) -> int:
