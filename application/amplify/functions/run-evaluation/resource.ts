@@ -33,7 +33,9 @@ export const runEvaluation = defineFunction(
                   `python3 -m pip install -r ${path.join(functionDir, 'requirements.txt')} -t ${outputDir} --platform manylinux2014_x86_64 --only-binary=:all: --quiet`,
                   { stdio: 'inherit' }
                 );
-                execSync(`cp -r ${functionDir}/*.py ${outputDir}/`);
+                execSync(
+                  `find ${functionDir} -maxdepth 1 -name '*.py' ! -name 'test_*' -exec cp {} ${outputDir}/ \\;`
+                );
                 return true;
               } catch (error) {
                 console.error('Local bundling failed:', error);
