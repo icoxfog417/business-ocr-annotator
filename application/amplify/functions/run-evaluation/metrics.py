@@ -3,24 +3,25 @@ Evaluation Metrics Module
 
 Contains metric calculations for VQA evaluation:
 - ANLS (Average Normalized Levenshtein Similarity): text accuracy
-  Uses the `anls` package — reference implementation from DocVQA competition.
-  See: https://pypi.org/project/anls/
 - IoU (Intersection over Union): bounding box spatial accuracy
 
 These functions are extracted from handler.py for testability.
 """
 from typing import List
 
-from anls import anls_score
-
 
 def calculate_anls(prediction: str, ground_truths: List[str], threshold: float = 0.5) -> float:
     """
     Calculate ANLS (Average Normalized Levenshtein Similarity).
 
-    For single ground truth: delegates to the `anls` package directly.
-    For multiple ground truths (list items): splits prediction by newlines
-    and matches each ground truth to the best prediction line, then averages.
+    Standard metric for DocVQA evaluation.
+    ANLS = 1 - NLD (Normalized Levenshtein Distance).
+    If ANLS < threshold, return 0 (penalize very wrong answers).
+
+    For single ground truth: Standard ANLS comparison
+    For multiple ground truths (list items): Average ANLS across all items
+      - Model must output ALL items to score high
+      - Prediction is split by newlines and matched against each ground truth
 
     Args:
         prediction: Model's predicted answer text
@@ -33,9 +34,9 @@ def calculate_anls(prediction: str, ground_truths: List[str], threshold: float =
     if not ground_truths:
         return 0.0
 
-    # Single answer: use anls package directly
+    # Single answer: standard ANLS comparison
     if len(ground_truths) == 1:
-        return anls_score(prediction, ground_truths, threshold)
+        return _single_anls(prediction, ground_truths[0], threshold)
 
     # Multiple answers (list items): model must output ALL items
     # Split prediction into items by newline
@@ -47,11 +48,48 @@ def calculate_anls(prediction: str, ground_truths: List[str], threshold: float =
     # For each ground truth item, find best matching prediction line
     total_anls = 0.0
     for gt in ground_truths:
-        best = max(anls_score(pred, [gt], threshold) for pred in pred_items)
+        best = max(_single_anls(pred, gt, threshold) for pred in pred_items)
         total_anls += best
 
     # Average across all ground truth items
     return total_anls / len(ground_truths)
+
+
+def _single_anls(prediction: str, ground_truth: str, threshold: float = 0.5) -> float:
+    """Calculate ANLS between a single prediction and single ground truth."""
+    pred_norm = prediction.lower().strip()
+    gt_norm = ground_truth.lower().strip()
+
+    if not pred_norm and not gt_norm:
+        return 1.0
+    if not pred_norm or not gt_norm:
+        return 0.0
+
+    lev_dist = _levenshtein(pred_norm, gt_norm)
+    max_len = max(len(pred_norm), len(gt_norm))
+    anls = 1.0 - (lev_dist / max_len)
+
+    return anls if anls >= threshold else 0.0
+
+
+def _levenshtein(s1: str, s2: str) -> int:
+    """Levenshtein distance via dynamic programming."""
+    if len(s1) < len(s2):
+        return _levenshtein(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+
+    prev_row = list(range(len(s2) + 1))
+    for i, c1 in enumerate(s1):
+        curr_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            curr_row.append(min(
+                prev_row[j + 1] + 1,
+                curr_row[j] + 1,
+                prev_row[j] + (c1 != c2),
+            ))
+        prev_row = curr_row
+    return prev_row[-1]
 
 
 def calculate_iou(pred_bbox: List[float], gt_bbox: List[float]) -> float:
@@ -72,20 +110,16 @@ def calculate_iou(pred_bbox: List[float], gt_bbox: List[float]) -> float:
     if len(pred_bbox) != 4 or len(gt_bbox) != 4:
         return 0.0
 
-    # Calculate intersection coordinates
     x1 = max(pred_bbox[0], gt_bbox[0])
     y1 = max(pred_bbox[1], gt_bbox[1])
     x2 = min(pred_bbox[2], gt_bbox[2])
     y2 = min(pred_bbox[3], gt_bbox[3])
 
-    # Calculate intersection area
     intersection = max(0.0, x2 - x1) * max(0.0, y2 - y1)
 
-    # Calculate individual areas
     pred_area = (pred_bbox[2] - pred_bbox[0]) * (pred_bbox[3] - pred_bbox[1])
     gt_area = (gt_bbox[2] - gt_bbox[0]) * (gt_bbox[3] - gt_bbox[1])
 
-    # Calculate union
     union = pred_area + gt_area - intersection
 
     if union <= 0:
