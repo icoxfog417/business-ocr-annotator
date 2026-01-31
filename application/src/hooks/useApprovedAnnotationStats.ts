@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { listAllItems } from '../lib/paginatedList';
+import { client } from '../lib/apiClient';
 
 interface ApprovedAnnotationStats {
   annotationCount: number;
@@ -33,18 +33,21 @@ export function useApprovedAnnotationStats(): ApprovedAnnotationStats {
     setError(null);
 
     try {
-      // Fetch both APPROVED and PENDING annotations in parallel (with pagination)
-      const [approved, pending] = await Promise.all([
-        listAllItems<{ imageId: string }>('Annotation', {
+      // Fetch both APPROVED and PENDING annotations in parallel
+      const [approvedResult, pendingResult] = await Promise.all([
+        client.models.Annotation.list({
           filter: { validationStatus: { eq: 'APPROVED' } },
         }),
-        listAllItems<{ imageId: string }>('Annotation', {
+        client.models.Annotation.list({
           filter: { validationStatus: { eq: 'PENDING' } },
         }),
       ]);
 
-      const approvedImageIds = new Set(approved.map((a) => a.imageId));
-      const pendingImageIds = new Set(pending.map((a) => a.imageId));
+      const approved = approvedResult.data || [];
+      const pending = pendingResult.data || [];
+
+      const approvedImageIds = new Set(approved.map((a: { imageId: string }) => a.imageId));
+      const pendingImageIds = new Set(pending.map((a: { imageId: string }) => a.imageId));
       const allExportableImageIds = new Set([...approvedImageIds, ...pendingImageIds]);
 
       setAnnotationCount(approved.length);
