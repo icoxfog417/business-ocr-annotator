@@ -5,7 +5,7 @@ import { listAllItems } from '../lib/paginatedList';
 import { useEvaluationModels } from '../hooks/useEvaluationModels';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { useIsAdmin } from '../hooks/useIsAdmin';
-import { useApprovedAnnotationStats } from '../hooks/useApprovedAnnotationStats';
+import { useAnnotationCounts } from '../hooks/useAnnotationCounts';
 import { exportConfig } from '../config/exportConfig';
 import { MobileNavSpacer } from '../components/layout';
 import './DatasetManagement.css';
@@ -108,12 +108,15 @@ export function DatasetManagement() {
   const { isMobile } = useBreakpoint();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
   const {
-    annotationCount: approvedAnnotationCount,
-    pendingAnnotationCount,
-    totalExportableAnnotationCount,
-    totalExportableImageCount,
+    annotations: annotationCounts,
+    images: imageCounts,
+    isLoading: isCountsLoading,
     refetch: refetchStats,
-  } = useApprovedAnnotationStats();
+  } = useAnnotationCounts();
+  const approvedAnnotationCount = annotationCounts.approved;
+  const pendingAnnotationCount = annotationCounts.pending;
+  const totalExportableAnnotationCount = annotationCounts.pending + annotationCounts.approved;
+  const totalExportableImageCount = imageCounts.exportable;
 
   // Export configuration (preset repo ID based on build environment)
   const { huggingFaceRepoId: presetRepoId, isRepoIdLocked } = exportConfig;
@@ -672,7 +675,7 @@ export function DatasetManagement() {
             </div>
             <button
               className="dm-btn dm-btn-primary"
-              disabled={isExporting || !newVersion || !repoId || totalExportableAnnotationCount === 0}
+              disabled={isExporting || isCountsLoading || !newVersion || !repoId || totalExportableAnnotationCount === 0}
               onClick={handleCreateVersionClick}
             >
               {isExporting ? 'Exporting...' : 'Create New Version'}

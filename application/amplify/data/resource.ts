@@ -24,6 +24,14 @@ const triggerEvaluationHandler = defineFunction({
   memoryMB: 512,
 });
 
+// Server-side annotation and image counts
+const getAnnotationCountsHandler = defineFunction({
+  name: 'getAnnotationCountsHandler',
+  entry: '../functions/get-annotation-counts/handler.ts',
+  timeoutSeconds: 10,
+  memoryMB: 256,
+});
+
 
 const schema = a.schema({
   Image: a
@@ -244,11 +252,22 @@ const schema = a.schema({
     .authorization((allow) => [allow.authenticated()])
     .handler(a.handler.function(triggerEvaluationHandler)),
 
+  // Server-side annotation and image counts
+  getAnnotationCounts: a
+    .query()
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(getAnnotationCountsHandler)),
 });
 
 export type Schema = ClientSchema<typeof schema>;
 
-export { generateAnnotationHandler, exportDatasetHandler, triggerEvaluationHandler };
+export {
+  generateAnnotationHandler,
+  exportDatasetHandler,
+  triggerEvaluationHandler,
+  getAnnotationCountsHandler,
+};
 export const data = defineData({
   schema,
   authorizationModes: {
