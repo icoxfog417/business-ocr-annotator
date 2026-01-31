@@ -83,64 +83,50 @@ export function FileUpload() {
     const uploadedImageIds: string[] = [];
 
     try {
-      for (const file of files) {
-        // Upload to images/original/ folder for 3-tier storage
-        const fileId = `${Date.now()}-${file.name}`;
-        const s3KeyOriginal = `images/original/${fileId}`;
+      // Process all files concurrently for faster uploads
+      const uploadResults = await Promise.all(
+        files.map(async (file, index) => {
+          // Use index + timestamp to ensure unique keys even for parallel uploads
+          const fileId = `${Date.now()}-${index}-${file.name}`;
+          const s3KeyOriginal = `images/original/${fileId}`;
 
-        console.log('Uploading file:', file.name, 'to path:', s3KeyOriginal);
+          // Upload to S3 and get image dimensions concurrently
+          const [, dimensions] = await Promise.all([
+            uploadData({
+              path: s3KeyOriginal,
+              data: file,
+              options: { contentType: file.type },
+            }).result,
+            new Promise<{ width: number; height: number }>((resolve) => {
+              const img = new Image();
+              img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+              img.src = URL.createObjectURL(file);
+            }),
+          ]);
 
-        // Upload to S3 original folder
-        const uploadResult = await uploadData({
-          path: s3KeyOriginal,
-          data: file,
-          options: {
-            contentType: file.type,
-          },
-        }).result;
+          // Save metadata to DynamoDB
+          const dbResult = await client.models.Image.create({
+            fileName: file.name,
+            s3KeyOriginal: s3KeyOriginal,
+            width: dimensions.width,
+            height: dimensions.height,
+            originalSize: file.size,
+            documentType: documentType,
+            language: language,
+            status: 'PROCESSING',
+            uploadedBy: 'current-user',
+            uploadedAt: new Date().toISOString(),
+          });
 
-        console.log('Upload successful:', uploadResult);
+          if (dbResult.errors) {
+            throw new Error(dbResult.errors.map((e) => e.message).join(', '));
+          }
 
-        // Get image dimensions
-        const img = new Image();
-        const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
-          img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-          img.src = URL.createObjectURL(file);
-        });
+          return dbResult.data?.id;
+        })
+      );
 
-        // Save metadata to DynamoDB with 3-tier storage fields
-        // Status is PROCESSING until the process-image Lambda completes
-        console.log('Saving to database...');
-        const dbResult = await client.models.Image.create({
-          fileName: file.name,
-          s3KeyOriginal: s3KeyOriginal,
-          // s3KeyCompressed and s3KeyThumbnail will be set by process-image Lambda
-          width: dimensions.width,
-          height: dimensions.height,
-          originalSize: file.size,
-          documentType: documentType,
-          language: language,
-          status: 'PROCESSING',
-          uploadedBy: 'current-user',
-          uploadedAt: new Date().toISOString(),
-        });
-
-        console.log('Database result:', dbResult);
-
-        if (dbResult.errors) {
-          console.error('Database errors:', dbResult.errors);
-          throw new Error(dbResult.errors.map((e) => e.message).join(', '));
-        }
-
-        if (dbResult.data?.id) {
-          uploadedImageIds.push(dbResult.data.id);
-        }
-
-        // Note: The process-image Lambda should be triggered automatically
-        // via S3 event trigger or can be invoked manually
-        // For now, we'll rely on S3 trigger or manual invocation
-        console.log('Image uploaded. Compression will be handled by process-image Lambda.');
-      }
+      uploadedImageIds.push(...uploadResults.filter((id): id is string => !!id));
 
       setFiles([]);
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { client } from '../lib/apiClient';
+import { listAllItems } from '../lib/paginatedList';
 import { useEvaluationModels } from '../hooks/useEvaluationModels';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { useIsAdmin } from '../hooks/useIsAdmin';
@@ -152,19 +153,19 @@ export function DatasetManagement() {
   // -------------------------------------------------------------------------
   const fetchData = useCallback(async () => {
     try {
-      const [versionsResult, progressResult, jobsResult] = await Promise.all([
-        client.models.DatasetVersion.list(),
-        client.models.DatasetExportProgress.list(),
-        client.models.EvaluationJob.list(),
+      const [versionsData, progressData, jobsData] = await Promise.all([
+        listAllItems<DatasetVersion>('DatasetVersion'),
+        listAllItems<DatasetExportProgress>('DatasetExportProgress'),
+        listAllItems<EvaluationJob>('EvaluationJob'),
       ]);
 
-      const versions = (versionsResult.data as unknown as DatasetVersion[]).sort(
+      const versions = versionsData.sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       setDatasetVersions(versions);
-      setExportProgresses(progressResult.data as unknown as DatasetExportProgress[]);
+      setExportProgresses(progressData);
       setEvaluationJobs(
-        (jobsResult.data as unknown as EvaluationJob[]).sort(
+        jobsData.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
       );

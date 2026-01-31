@@ -157,70 +157,79 @@ export function AnnotationWorkspace() {
   const handleComplete = async (answers: AnnotationAnswer[]) => {
     if (!imageId || !image) return;
 
-    for (const answer of answers) {
-      // Skip if skipped (not unanswerable - those should be saved)
-      if (answer.skipped) continue;
+    // Build all annotation save operations in parallel
+    const saveOperations = answers
+      .filter((answer) => {
+        if (answer.skipped) return false;
+        const bbox = answer.isUnanswerable
+          ? null
+          : answer.boundingBox
+            ? [
+                answer.boundingBox.x,
+                answer.boundingBox.y,
+                answer.boundingBox.x + answer.boundingBox.width,
+                answer.boundingBox.y + answer.boundingBox.height,
+              ]
+            : null;
+        return answer.isUnanswerable || bbox;
+      })
+      .map((answer) => {
+        const bbox = answer.isUnanswerable
+          ? null
+          : answer.boundingBox
+            ? [
+                answer.boundingBox.x,
+                answer.boundingBox.y,
+                answer.boundingBox.x + answer.boundingBox.width,
+                answer.boundingBox.y + answer.boundingBox.height,
+              ]
+            : null;
 
-      // For unanswerable: save with empty answer and no bounding box
-      const bbox = answer.isUnanswerable
-        ? null
-        : answer.boundingBox
-          ? [
-              answer.boundingBox.x,
-              answer.boundingBox.y,
-              answer.boundingBox.x + answer.boundingBox.width,
-              answer.boundingBox.y + answer.boundingBox.height,
-            ]
-          : null;
+        const existingById = annotations.find((a) => a.id === answer.questionId);
 
-      // Skip if not unanswerable and no bounding box
-      if (!answer.isUnanswerable && !bbox) continue;
+        if (existingById) {
+          return client.models.Annotation.update({
+            id: existingById.id,
+            answer: answer.answer,
+            boundingBoxes: bbox ? JSON.stringify([bbox]) : '[]',
+            isUnanswerable: answer.isUnanswerable,
+            aiAssisted: answer.aiAssisted,
+            aiModelId: answer.aiModelId,
+            aiModelProvider: answer.aiModelProvider,
+            aiExtractionTimestamp: answer.aiExtractionTimestamp,
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          return client.models.Annotation.create({
+            imageId,
+            question: answer.question,
+            answer: answer.answer,
+            language: image.language,
+            boundingBoxes: bbox ? JSON.stringify([bbox]) : '[]',
+            isUnanswerable: answer.isUnanswerable,
+            questionType: 'EXTRACTIVE',
+            validationStatus: 'PENDING',
+            generatedBy: answer.aiAssisted ? 'AI' : 'HUMAN',
+            aiAssisted: answer.aiAssisted,
+            aiModelId: answer.aiModelId,
+            aiModelProvider: answer.aiModelProvider,
+            aiExtractionTimestamp: answer.aiExtractionTimestamp,
+            confidence: answer.confidence,
+            createdBy: 'current-user',
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
 
-      // Check if updating existing annotation by ID (from gallery edit flow)
-      const existingById = annotations.find((a) => a.id === answer.questionId);
-
-      if (existingById) {
-        // Update existing annotation
-        await client.models.Annotation.update({
-          id: existingById.id,
-          answer: answer.answer,
-          boundingBoxes: bbox ? JSON.stringify([bbox]) : '[]',
-          isUnanswerable: answer.isUnanswerable,
-          aiAssisted: answer.aiAssisted,
-          aiModelId: answer.aiModelId,
-          aiModelProvider: answer.aiModelProvider,
-          aiExtractionTimestamp: answer.aiExtractionTimestamp,
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
-        // Create new annotation
-        await client.models.Annotation.create({
-          imageId,
-          question: answer.question,
-          answer: answer.answer,
-          language: image.language,
-          boundingBoxes: bbox ? JSON.stringify([bbox]) : '[]',
-          isUnanswerable: answer.isUnanswerable,
-          questionType: 'EXTRACTIVE',
-          validationStatus: 'PENDING',
-          generatedBy: answer.aiAssisted ? 'AI' : 'HUMAN',
-          aiAssisted: answer.aiAssisted,
-          aiModelId: answer.aiModelId,
-          aiModelProvider: answer.aiModelProvider,
-          aiExtractionTimestamp: answer.aiExtractionTimestamp,
-          confidence: answer.confidence,
-          createdBy: 'current-user',
-          createdAt: new Date().toISOString(),
-        });
-      }
-    }
-
-    // Update image status
-    await client.models.Image.update({
-      id: imageId,
-      status: 'ANNOTATING',
-      updatedAt: new Date().toISOString(),
-    });
+    // Execute all saves and image status update concurrently
+    await Promise.all([
+      ...saveOperations,
+      client.models.Image.update({
+        id: imageId,
+        status: 'ANNOTATING',
+        updatedAt: new Date().toISOString(),
+      }),
+    ]);
   };
 
   // Read text from bounding box using AI

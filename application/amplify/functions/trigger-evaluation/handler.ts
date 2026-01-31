@@ -1,5 +1,5 @@
 import { DynamoDBClient, ListTablesCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 
 const dynamoClient = new DynamoDBClient({});
@@ -22,34 +22,82 @@ async function getEvaluationJobTableName(): Promise<string> {
   return evaluationJobTableName;
 }
 
+// GSI name cache (discovered at runtime)
+let evaluationJobGsiName: string | null = null;
+
+async function getEvaluationJobGsiName(tableName: string): Promise<string | null> {
+  if (evaluationJobGsiName) return evaluationJobGsiName;
+
+  const result = await dynamoClient.send(
+    new (await import('@aws-sdk/client-dynamodb')).DescribeTableCommand({
+      TableName: tableName,
+    })
+  );
+
+  const gsi = result.Table?.GlobalSecondaryIndexes?.find(
+    (idx) => idx.KeySchema?.some((key) => key.AttributeName === 'datasetVersion')
+  );
+  evaluationJobGsiName = gsi?.IndexName ?? null;
+  return evaluationJobGsiName;
+}
+
 /**
  * Check for existing QUEUED or RUNNING jobs for the given dataset version and model.
- * Returns the existing job if found, null otherwise.
+ * Uses GSI query on datasetVersion instead of full table scan.
  */
 async function findActiveJob(
   tableName: string,
   datasetVersion: string,
   modelId: string
 ): Promise<{ id: string; status: string } | null> {
-  const result = await docClient.send(
-    new ScanCommand({
-      TableName: tableName,
-      FilterExpression:
-        'datasetVersion = :dv AND modelId = :mid AND (#s = :queued OR #s = :running)',
-      ExpressionAttributeNames: { '#s': 'status' },
-      ExpressionAttributeValues: {
-        ':dv': datasetVersion,
-        ':mid': modelId,
-        ':queued': 'QUEUED',
-        ':running': 'RUNNING',
-      },
-      ProjectionExpression: 'id, #s',
-    })
-  );
+  const gsiName = await getEvaluationJobGsiName(tableName);
 
-  if (result.Items && result.Items.length > 0) {
-    return { id: result.Items[0].id as string, status: result.Items[0].status as string };
+  if (gsiName) {
+    // Use GSI query (efficient: reads only matching partition)
+    const result = await docClient.send(
+      new QueryCommand({
+        TableName: tableName,
+        IndexName: gsiName,
+        KeyConditionExpression: 'datasetVersion = :dv',
+        FilterExpression: 'modelId = :mid AND (#s = :queued OR #s = :running)',
+        ExpressionAttributeNames: { '#s': 'status' },
+        ExpressionAttributeValues: {
+          ':dv': datasetVersion,
+          ':mid': modelId,
+          ':queued': 'QUEUED',
+          ':running': 'RUNNING',
+        },
+        ProjectionExpression: 'id, #s',
+      })
+    );
+
+    if (result.Items && result.Items.length > 0) {
+      return { id: result.Items[0].id as string, status: result.Items[0].status as string };
+    }
+  } else {
+    // Fallback to scan if GSI not yet available
+    const { ScanCommand: ScanCmd } = await import('@aws-sdk/lib-dynamodb');
+    const result = await docClient.send(
+      new ScanCmd({
+        TableName: tableName,
+        FilterExpression:
+          'datasetVersion = :dv AND modelId = :mid AND (#s = :queued OR #s = :running)',
+        ExpressionAttributeNames: { '#s': 'status' },
+        ExpressionAttributeValues: {
+          ':dv': datasetVersion,
+          ':mid': modelId,
+          ':queued': 'QUEUED',
+          ':running': 'RUNNING',
+        },
+        ProjectionExpression: 'id, #s',
+      })
+    );
+
+    if (result.Items && result.Items.length > 0) {
+      return { id: result.Items[0].id as string, status: result.Items[0].status as string };
+    }
   }
+
   return null;
 }
 
@@ -118,9 +166,17 @@ export const handler = async (
     const skippedModels: { modelId: string; reason: string; existingJobId?: string }[] = [];
     const now = new Date().toISOString();
 
-    for (const model of models) {
-      // Check for existing QUEUED or RUNNING job to prevent duplicate concurrent execution
-      const existingJob = await findActiveJob(tableName, datasetVersion, model.id);
+    // Check all models for active jobs in parallel
+    const activeJobChecks = await Promise.all(
+      models.map(async (model) => ({
+        model,
+        existingJob: await findActiveJob(tableName, datasetVersion, model.id),
+      }))
+    );
+
+    // Separate models into skipped (already active) and pending (need new job)
+    const pendingModels: typeof models = [];
+    for (const { model, existingJob } of activeJobChecks) {
       if (existingJob) {
         console.log(
           `Skipping ${model.id} - already ${existingJob.status} (job ${existingJob.id})`
@@ -130,55 +186,65 @@ export const handler = async (
           reason: `Already ${existingJob.status}`,
           existingJobId: existingJob.id,
         });
-        continue;
+      } else {
+        pendingModels.push(model);
       }
+    }
 
-      const jobId = crypto.randomUUID();
+    // Create jobs and send SQS messages in parallel
+    const jobResults = await Promise.all(
+      pendingModels.map(async (model) => {
+        const jobId = crypto.randomUUID();
 
-      // Create EvaluationJob record in DynamoDB
-      await docClient.send(
-        new PutCommand({
-          TableName: tableName,
-          Item: {
-            id: jobId,
-            jobId: jobId,
-            datasetVersion: datasetVersion,
-            modelId: model.id,
-            modelName: model.name,
-            status: 'QUEUED',
-            createdAt: now,
-            updatedAt: now,
-          },
-        })
-      );
-
-      // Send SQS message to trigger parallel evaluation
-      try {
-        await sqsClient.send(
-          new SendMessageCommand({
-            QueueUrl: queueUrl,
-            MessageBody: JSON.stringify({
-              evaluationJobId: jobId,
+        // Create EvaluationJob record in DynamoDB
+        await docClient.send(
+          new PutCommand({
+            TableName: tableName,
+            Item: {
+              id: jobId,
               jobId: jobId,
               datasetVersion: datasetVersion,
-              huggingFaceRepoId: huggingFaceRepoId,
               modelId: model.id,
               modelName: model.name,
-              modelBedrockId: model.bedrockModelId,
-            }),
+              status: 'QUEUED',
+              createdAt: now,
+              updatedAt: now,
+            },
           })
         );
-        console.log(`Queued evaluation job ${jobId} for model ${model.id}`);
-        jobIds.push(jobId);
-      } catch (sqsError) {
-        // SQS send failed - mark job as FAILED to avoid orphaned QUEUED jobs
-        const errorMsg = sqsError instanceof Error ? sqsError.message : 'SQS send failed';
-        console.error(`Failed to send SQS message for job ${jobId}: ${errorMsg}`);
-        await markJobFailed(tableName, jobId, `Failed to queue: ${errorMsg}`);
-        skippedModels.push({
-          modelId: model.id,
-          reason: `SQS error: ${errorMsg}`,
-        });
+
+        // Send SQS message to trigger parallel evaluation
+        try {
+          await sqsClient.send(
+            new SendMessageCommand({
+              QueueUrl: queueUrl,
+              MessageBody: JSON.stringify({
+                evaluationJobId: jobId,
+                jobId: jobId,
+                datasetVersion: datasetVersion,
+                huggingFaceRepoId: huggingFaceRepoId,
+                modelId: model.id,
+                modelName: model.name,
+                modelBedrockId: model.bedrockModelId,
+              }),
+            })
+          );
+          console.log(`Queued evaluation job ${jobId} for model ${model.id}`);
+          return { success: true as const, jobId };
+        } catch (sqsError) {
+          const errorMsg = sqsError instanceof Error ? sqsError.message : 'SQS send failed';
+          console.error(`Failed to send SQS message for job ${jobId}: ${errorMsg}`);
+          await markJobFailed(tableName, jobId, `Failed to queue: ${errorMsg}`);
+          return { success: false as const, modelId: model.id, reason: `SQS error: ${errorMsg}` };
+        }
+      })
+    );
+
+    for (const result of jobResults) {
+      if (result.success) {
+        jobIds.push(result.jobId);
+      } else {
+        skippedModels.push({ modelId: result.modelId, reason: result.reason });
       }
     }
 

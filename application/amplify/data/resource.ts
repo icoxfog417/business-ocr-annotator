@@ -199,6 +199,7 @@ const schema = a.schema({
       completedAt: a.datetime(),
       createdAt: a.datetime().required(),
     })
+    .secondaryIndexes((index) => [index('datasetVersion')])
     .authorization((allow) => [allow.authenticated()]),
 
   // Custom query for AI annotation generation

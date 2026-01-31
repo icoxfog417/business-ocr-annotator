@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { signOut } from 'aws-amplify/auth';
 import { Link } from 'react-router-dom';
-import { client } from '../lib/apiClient';
+import { listAllItems } from '../lib/paginatedList';
 import { MobileNavSpacer } from '../components/layout';
 
 interface Stats {
@@ -28,30 +28,39 @@ export function Dashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [imagesResult, annotationsResult, datasetsResult] = await Promise.all([
-          client.models.Image.list(),
-          client.models.Annotation.list(),
-          client.models.DatasetVersion.list(),
-        ]);
+        interface AnnotationRecord {
+          generatedBy?: string | null;
+          validationStatus?: string | null;
+        }
 
-        const annotations = annotationsResult.data;
-        const aiAnnotations = annotations.filter((a) => a.generatedBy === 'AI').length;
-        const humanAnnotations = annotations.filter((a) => a.generatedBy === 'HUMAN').length;
-        const approvedAnnotations = annotations.filter(
-          (a) => a.validationStatus === 'APPROVED'
-        ).length;
-        const pendingAnnotations = annotations.filter(
-          (a) => a.validationStatus === 'PENDING' || !a.validationStatus
-        ).length;
+        // Fetch all data with pagination and use server-side filters
+        // for annotation sub-categories to reduce data transfer
+        const [images, aiAnnotations, humanAnnotations, approvedAnnotations, pendingAnnotations, datasets] =
+          await Promise.all([
+            listAllItems('Image'),
+            listAllItems<AnnotationRecord>('Annotation', {
+              filter: { generatedBy: { eq: 'AI' } },
+            }),
+            listAllItems<AnnotationRecord>('Annotation', {
+              filter: { generatedBy: { eq: 'HUMAN' } },
+            }),
+            listAllItems<AnnotationRecord>('Annotation', {
+              filter: { validationStatus: { eq: 'APPROVED' } },
+            }),
+            listAllItems<AnnotationRecord>('Annotation', {
+              filter: { validationStatus: { eq: 'PENDING' } },
+            }),
+            listAllItems('DatasetVersion'),
+          ]);
 
         setStats({
-          images: imagesResult.data.length,
-          annotations: annotations.length,
-          datasets: datasetsResult.data.length,
-          aiAnnotations,
-          humanAnnotations,
-          approvedAnnotations,
-          pendingAnnotations,
+          images: images.length,
+          annotations: aiAnnotations.length + humanAnnotations.length,
+          datasets: datasets.length,
+          aiAnnotations: aiAnnotations.length,
+          humanAnnotations: humanAnnotations.length,
+          approvedAnnotations: approvedAnnotations.length,
+          pendingAnnotations: pendingAnnotations.length,
         });
       } catch (error) {
         console.error('Failed to fetch stats:', error);
