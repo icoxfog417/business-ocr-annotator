@@ -108,7 +108,9 @@ export function DatasetManagement() {
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
   const {
     annotationCount: approvedAnnotationCount,
-    imageCount: approvedImageCount,
+    pendingAnnotationCount,
+    totalExportableAnnotationCount,
+    totalExportableImageCount,
     refetch: refetchStats,
   } = useApprovedAnnotationStats();
 
@@ -356,10 +358,54 @@ export function DatasetManagement() {
     setShowConfirmDialog(true);
   };
 
+  const autoApprovePendingAnnotations = async () => {
+    const now = new Date().toISOString();
+    let nextToken: string | null | undefined;
+
+    do {
+      const result = await client.models.Annotation.list({
+        filter: { validationStatus: { eq: 'PENDING' } },
+        ...(nextToken ? { nextToken } : {}),
+      });
+
+      const annotations = result.data || [];
+
+      await Promise.all(
+        annotations.map((annotation) =>
+          client.models.Annotation.update({
+            id: annotation.id,
+            validationStatus: 'APPROVED',
+            validatedBy: 'auto-approved-on-export',
+            validatedAt: now,
+          })
+        )
+      );
+
+      nextToken = result.nextToken || undefined;
+    } while (nextToken);
+  };
+
   const handleConfirmExport = async () => {
     setShowConfirmDialog(false);
+    setExportError(null);
+
+    // Auto-approve all PENDING annotations before export
+    if (pendingAnnotationCount > 0) {
+      setIsExporting(true);
+      try {
+        await autoApprovePendingAnnotations();
+      } catch (err) {
+        setExportError(
+          'Failed to auto-approve annotations: ' +
+            (err instanceof Error ? err.message : String(err))
+        );
+        setIsExporting(false);
+        return;
+      }
+      setIsExporting(false);
+    }
+
     await handleExport();
-    // Refresh stats after export starts
     refetchStats();
   };
 
@@ -567,14 +613,21 @@ export function DatasetManagement() {
         <section className="dm-section">
           <h2 className="dm-section-title">Export to HuggingFace</h2>
 
-          {/* Approved annotations summary */}
+          {/* Exportable annotations summary */}
           <div className="dm-stats-summary">
             <div className="dm-stat-item">
-              <span className="dm-stat-value">{approvedAnnotationCount}</span>
-              <span className="dm-stat-label">Approved Annotations</span>
+              <span className="dm-stat-value">{totalExportableAnnotationCount}</span>
+              <span className="dm-stat-label">
+                Exportable Annotations
+                {pendingAnnotationCount > 0 && (
+                  <span className="dm-stat-detail">
+                    ({approvedAnnotationCount} approved, {pendingAnnotationCount} pending)
+                  </span>
+                )}
+              </span>
             </div>
             <div className="dm-stat-item">
-              <span className="dm-stat-value">{approvedImageCount}</span>
+              <span className="dm-stat-value">{totalExportableImageCount}</span>
               <span className="dm-stat-label">Unique Images</span>
             </div>
           </div>
@@ -616,7 +669,7 @@ export function DatasetManagement() {
             </div>
             <button
               className="dm-btn dm-btn-primary"
-              disabled={isExporting || !newVersion || !repoId || approvedAnnotationCount === 0}
+              disabled={isExporting || !newVersion || !repoId || totalExportableAnnotationCount === 0}
               onClick={handleCreateVersionClick}
             >
               {isExporting ? 'Exporting...' : 'Create New Version'}
@@ -853,14 +906,20 @@ export function DatasetManagement() {
               <p>Ready to export the following to HuggingFace:</p>
               <div className="dm-dialog-stats">
                 <div className="dm-dialog-stat">
-                  <span className="dm-dialog-stat-value">{approvedAnnotationCount}</span>
-                  <span className="dm-dialog-stat-label">Approved Annotations</span>
+                  <span className="dm-dialog-stat-value">{totalExportableAnnotationCount}</span>
+                  <span className="dm-dialog-stat-label">Annotations</span>
                 </div>
                 <div className="dm-dialog-stat">
-                  <span className="dm-dialog-stat-value">{approvedImageCount}</span>
+                  <span className="dm-dialog-stat-value">{totalExportableImageCount}</span>
                   <span className="dm-dialog-stat-label">Unique Images</span>
                 </div>
               </div>
+              {pendingAnnotationCount > 0 && (
+                <p className="dm-dialog-note">
+                  {pendingAnnotationCount} pending annotation
+                  {pendingAnnotationCount !== 1 ? 's' : ''} will be auto-approved.
+                </p>
+              )}
               <div className="dm-dialog-destination">
                 <span className="dm-dialog-dest-label">Destination:</span>
                 <span className="dm-dialog-dest-value">{repoId}</span>
@@ -873,7 +932,7 @@ export function DatasetManagement() {
               <button
                 className="dm-btn dm-btn-primary"
                 onClick={handleConfirmExport}
-                disabled={approvedAnnotationCount === 0}
+                disabled={totalExportableAnnotationCount === 0}
               >
                 Create
               </button>
