@@ -360,6 +360,7 @@ export function DatasetManagement() {
 
   const autoApprovePendingAnnotations = async () => {
     const now = new Date().toISOString();
+    const BATCH_SIZE = 25;
     let nextToken: string | null | undefined;
 
     do {
@@ -370,16 +371,20 @@ export function DatasetManagement() {
 
       const annotations = result.data || [];
 
-      await Promise.all(
-        annotations.map((annotation) =>
-          client.models.Annotation.update({
-            id: annotation.id,
-            validationStatus: 'APPROVED',
-            validatedBy: 'auto-approved-on-export',
-            validatedAt: now,
-          })
-        )
-      );
+      // Process in batches to avoid API rate limiting
+      for (let i = 0; i < annotations.length; i += BATCH_SIZE) {
+        const batch = annotations.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          batch.map((annotation) =>
+            client.models.Annotation.update({
+              id: annotation.id,
+              validationStatus: 'APPROVED',
+              validatedBy: 'auto-approved-on-export',
+              validatedAt: now,
+            })
+          )
+        );
+      }
 
       nextToken = result.nextToken || undefined;
     } while (nextToken);
@@ -388,25 +393,22 @@ export function DatasetManagement() {
   const handleConfirmExport = async () => {
     setShowConfirmDialog(false);
     setExportError(null);
+    setIsExporting(true);
 
     // Auto-approve all PENDING annotations before export
-    if (pendingAnnotationCount > 0) {
-      setIsExporting(true);
-      try {
-        await autoApprovePendingAnnotations();
-      } catch (err) {
-        setExportError(
-          'Failed to auto-approve annotations: ' +
-            (err instanceof Error ? err.message : String(err))
-        );
-        setIsExporting(false);
-        return;
-      }
+    try {
+      await autoApprovePendingAnnotations();
+    } catch (err) {
+      setExportError(
+        'Failed to auto-approve annotations: ' +
+          (err instanceof Error ? err.message : String(err))
+      );
       setIsExporting(false);
+      return;
     }
 
     await handleExport();
-    refetchStats();
+    await refetchStats();
   };
 
   const handleCancelExport = () => {
