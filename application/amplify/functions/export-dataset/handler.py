@@ -132,16 +132,17 @@ def handler(event, context):
             processed_count = 0
             image_ids_seen: set = set()
 
-            # Cache for image records and downloaded images to avoid
-            # redundant DynamoDB gets and S3 downloads for the same image
+            # Cache for image records (DynamoDB metadata) to avoid redundant
+            # lookups when multiple annotations reference the same image.
+            # Note: we intentionally do NOT cache PIL Image objects because
+            # decoded images consume significant memory in Lambda.
             image_record_cache: Dict[str, Optional[Dict]] = {}
-            image_data_cache: Dict[str, Optional[Image.Image]] = {}
 
             for annotation in annotations:
                 try:
                     record = process_annotation(
                         annotation, image_table, storage_bucket,
-                        image_record_cache, image_data_cache,
+                        image_record_cache,
                     )
                     if record:
                         # Save image as JPEG
@@ -323,12 +324,11 @@ def process_annotation(
     image_table,
     bucket_name: str,
     image_record_cache: Optional[Dict[str, Optional[Dict]]] = None,
-    image_data_cache: Optional[Dict[str, Optional[Image.Image]]] = None,
 ) -> Optional[Dict]:
     """Process a single annotation into dataset format.
 
-    Uses optional caches to avoid redundant DynamoDB gets and S3 downloads
-    when multiple annotations reference the same image.
+    Uses an optional cache for DynamoDB image records to avoid redundant
+    lookups when multiple annotations reference the same image.
     """
     image_id = annotation.get('imageId')
     if not image_id:
@@ -347,22 +347,18 @@ def process_annotation(
         print(f"Image not found for annotation {annotation['id']}, imageId={image_id}")
         return None
 
-    # Download compressed image from S3 (with cache)
+    # Download compressed image from S3
     s3_key = image_record.get('s3KeyCompressed')
     if not s3_key:
         print(f"No compressed image for annotation {annotation['id']}")
         return None
 
-    if image_data_cache is not None and s3_key in image_data_cache:
-        image = image_data_cache[s3_key]
-    else:
+    try:
         image_obj = s3.get_object(Bucket=bucket_name, Key=s3_key)
         image_bytes = image_obj['Body'].read()
         image = Image.open(BytesIO(image_bytes))
-        if image_data_cache is not None:
-            image_data_cache[s3_key] = image
-
-    if not image:
+    except Exception as e:
+        print(f"Failed to load image for annotation {annotation['id']}, s3Key={s3_key}: {e}")
         return None
 
     # Get image dimensions

@@ -6,6 +6,8 @@ interface ListOptions {
   filter?: Record<string, unknown>;
 }
 
+const MAX_PAGES = 1000;
+
 /**
  * Fetch all items from an Amplify model using pagination.
  *
@@ -18,6 +20,7 @@ export async function listAllItems<T>(
 ): Promise<T[]> {
   const allItems: T[] = [];
   let nextToken: string | null | undefined;
+  let pages = 0;
 
   do {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,9 +30,12 @@ export async function listAllItems<T>(
       ...(nextToken ? { nextToken } : {}),
     });
 
-    allItems.push(...(result.data as T[]));
+    if (Array.isArray(result.data)) {
+      allItems.push(...(result.data as T[]));
+    }
     nextToken = result.nextToken;
-  } while (nextToken);
+    pages += 1;
+  } while (nextToken && pages < MAX_PAGES);
 
   return allItems;
 }

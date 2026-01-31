@@ -365,33 +365,25 @@ export function DatasetManagement() {
   const autoApprovePendingAnnotations = async () => {
     const now = new Date().toISOString();
     const BATCH_SIZE = 25;
-    let nextToken: string | null | undefined;
 
-    do {
-      const result = await client.models.Annotation.list({
-        filter: { validationStatus: { eq: 'PENDING' } },
-        ...(nextToken ? { nextToken } : {}),
-      });
+    const annotations = await listAllItems<{ id: string }>('Annotation', {
+      filter: { validationStatus: { eq: 'PENDING' } },
+    });
 
-      const annotations = result.data || [];
-
-      // Process in batches to avoid API rate limiting
-      for (let i = 0; i < annotations.length; i += BATCH_SIZE) {
-        const batch = annotations.slice(i, i + BATCH_SIZE);
-        await Promise.all(
-          batch.map((annotation) =>
-            client.models.Annotation.update({
-              id: annotation.id,
-              validationStatus: 'APPROVED',
-              validatedBy: 'auto-approved-on-export',
-              validatedAt: now,
-            })
-          )
-        );
-      }
-
-      nextToken = result.nextToken || undefined;
-    } while (nextToken);
+    // Process in batches to avoid API rate limiting
+    for (let i = 0; i < annotations.length; i += BATCH_SIZE) {
+      const batch = annotations.slice(i, i + BATCH_SIZE);
+      await Promise.all(
+        batch.map((annotation) =>
+          client.models.Annotation.update({
+            id: annotation.id,
+            validationStatus: 'APPROVED',
+            validatedBy: 'auto-approved-on-export',
+            validatedAt: now,
+          })
+        )
+      );
+    }
   };
 
   const handleConfirmExport = async () => {

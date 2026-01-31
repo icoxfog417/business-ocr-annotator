@@ -1,5 +1,5 @@
-import { DynamoDBClient, ListTablesCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBClient, DescribeTableCommand, ListTablesCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 
 const dynamoClient = new DynamoDBClient({});
@@ -29,9 +29,7 @@ async function getEvaluationJobGsiName(tableName: string): Promise<string | null
   if (evaluationJobGsiName) return evaluationJobGsiName;
 
   const result = await dynamoClient.send(
-    new (await import('@aws-sdk/client-dynamodb')).DescribeTableCommand({
-      TableName: tableName,
-    })
+    new DescribeTableCommand({ TableName: tableName })
   );
 
   const gsi = result.Table?.GlobalSecondaryIndexes?.find(
@@ -53,7 +51,9 @@ async function findActiveJob(
   const gsiName = await getEvaluationJobGsiName(tableName);
 
   if (gsiName) {
-    // Use GSI query (efficient: reads only matching partition)
+    // Use GSI query (efficient: reads only matching partition).
+    // Pagination is not needed here: the number of jobs per datasetVersion
+    // is tiny (one per model), well within a single 1 MB DynamoDB page.
     const result = await docClient.send(
       new QueryCommand({
         TableName: tableName,
@@ -75,10 +75,11 @@ async function findActiveJob(
       return { id: result.Items[0].id as string, status: result.Items[0].status as string };
     }
   } else {
-    // Fallback to scan if GSI not yet available
-    const { ScanCommand: ScanCmd } = await import('@aws-sdk/lib-dynamodb');
+    // Fallback to scan if GSI is not yet available (transient state during
+    // deployment). The EvaluationJob table is small so a single scan page
+    // (1 MB) is sufficient; pagination is not needed here.
     const result = await docClient.send(
-      new ScanCmd({
+      new ScanCommand({
         TableName: tableName,
         FilterExpression:
           'datasetVersion = :dv AND modelId = :mid AND (#s = :queued OR #s = :running)',
