@@ -83,50 +83,51 @@ export function FileUpload() {
     const uploadedImageIds: string[] = [];
 
     try {
-      // Process all files concurrently for faster uploads
-      const uploadResults = await Promise.all(
-        files.map(async (file, index) => {
-          // Use index + timestamp to ensure unique keys even for parallel uploads
-          const fileId = `${Date.now()}-${index}-${file.name}`;
-          const s3KeyOriginal = `images/original/${fileId}`;
+      for (const file of files) {
+        // Upload to images/original/ folder for 3-tier storage
+        const fileId = `${Date.now()}-${file.name}`;
+        const s3KeyOriginal = `images/original/${fileId}`;
 
-          // Upload to S3 and get image dimensions concurrently
-          const [, dimensions] = await Promise.all([
-            uploadData({
-              path: s3KeyOriginal,
-              data: file,
-              options: { contentType: file.type },
-            }).result,
-            new Promise<{ width: number; height: number }>((resolve) => {
-              const img = new Image();
-              img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-              img.src = URL.createObjectURL(file);
-            }),
-          ]);
+        // Upload to S3 original folder
+        await uploadData({
+          path: s3KeyOriginal,
+          data: file,
+          options: {
+            contentType: file.type,
+          },
+        }).result;
 
-          // Save metadata to DynamoDB
-          const dbResult = await client.models.Image.create({
-            fileName: file.name,
-            s3KeyOriginal: s3KeyOriginal,
-            width: dimensions.width,
-            height: dimensions.height,
-            originalSize: file.size,
-            documentType: documentType,
-            language: language,
-            status: 'PROCESSING',
-            uploadedBy: 'current-user',
-            uploadedAt: new Date().toISOString(),
-          });
+        // Get image dimensions
+        const img = new Image();
+        const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
+          img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          img.src = URL.createObjectURL(file);
+        });
 
-          if (dbResult.errors) {
-            throw new Error(dbResult.errors.map((e) => e.message).join(', '));
-          }
+        // Save metadata to DynamoDB with 3-tier storage fields
+        // Status is PROCESSING until the process-image Lambda completes
+        const dbResult = await client.models.Image.create({
+          fileName: file.name,
+          s3KeyOriginal: s3KeyOriginal,
+          // s3KeyCompressed and s3KeyThumbnail will be set by process-image Lambda
+          width: dimensions.width,
+          height: dimensions.height,
+          originalSize: file.size,
+          documentType: documentType,
+          language: language,
+          status: 'PROCESSING',
+          uploadedBy: 'current-user',
+          uploadedAt: new Date().toISOString(),
+        });
 
-          return dbResult.data?.id;
-        })
-      );
+        if (dbResult.errors) {
+          throw new Error(dbResult.errors.map((e) => e.message).join(', '));
+        }
 
-      uploadedImageIds.push(...uploadResults.filter((id): id is string => !!id));
+        if (dbResult.data?.id) {
+          uploadedImageIds.push(dbResult.data.id);
+        }
+      }
 
       setFiles([]);
 

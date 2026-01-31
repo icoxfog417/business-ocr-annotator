@@ -166,17 +166,9 @@ export const handler = async (
     const skippedModels: { modelId: string; reason: string; existingJobId?: string }[] = [];
     const now = new Date().toISOString();
 
-    // Check all models for active jobs in parallel
-    const activeJobChecks = await Promise.all(
-      models.map(async (model) => ({
-        model,
-        existingJob: await findActiveJob(tableName, datasetVersion, model.id),
-      }))
-    );
-
-    // Separate models into skipped (already active) and pending (need new job)
-    const pendingModels: typeof models = [];
-    for (const { model, existingJob } of activeJobChecks) {
+    for (const model of models) {
+      // Check for existing QUEUED or RUNNING job to prevent duplicate concurrent execution
+      const existingJob = await findActiveJob(tableName, datasetVersion, model.id);
       if (existingJob) {
         console.log(
           `Skipping ${model.id} - already ${existingJob.status} (job ${existingJob.id})`
@@ -186,65 +178,55 @@ export const handler = async (
           reason: `Already ${existingJob.status}`,
           existingJobId: existingJob.id,
         });
-      } else {
-        pendingModels.push(model);
+        continue;
       }
-    }
 
-    // Create jobs and send SQS messages in parallel
-    const jobResults = await Promise.all(
-      pendingModels.map(async (model) => {
-        const jobId = crypto.randomUUID();
+      const jobId = crypto.randomUUID();
 
-        // Create EvaluationJob record in DynamoDB
-        await docClient.send(
-          new PutCommand({
-            TableName: tableName,
-            Item: {
-              id: jobId,
+      // Create EvaluationJob record in DynamoDB
+      await docClient.send(
+        new PutCommand({
+          TableName: tableName,
+          Item: {
+            id: jobId,
+            jobId: jobId,
+            datasetVersion: datasetVersion,
+            modelId: model.id,
+            modelName: model.name,
+            status: 'QUEUED',
+            createdAt: now,
+            updatedAt: now,
+          },
+        })
+      );
+
+      // Send SQS message to trigger parallel evaluation
+      try {
+        await sqsClient.send(
+          new SendMessageCommand({
+            QueueUrl: queueUrl,
+            MessageBody: JSON.stringify({
+              evaluationJobId: jobId,
               jobId: jobId,
               datasetVersion: datasetVersion,
+              huggingFaceRepoId: huggingFaceRepoId,
               modelId: model.id,
               modelName: model.name,
-              status: 'QUEUED',
-              createdAt: now,
-              updatedAt: now,
-            },
+              modelBedrockId: model.bedrockModelId,
+            }),
           })
         );
-
-        // Send SQS message to trigger parallel evaluation
-        try {
-          await sqsClient.send(
-            new SendMessageCommand({
-              QueueUrl: queueUrl,
-              MessageBody: JSON.stringify({
-                evaluationJobId: jobId,
-                jobId: jobId,
-                datasetVersion: datasetVersion,
-                huggingFaceRepoId: huggingFaceRepoId,
-                modelId: model.id,
-                modelName: model.name,
-                modelBedrockId: model.bedrockModelId,
-              }),
-            })
-          );
-          console.log(`Queued evaluation job ${jobId} for model ${model.id}`);
-          return { success: true as const, jobId };
-        } catch (sqsError) {
-          const errorMsg = sqsError instanceof Error ? sqsError.message : 'SQS send failed';
-          console.error(`Failed to send SQS message for job ${jobId}: ${errorMsg}`);
-          await markJobFailed(tableName, jobId, `Failed to queue: ${errorMsg}`);
-          return { success: false as const, modelId: model.id, reason: `SQS error: ${errorMsg}` };
-        }
-      })
-    );
-
-    for (const result of jobResults) {
-      if (result.success) {
-        jobIds.push(result.jobId);
-      } else {
-        skippedModels.push({ modelId: result.modelId, reason: result.reason });
+        console.log(`Queued evaluation job ${jobId} for model ${model.id}`);
+        jobIds.push(jobId);
+      } catch (sqsError) {
+        // SQS send failed - mark job as FAILED to avoid orphaned QUEUED jobs
+        const errorMsg = sqsError instanceof Error ? sqsError.message : 'SQS send failed';
+        console.error(`Failed to send SQS message for job ${jobId}: ${errorMsg}`);
+        await markJobFailed(tableName, jobId, `Failed to queue: ${errorMsg}`);
+        skippedModels.push({
+          modelId: model.id,
+          reason: `SQS error: ${errorMsg}`,
+        });
       }
     }
 
