@@ -128,6 +128,30 @@ class TestAnlsMultiItem:
         gt = ["コーヒー", "サンドイッチ", "ケーキ"]
         assert calculate_anls(pred, gt) == 1.0
 
+    def test_japanese_items_with_subtle_mismatch(self):
+        """Realistic receipt OCR: model extracts items with subtle errors.
+
+        Ground truth (annotation): ["コーヒー", "ケーキ", "お団子"]
+        Prediction (model output): ["コーヒー200ml", "ケーキ", "特製団子"]
+
+        Per-item breakdown:
+          "コーヒー" vs best pred "コーヒー200ml":
+            dist=5, maxlen=9, raw=0.444 → below threshold → 0.0
+            Model added quantity "200ml" — short Japanese word + long suffix
+            is penalized heavily because 5 extra chars on a 4-char word
+            drops ANLS below the 0.5 threshold.
+          "ケーキ" vs best pred "ケーキ":
+            exact match → 1.0
+          "お団子" vs best pred "特製団子":
+            dist=2, maxlen=4, raw=0.500 → exactly at threshold → 0.5
+            "お" replaced by "特製" (1 delete + 1 substitute = 2 edits).
+
+        Final = (0.0 + 1.0 + 0.5) / 3 = 0.5
+        """
+        pred = "コーヒー200ml\nケーキ\n特製団子"
+        gt = ["コーヒー", "ケーキ", "お団子"]
+        assert calculate_anls(pred, gt) == pytest.approx(0.5, abs=1e-9)
+
 
 # =============================================================================
 # IoU: Verified by hand-computed geometry
