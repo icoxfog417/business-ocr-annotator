@@ -79,7 +79,10 @@ async function countImages(tableName: string): Promise<number> {
 
 /**
  * Get unique image IDs from annotations with exportable statuses (PENDING + APPROVED).
- * Uses ProjectionExpression to transfer only imageId per record, then deduplicates server-side.
+ * Uses ProjectionExpression to transfer only imageId per record (~36 bytes each),
+ * then deduplicates server-side. At 100k annotations this is ~3.6MB — well within
+ * Lambda memory limits. For significantly larger datasets, consider maintaining
+ * a counter table updated via DynamoDB Streams instead.
  */
 async function countExportableImages(tableName: string): Promise<number> {
   const imageIds = new Set<string>();

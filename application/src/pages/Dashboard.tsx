@@ -6,7 +6,7 @@ import { useAnnotationCounts } from '../hooks/useAnnotationCounts';
 import { MobileNavSpacer } from '../components/layout';
 
 export function Dashboard() {
-  const { annotations, images } = useAnnotationCounts();
+  const { annotations, images, isLoading: countsLoading } = useAnnotationCounts();
   const [datasetCount, setDatasetCount] = useState(0);
 
   useEffect(() => {
@@ -20,7 +20,6 @@ export function Dashboard() {
     };
     fetchDatasets();
   }, []);
-
 
   const handleSignOut = async () => {
     try {
@@ -349,9 +348,11 @@ export function Dashboard() {
                 </svg>
               </div>
             </div>
-            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{images.total}</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>
+              {countsLoading ? '-' : images.total}
+            </div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              {images.total === 0 ? 'No images uploaded yet' : 'Images in database'}
+              {countsLoading ? 'Loading...' : images.total === 0 ? 'No images uploaded yet' : 'Images in database'}
             </p>
           </div>
 
@@ -408,9 +409,11 @@ export function Dashboard() {
                 </svg>
               </div>
             </div>
-            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{annotations.total}</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>
+              {countsLoading ? '-' : annotations.total}
+            </div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              {annotations.total === 0 ? 'Ready to annotate' : 'Annotations created'}
+              {countsLoading ? 'Loading...' : annotations.total === 0 ? 'Ready to annotate' : 'Annotations created'}
             </p>
           </div>
 
@@ -494,7 +497,7 @@ export function Dashboard() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
               <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Approved</span>
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{annotations.approved}</div>
+            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{countsLoading ? '-' : annotations.approved}</div>
           </div>
 
           {/* Pending */}
@@ -509,7 +512,7 @@ export function Dashboard() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
               <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Pending Review</span>
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{annotations.pending}</div>
+            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{countsLoading ? '-' : annotations.pending}</div>
           </div>
 
           {/* Rejected */}
@@ -524,7 +527,7 @@ export function Dashboard() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
               <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Rejected</span>
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{annotations.rejected}</div>
+            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{countsLoading ? '-' : annotations.rejected}</div>
           </div>
         </div>
 

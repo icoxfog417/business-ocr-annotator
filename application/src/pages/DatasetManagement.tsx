@@ -106,8 +106,12 @@ export function DatasetManagement() {
   const { enabledModels, getModelById } = useEvaluationModels();
   const { isMobile } = useBreakpoint();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
-  const { annotations: annotationCounts, images: imageCounts, refetch: refetchStats } =
-    useAnnotationCounts();
+  const {
+    annotations: annotationCounts,
+    images: imageCounts,
+    isLoading: isCountsLoading,
+    refetch: refetchStats,
+  } = useAnnotationCounts();
   const approvedAnnotationCount = annotationCounts.approved;
   const pendingAnnotationCount = annotationCounts.pending;
   const totalExportableAnnotationCount = annotationCounts.pending + annotationCounts.approved;
@@ -670,7 +674,7 @@ export function DatasetManagement() {
             </div>
             <button
               className="dm-btn dm-btn-primary"
-              disabled={isExporting || !newVersion || !repoId || totalExportableAnnotationCount === 0}
+              disabled={isExporting || isCountsLoading || !newVersion || !repoId || totalExportableAnnotationCount === 0}
               onClick={handleCreateVersionClick}
             >
               {isExporting ? 'Exporting...' : 'Create New Version'}
