@@ -9,11 +9,14 @@ const generateAnnotationHandler = defineFunction({
 });
 
 // Sprint 4 Phase 2: Export dataset dispatcher (Node.js wrapper for Python Lambda)
+// resourceGroupName: 'data' places this in the data stack so it can reference
+// table name CDK tokens without creating a circular dependency.
 const exportDatasetHandler = defineFunction({
   name: 'exportDatasetHandler',
   entry: '../functions/export-dataset-handler/handler.ts',
   timeoutSeconds: 30,
   memoryMB: 256,
+  resourceGroupName: 'data',
 });
 
 // Sprint 4 Phase 2: Trigger evaluation orchestrator (Node.js)
@@ -22,6 +25,7 @@ const triggerEvaluationHandler = defineFunction({
   entry: '../functions/trigger-evaluation/handler.ts',
   timeoutSeconds: 30,
   memoryMB: 512,
+  resourceGroupName: 'data',
 });
 
 // Server-side annotation and image counts
@@ -30,6 +34,7 @@ const getAnnotationCountsHandler = defineFunction({
   entry: '../functions/get-annotation-counts/handler.ts',
   timeoutSeconds: 10,
   memoryMB: 256,
+  resourceGroupName: 'data',
 });
 
 
