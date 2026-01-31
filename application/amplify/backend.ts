@@ -3,6 +3,7 @@ import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { EventType } from 'aws-cdk-lib/aws-s3';
 import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
 import { Duration, Stack } from 'aws-cdk-lib';
+import { Function as LambdaFunction } from 'aws-cdk-lib/aws-lambda';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { auth } from './auth/resource';
@@ -132,11 +133,12 @@ storageBucket.addEventNotification(
 // =============================================================================
 const exportDatasetLambda = backend.exportDataset.resources.lambda;
 
-// Pass table names as environment variables (addEnvironment works for custom CDK Functions)
-exportDatasetLambda.addEnvironment('ANNOTATION_TABLE_NAME', annotationTable.tableName);
-exportDatasetLambda.addEnvironment('IMAGE_TABLE_NAME', imageTable.tableName);
-exportDatasetLambda.addEnvironment('DATASET_VERSION_TABLE_NAME', datasetVersionTable.tableName);
-exportDatasetLambda.addEnvironment('DATASET_EXPORT_PROGRESS_TABLE_NAME', datasetExportProgressTable.tableName);
+// Pass table names as environment variables (cast to Function for addEnvironment access)
+const exportDatasetFunction = exportDatasetLambda as LambdaFunction;
+exportDatasetFunction.addEnvironment('ANNOTATION_TABLE_NAME', annotationTable.tableName);
+exportDatasetFunction.addEnvironment('IMAGE_TABLE_NAME', imageTable.tableName);
+exportDatasetFunction.addEnvironment('DATASET_VERSION_TABLE_NAME', datasetVersionTable.tableName);
+exportDatasetFunction.addEnvironment('DATASET_EXPORT_PROGRESS_TABLE_NAME', datasetExportProgressTable.tableName);
 
 // DynamoDB permissions
 exportDatasetLambda.addToRolePolicy(
@@ -233,8 +235,9 @@ runEvaluationLambda.addEventSource(
   })
 );
 
-// Pass table name as environment variable (addEnvironment works for custom CDK Functions)
-runEvaluationLambda.addEnvironment('EVALUATION_JOB_TABLE_NAME', evaluationJobTable.tableName);
+// Pass table name as environment variable (cast to Function for addEnvironment access)
+const runEvaluationFunction = runEvaluationLambda as LambdaFunction;
+runEvaluationFunction.addEnvironment('EVALUATION_JOB_TABLE_NAME', evaluationJobTable.tableName);
 
 // DynamoDB permissions
 runEvaluationLambda.addToRolePolicy(
