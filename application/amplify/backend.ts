@@ -3,7 +3,6 @@ import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { EventType } from 'aws-cdk-lib/aws-s3';
 import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
 import { Duration, Stack } from 'aws-cdk-lib';
-import { Function as LambdaFunction } from 'aws-cdk-lib/aws-lambda';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { auth } from './auth/resource';
@@ -97,10 +96,22 @@ backend.processImage.resources.lambda.addToRolePolicy(
   })
 );
 
+// Note: processImage is in the function stack and is S3-triggered (no data-stack
+// intermediary). Using CDK table tokens here would create a circular dependency
+// between function and data stacks. Table name is discovered at runtime via
+// ListTables — acceptable because processImage only updates metadata (dimensions,
+// compression) on records already created by AppSync in the correct table.
+// TODO: Consider passing table name via S3 event metadata or SSM parameter.
+backend.processImage.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:ListTables'],
+    resources: ['*'],
+  })
+);
 backend.processImage.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:UpdateItem', 'dynamodb:Query'],
-    resources: [imageTable.tableArn, `${imageTable.tableArn}/index/*`],
+    resources: ['arn:aws:dynamodb:*:*:table/Image-*', 'arn:aws:dynamodb:*:*:table/Image-*/index/*'],
   })
 );
 
@@ -109,10 +120,6 @@ const processImageCfnFunction = backend.processImage.resources.cfnResources
 processImageCfnFunction.addPropertyOverride(
   'Environment.Variables.STORAGE_BUCKET_NAME',
   storageBucket.bucketName
-);
-processImageCfnFunction.addPropertyOverride(
-  'Environment.Variables.IMAGE_TABLE_NAME',
-  imageTable.tableName
 );
 processImageCfnFunction.addPropertyOverride(
   'Environment.Variables.IMAGE_TABLE_INDEX_NAME',
@@ -133,25 +140,19 @@ storageBucket.addEventNotification(
 // =============================================================================
 const exportDatasetLambda = backend.exportDataset.resources.lambda;
 
-// Pass table names as environment variables
-if (!(exportDatasetLambda instanceof LambdaFunction)) {
-  throw new Error('exportDataset lambda is not a Function instance');
-}
-exportDatasetLambda.addEnvironment('ANNOTATION_TABLE_NAME', annotationTable.tableName);
-exportDatasetLambda.addEnvironment('IMAGE_TABLE_NAME', imageTable.tableName);
-exportDatasetLambda.addEnvironment('DATASET_VERSION_TABLE_NAME', datasetVersionTable.tableName);
-exportDatasetLambda.addEnvironment('DATASET_EXPORT_PROGRESS_TABLE_NAME', datasetExportProgressTable.tableName);
-
-// DynamoDB permissions
+// Note: exportDataset is in the function stack (custom CDK Function). Using CDK
+// table tokens here would create a circular dependency with the data stack. Table
+// names are passed at runtime via the event payload from exportDatasetHandler
+// (which IS in the data stack and can safely reference table tokens).
 exportDatasetLambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:Query', 'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem'],
     resources: [
-      annotationTable.tableArn,
-      `${annotationTable.tableArn}/index/*`,
-      imageTable.tableArn,
-      datasetVersionTable.tableArn,
-      datasetExportProgressTable.tableArn,
+      'arn:aws:dynamodb:*:*:table/Annotation-*',
+      'arn:aws:dynamodb:*:*:table/Annotation-*/index/*',
+      'arn:aws:dynamodb:*:*:table/Image-*',
+      'arn:aws:dynamodb:*:*:table/DatasetVersion-*',
+      'arn:aws:dynamodb:*:*:table/DatasetExportProgress-*',
     ],
   })
 );
@@ -188,6 +189,23 @@ exportDatasetHandlerCfnFunction.addPropertyOverride(
 exportDatasetHandlerCfnFunction.addPropertyOverride(
   'Environment.Variables.STORAGE_BUCKET_NAME',
   storageBucket.bucketName
+);
+// Table names for the Python export Lambda (passed via event payload)
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.ANNOTATION_TABLE_NAME',
+  annotationTable.tableName
+);
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.IMAGE_TABLE_NAME',
+  imageTable.tableName
+);
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.DATASET_VERSION_TABLE_NAME',
+  datasetVersionTable.tableName
+);
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.DATASET_EXPORT_PROGRESS_TABLE_NAME',
+  datasetExportProgressTable.tableName
 );
 
 // Grant the wrapper permission to invoke the Python Lambda
@@ -237,17 +255,12 @@ runEvaluationLambda.addEventSource(
   })
 );
 
-// Pass table name as environment variable
-if (!(runEvaluationLambda instanceof LambdaFunction)) {
-  throw new Error('runEvaluation lambda is not a Function instance');
-}
-runEvaluationLambda.addEnvironment('EVALUATION_JOB_TABLE_NAME', evaluationJobTable.tableName);
-
-// DynamoDB permissions
+// Note: runEvaluation is in the function stack (custom CDK Function). Table name
+// is passed at runtime via the SQS message from triggerEvaluationHandler (data stack).
 runEvaluationLambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:GetItem', 'dynamodb:UpdateItem'],
-    resources: [evaluationJobTable.tableArn],
+    resources: ['arn:aws:dynamodb:*:*:table/EvaluationJob-*'],
   })
 );
 

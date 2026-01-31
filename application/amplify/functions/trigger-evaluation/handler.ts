@@ -207,6 +207,7 @@ export const handler = async (
               modelId: model.id,
               modelName: model.name,
               modelBedrockId: model.bedrockModelId,
+              evaluationJobTableName: tableName,
             }),
           })
         );

@@ -31,24 +31,30 @@ _table_cache: Dict[str, object] = {}
 _hf_token: Optional[str] = None
 
 
-# Map model name prefix to environment variable name
-_TABLE_ENV_VARS = {
-    'Annotation': 'ANNOTATION_TABLE_NAME',
-    'Image': 'IMAGE_TABLE_NAME',
-    'DatasetVersion': 'DATASET_VERSION_TABLE_NAME',
-    'DatasetExportProgress': 'DATASET_EXPORT_PROGRESS_TABLE_NAME',
-}
+# Table name overrides passed via event payload from the data-stack dispatcher.
+# This avoids circular dependency between function and data CloudFormation stacks.
+_table_name_overrides: Dict[str, str] = {}
+
+
+def set_table_name_overrides(table_names: Dict[str, str]) -> None:
+    """Set table name overrides from event payload."""
+    mapping = {
+        'annotation': 'Annotation',
+        'image': 'Image',
+        'datasetVersion': 'DatasetVersion',
+        'datasetExportProgress': 'DatasetExportProgress',
+    }
+    for key, prefix in mapping.items():
+        if key in table_names and table_names[key]:
+            _table_name_overrides[prefix] = table_names[key]
 
 
 def get_table(prefix: str):
-    """Get DynamoDB table by prefix using environment variable for table name."""
+    """Get DynamoDB table by name from event payload overrides."""
     if prefix not in _table_cache:
-        env_var = _TABLE_ENV_VARS.get(prefix)
-        if not env_var:
-            raise ValueError(f"No environment variable mapping for table prefix '{prefix}'")
-        table_name = os.environ.get(env_var)
+        table_name = _table_name_overrides.get(prefix)
         if not table_name:
-            raise ValueError(f"{env_var} environment variable not set")
+            raise ValueError(f"Table name for '{prefix}' not provided in event payload")
         print(f'Using table: {table_name}')
         _table_cache[prefix] = dynamodb.Table(table_name)
     return _table_cache[prefix]
@@ -90,6 +96,13 @@ def handler(event, context):
         export_id = event['exportId']
         storage_bucket = event['storageBucketName']
         resume_from = event.get('resumeFrom')
+
+        # Table names are passed from the data-stack dispatcher to avoid
+        # circular CloudFormation dependency between function and data stacks.
+        table_names = event.get('tableNames')
+        if not table_names:
+            raise ValueError('tableNames not provided in event payload')
+        set_table_name_overrides(table_names)
 
         print(f'Starting export: {export_id} for version {dataset_version}')
 

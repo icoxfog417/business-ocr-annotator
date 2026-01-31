@@ -34,6 +34,9 @@ export const handler = async (
     }
 
     // Invoke the Python Lambda asynchronously (fire-and-forget)
+    // Table names are passed via payload to avoid circular dependency between
+    // the data stack (where this handler lives) and the function stack (where
+    // the Python Lambda lives). See backend.ts for details.
     await lambdaClient.send(
       new InvokeCommand({
         FunctionName: functionName,
@@ -45,6 +48,12 @@ export const handler = async (
           exportId,
           storageBucketName,
           resumeFrom: args.resumeFrom,
+          tableNames: {
+            annotation: process.env.ANNOTATION_TABLE_NAME,
+            image: process.env.IMAGE_TABLE_NAME,
+            datasetVersion: process.env.DATASET_VERSION_TABLE_NAME,
+            datasetExportProgress: process.env.DATASET_EXPORT_PROGRESS_TABLE_NAME,
+          },
         }),
       })
     );

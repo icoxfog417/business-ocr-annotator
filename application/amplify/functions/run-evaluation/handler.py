@@ -34,21 +34,17 @@ _table_cache: Dict[str, object] = {}
 _secrets_cache: Dict[str, str] = {}
 
 
-# Map model name prefix to environment variable name
-_TABLE_ENV_VARS = {
-    'EvaluationJob': 'EVALUATION_JOB_TABLE_NAME',
-}
+# Table name overrides passed via SQS message from the data-stack trigger.
+# This avoids circular dependency between function and data CloudFormation stacks.
+_table_name_overrides: Dict[str, str] = {}
 
 
 def get_table(prefix: str):
-    """Get DynamoDB table by prefix using environment variable for table name."""
+    """Get DynamoDB table by name from SQS message overrides."""
     if prefix not in _table_cache:
-        env_var = _TABLE_ENV_VARS.get(prefix)
-        if not env_var:
-            raise ValueError(f"No environment variable mapping for table prefix '{prefix}'")
-        table_name = os.environ.get(env_var)
+        table_name = _table_name_overrides.get(prefix)
         if not table_name:
-            raise ValueError(f"{env_var} environment variable not set")
+            raise ValueError(f"Table name for '{prefix}' not provided in SQS message")
         print(f'Using table: {table_name}')
         _table_cache[prefix] = dynamodb.Table(table_name)
     return _table_cache[prefix]
@@ -106,6 +102,13 @@ def process_evaluation_job(message: Dict):
     model_id = message['modelId']
     model_name = message.get('modelName', model_id)
     bedrock_model_id = message['modelBedrockId']
+
+    # Table name is passed from the data-stack trigger to avoid circular
+    # CloudFormation dependency between function and data stacks.
+    eval_table_name = message.get('evaluationJobTableName')
+    if not eval_table_name:
+        raise ValueError('evaluationJobTableName not provided in SQS message')
+    _table_name_overrides['EvaluationJob'] = eval_table_name
 
     job_table = get_table('EvaluationJob')
     now = datetime.now(timezone.utc).isoformat()
