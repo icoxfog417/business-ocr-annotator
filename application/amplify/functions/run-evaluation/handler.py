@@ -23,7 +23,6 @@ from prompts import get_evaluation_prompt
 
 # AWS clients
 dynamodb = boto3.resource('dynamodb')
-dynamodb_client = boto3.client('dynamodb')
 bedrock_client = boto3.client('bedrock-runtime')
 ssm_client = boto3.client('ssm')
 
@@ -35,17 +34,22 @@ _table_cache: Dict[str, object] = {}
 _secrets_cache: Dict[str, str] = {}
 
 
+# Map model name prefix to environment variable name
+_TABLE_ENV_VARS = {
+    'EvaluationJob': 'EVALUATION_JOB_TABLE_NAME',
+}
+
+
 def get_table(prefix: str):
-    """Discover DynamoDB table name by prefix (same pattern as process-image)."""
+    """Get DynamoDB table by prefix using environment variable for table name."""
     if prefix not in _table_cache:
-        response = dynamodb_client.list_tables()
-        table_name = next(
-            (name for name in response.get('TableNames', []) if name.startswith(f'{prefix}-')),
-            None,
-        )
+        env_var = _TABLE_ENV_VARS.get(prefix)
+        if not env_var:
+            raise ValueError(f"No environment variable mapping for table prefix '{prefix}'")
+        table_name = os.environ.get(env_var)
         if not table_name:
-            raise ValueError(f"Table with prefix '{prefix}' not found")
-        print(f'Discovered table: {table_name}')
+            raise ValueError(f"{env_var} environment variable not set")
+        print(f'Using table: {table_name}')
         _table_cache[prefix] = dynamodb.Table(table_name)
     return _table_cache[prefix]
 

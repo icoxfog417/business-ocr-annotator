@@ -65,6 +65,16 @@ backend.addOutput({
 });
 
 // =============================================================================
+// DynamoDB table references (used to pass exact table names to Lambdas)
+// =============================================================================
+const { tables } = backend.data.resources;
+const annotationTable = tables['Annotation'];
+const imageTable = tables['Image'];
+const evaluationJobTable = tables['EvaluationJob'];
+const datasetVersionTable = tables['DatasetVersion'];
+const datasetExportProgressTable = tables['DatasetExportProgress'];
+
+// =============================================================================
 // generateAnnotation Lambda (Sprint 2)
 // =============================================================================
 backend.generateAnnotationHandler.resources.lambda.addToRolePolicy(
@@ -88,14 +98,8 @@ backend.processImage.resources.lambda.addToRolePolicy(
 
 backend.processImage.resources.lambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
-  })
-);
-backend.processImage.resources.lambda.addToRolePolicy(
-  new PolicyStatement({
     actions: ['dynamodb:UpdateItem', 'dynamodb:Query'],
-    resources: ['arn:aws:dynamodb:*:*:table/Image-*', 'arn:aws:dynamodb:*:*:table/Image-*/index/*'],
+    resources: [imageTable.tableArn, `${imageTable.tableArn}/index/*`],
   })
 );
 
@@ -104,6 +108,10 @@ const processImageCfnFunction = backend.processImage.resources.cfnResources
 processImageCfnFunction.addPropertyOverride(
   'Environment.Variables.STORAGE_BUCKET_NAME',
   storageBucket.bucketName
+);
+processImageCfnFunction.addPropertyOverride(
+  'Environment.Variables.IMAGE_TABLE_NAME',
+  imageTable.tableName
 );
 processImageCfnFunction.addPropertyOverride(
   'Environment.Variables.IMAGE_TABLE_INDEX_NAME',
@@ -124,22 +132,22 @@ storageBucket.addEventNotification(
 // =============================================================================
 const exportDatasetLambda = backend.exportDataset.resources.lambda;
 
-// DynamoDB permissions: table discovery + read/write
-exportDatasetLambda.addToRolePolicy(
-  new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
-  })
-);
+// Pass table names as environment variables (addEnvironment works for custom CDK Functions)
+exportDatasetLambda.addEnvironment('ANNOTATION_TABLE_NAME', annotationTable.tableName);
+exportDatasetLambda.addEnvironment('IMAGE_TABLE_NAME', imageTable.tableName);
+exportDatasetLambda.addEnvironment('DATASET_VERSION_TABLE_NAME', datasetVersionTable.tableName);
+exportDatasetLambda.addEnvironment('DATASET_EXPORT_PROGRESS_TABLE_NAME', datasetExportProgressTable.tableName);
+
+// DynamoDB permissions
 exportDatasetLambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:Query', 'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem'],
     resources: [
-      'arn:aws:dynamodb:*:*:table/Annotation-*',
-      'arn:aws:dynamodb:*:*:table/Annotation-*/index/*',
-      'arn:aws:dynamodb:*:*:table/Image-*',
-      'arn:aws:dynamodb:*:*:table/DatasetVersion-*',
-      'arn:aws:dynamodb:*:*:table/DatasetExportProgress-*',
+      annotationTable.tableArn,
+      `${annotationTable.tableArn}/index/*`,
+      imageTable.tableArn,
+      datasetVersionTable.tableArn,
+      datasetExportProgressTable.tableArn,
     ],
   })
 );
@@ -187,25 +195,23 @@ exportDatasetLambda.grantInvoke(exportDatasetHandlerLambda);
 // =============================================================================
 const triggerEvaluationLambda = backend.triggerEvaluationHandler.resources.lambda;
 
-// Environment variable: SQS queue URL
+// Environment variables
 const triggerEvalCfnFunction = backend.triggerEvaluationHandler.resources.cfnResources
   .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
 triggerEvalCfnFunction.addPropertyOverride(
   'Environment.Variables.EVALUATION_QUEUE_URL',
   evaluationQueue.queueUrl
 );
-
-// DynamoDB permissions: table discovery + write
-triggerEvaluationLambda.addToRolePolicy(
-  new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
-  })
+triggerEvalCfnFunction.addPropertyOverride(
+  'Environment.Variables.EVALUATION_JOB_TABLE_NAME',
+  evaluationJobTable.tableName
 );
+
+// DynamoDB permissions
 triggerEvaluationLambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ['dynamodb:PutItem', 'dynamodb:Scan', 'dynamodb:UpdateItem'],
-    resources: ['arn:aws:dynamodb:*:*:table/EvaluationJob-*'],
+    actions: ['dynamodb:PutItem', 'dynamodb:Scan', 'dynamodb:UpdateItem', 'dynamodb:DescribeTable', 'dynamodb:Query'],
+    resources: [evaluationJobTable.tableArn, `${evaluationJobTable.tableArn}/index/*`],
   })
 );
 
@@ -227,17 +233,14 @@ runEvaluationLambda.addEventSource(
   })
 );
 
-// DynamoDB permissions: table discovery + read/write
-runEvaluationLambda.addToRolePolicy(
-  new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
-  })
-);
+// Pass table name as environment variable (addEnvironment works for custom CDK Functions)
+runEvaluationLambda.addEnvironment('EVALUATION_JOB_TABLE_NAME', evaluationJobTable.tableName);
+
+// DynamoDB permissions
 runEvaluationLambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:GetItem', 'dynamodb:UpdateItem'],
-    resources: ['arn:aws:dynamodb:*:*:table/EvaluationJob-*'],
+    resources: [evaluationJobTable.tableArn],
   })
 );
 
@@ -263,24 +266,29 @@ runEvaluationLambda.addToRolePolicy(
 // =============================================================================
 // getAnnotationCounts Lambda — Server-side annotation and image counts
 // =============================================================================
-backend.getAnnotationCountsHandler.resources.lambda.addToRolePolicy(
-  new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
-  })
+const getAnnotationCountsCfnFunction = backend.getAnnotationCountsHandler.resources.cfnResources
+  .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
+getAnnotationCountsCfnFunction.addPropertyOverride(
+  'Environment.Variables.ANNOTATION_TABLE_NAME',
+  annotationTable.tableName
 );
+getAnnotationCountsCfnFunction.addPropertyOverride(
+  'Environment.Variables.IMAGE_TABLE_NAME',
+  imageTable.tableName
+);
+
 backend.getAnnotationCountsHandler.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:Query'],
     resources: [
-      'arn:aws:dynamodb:*:*:table/Annotation-*',
-      'arn:aws:dynamodb:*:*:table/Annotation-*/index/*',
+      annotationTable.tableArn,
+      `${annotationTable.tableArn}/index/*`,
     ],
   })
 );
 backend.getAnnotationCountsHandler.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:Scan'],
-    resources: ['arn:aws:dynamodb:*:*:table/Image-*'],
+    resources: [imageTable.tableArn],
   })
 );

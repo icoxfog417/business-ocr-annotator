@@ -1,30 +1,16 @@
-import { DynamoDBClient, ListTablesCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 
 const dynamoClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
-// Cache for discovered table names
-let cachedAnnotationTable: string | null = null;
-let cachedImageTable: string | null = null;
+function getTableNames(): { annotationTable: string; imageTable: string } {
+  const annotationTable = process.env.ANNOTATION_TABLE_NAME;
+  const imageTable = process.env.IMAGE_TABLE_NAME;
 
-async function discoverTables(): Promise<{ annotationTable: string; imageTable: string }> {
-  if (cachedAnnotationTable && cachedImageTable) {
-    return { annotationTable: cachedAnnotationTable, imageTable: cachedImageTable };
-  }
+  if (!annotationTable) throw new Error('ANNOTATION_TABLE_NAME environment variable not set');
+  if (!imageTable) throw new Error('IMAGE_TABLE_NAME environment variable not set');
 
-  const result = await dynamoClient.send(new ListTablesCommand({}));
-  const tables = result.TableNames ?? [];
-
-  const annotationTable = tables.find((name) => name.startsWith('Annotation-'));
-  const imageTable = tables.find((name) => name.startsWith('Image-'));
-
-  if (!annotationTable) throw new Error('Annotation table not found');
-  if (!imageTable) throw new Error('Image table not found');
-
-  cachedAnnotationTable = annotationTable;
-  cachedImageTable = imageTable;
-  console.log(`Using tables: Annotation=${annotationTable}, Image=${imageTable}`);
   return { annotationTable, imageTable };
 }
 
@@ -130,7 +116,7 @@ interface AnnotationCountsResponse {
 
 export const handler = async (): Promise<AnnotationCountsResponse> => {
   try {
-    const { annotationTable, imageTable } = await discoverTables();
+    const { annotationTable, imageTable } = getTableNames();
 
     // Run all count queries in parallel
     const [pending, approved, rejected, totalImages, exportableImages] = await Promise.all([

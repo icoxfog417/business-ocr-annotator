@@ -1,6 +1,6 @@
 import type { Handler, S3Event } from 'aws-lambda';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import { DynamoDBClient, ListTablesCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import sharp from 'sharp';
 
@@ -13,25 +13,10 @@ const THUMBNAIL_MAX_SIZE = 100 * 1024; // 100KB for gallery
 const COMPRESSED_MAX_DIMENSION = 2048;
 const THUMBNAIL_MAX_DIMENSION = 300;
 
-// Cache for discovered table name
-let cachedTableName: string | null = null;
-
-/**
- * Discover Image table name via ListTables API.
- */
-async function getImageTableName(): Promise<string> {
-  if (cachedTableName) return cachedTableName;
-  
-  const result = await dynamoClient.send(new ListTablesCommand({}));
-  const imageTable = result.TableNames?.find(name => name.startsWith('Image-'));
-  
-  if (!imageTable) {
-    throw new Error('Image table not found');
-  }
-  
-  cachedTableName = imageTable;
-  console.log(`Using Image table: ${cachedTableName}`);
-  return cachedTableName;
+function getImageTableName(): string {
+  const tableName = process.env.IMAGE_TABLE_NAME;
+  if (!tableName) throw new Error('IMAGE_TABLE_NAME environment variable not set');
+  return tableName;
 }
 
 interface ProcessImageResult {
@@ -303,8 +288,7 @@ export const handler: Handler<S3Event, ProcessImageResult[]> = async (event) => 
     }];
   }
 
-  // Discover table name via ListTables API
-  const tableName = await getImageTableName();
+  const tableName = getImageTableName();
 
   const results: ProcessImageResult[] = [];
 
