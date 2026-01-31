@@ -423,6 +423,46 @@ Lambda functions have additional requirements:
 - Keep dependencies up to date
 - Run security audits regularly: `npm audit`
 
+## Code Review Guidelines
+
+### Responding to Automated Reviews (Copilot, etc.)
+
+When addressing automated PR review comments, apply critical judgment rather than accepting all suggestions:
+
+1. **Evaluate each comment independently** — automated reviewers often suggest over-engineered solutions
+2. **Reply to every comment** with a clear disposition: fixed, rejected (with rationale), or addressed with comment-only
+3. **Post a summary review** before inline replies so the PR author has an overview
+
+### Common Patterns to Watch For
+
+**Accept and fix:**
+- Dynamic imports when the module is already partially imported (use top-level imports)
+- Dead code paths (e.g., null checks after functions that raise on failure)
+- Inconsistent use of shared utilities (if a helper exists, use it everywhere)
+- Unbounded caches in Lambda functions (prefer caching small metadata only; avoid caching large objects like decoded images)
+
+**Reject with rationale:**
+- Adding sort keys to DynamoDB GSIs when the query uses OR on multiple status values (requires multiple queries, defeating the purpose)
+- Expanding utility interfaces for hypothetical future callers (YAGNI)
+- Parallelizing sequential batches that exist specifically for rate limiting
+- Adding streaming/virtual-scrolling for human-scale datasets (premature optimization)
+
+**Address with code comment only:**
+- Missing pagination on queries that return tiny result sets (document the assumption instead)
+- Scan fallback paths used only during transient deployment states
+
+### DynamoDB-Specific Guidance
+
+- **GSI design**: Partition-key-only GSIs are fine when the filter condition uses OR on multiple values for the candidate sort key
+- **Pagination**: DynamoDB pages at 1 MB. If the result set is known to be small (e.g., one job per model per dataset version), document why pagination is unnecessary rather than adding it
+- **DescribeTable for GSI discovery**: Cache the result at module level; the GSI name doesn't change at runtime
+
+### Lambda Memory Management
+
+- Cache DynamoDB metadata records (small dictionaries) — safe and effective
+- Do NOT cache decoded image objects (PIL Image, etc.) — unbounded memory growth risk
+- When handling image processing errors, use try/except rather than truthy checks on objects that never return None
+
 ## Communication
 
 - Use clear, descriptive language in all documentation
@@ -447,5 +487,5 @@ If you encounter ambiguity or need clarification:
 
 ---
 
-**Last Updated**: 2026-01-08
+**Last Updated**: 2026-01-31
 **Maintained By**: Project Team
