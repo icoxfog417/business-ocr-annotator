@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { client } from '../lib/apiClient';
+import { listAllItems } from '../lib/paginatedList';
 import { useEvaluationModels } from '../hooks/useEvaluationModels';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { useIsAdmin } from '../hooks/useIsAdmin';
@@ -155,19 +156,19 @@ export function DatasetManagement() {
   // -------------------------------------------------------------------------
   const fetchData = useCallback(async () => {
     try {
-      const [versionsResult, progressResult, jobsResult] = await Promise.all([
-        client.models.DatasetVersion.list(),
-        client.models.DatasetExportProgress.list(),
-        client.models.EvaluationJob.list(),
+      const [versionsData, progressData, jobsData] = await Promise.all([
+        listAllItems<DatasetVersion>('DatasetVersion'),
+        listAllItems<DatasetExportProgress>('DatasetExportProgress'),
+        listAllItems<EvaluationJob>('EvaluationJob'),
       ]);
 
-      const versions = (versionsResult.data as unknown as DatasetVersion[]).sort(
+      const versions = versionsData.sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       setDatasetVersions(versions);
-      setExportProgresses(progressResult.data as unknown as DatasetExportProgress[]);
+      setExportProgresses(progressData);
       setEvaluationJobs(
-        (jobsResult.data as unknown as EvaluationJob[]).sort(
+        jobsData.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
       );
@@ -364,33 +365,25 @@ export function DatasetManagement() {
   const autoApprovePendingAnnotations = async () => {
     const now = new Date().toISOString();
     const BATCH_SIZE = 25;
-    let nextToken: string | null | undefined;
 
-    do {
-      const result = await client.models.Annotation.list({
-        filter: { validationStatus: { eq: 'PENDING' } },
-        ...(nextToken ? { nextToken } : {}),
-      });
+    const annotations = await listAllItems<{ id: string }>('Annotation', {
+      filter: { validationStatus: { eq: 'PENDING' } },
+    });
 
-      const annotations = result.data || [];
-
-      // Process in batches to avoid API rate limiting
-      for (let i = 0; i < annotations.length; i += BATCH_SIZE) {
-        const batch = annotations.slice(i, i + BATCH_SIZE);
-        await Promise.all(
-          batch.map((annotation) =>
-            client.models.Annotation.update({
-              id: annotation.id,
-              validationStatus: 'APPROVED',
-              validatedBy: 'auto-approved-on-export',
-              validatedAt: now,
-            })
-          )
-        );
-      }
-
-      nextToken = result.nextToken || undefined;
-    } while (nextToken);
+    // Process in batches to avoid API rate limiting
+    for (let i = 0; i < annotations.length; i += BATCH_SIZE) {
+      const batch = annotations.slice(i, i + BATCH_SIZE);
+      await Promise.all(
+        batch.map((annotation) =>
+          client.models.Annotation.update({
+            id: annotation.id,
+            validationStatus: 'APPROVED',
+            validatedBy: 'auto-approved-on-export',
+            validatedAt: now,
+          })
+        )
+      );
+    }
   };
 
   const handleConfirmExport = async () => {

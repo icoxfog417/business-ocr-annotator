@@ -88,18 +88,14 @@ export function FileUpload() {
         const fileId = `${Date.now()}-${file.name}`;
         const s3KeyOriginal = `images/original/${fileId}`;
 
-        console.log('Uploading file:', file.name, 'to path:', s3KeyOriginal);
-
         // Upload to S3 original folder
-        const uploadResult = await uploadData({
+        await uploadData({
           path: s3KeyOriginal,
           data: file,
           options: {
             contentType: file.type,
           },
         }).result;
-
-        console.log('Upload successful:', uploadResult);
 
         // Get image dimensions
         const img = new Image();
@@ -110,7 +106,6 @@ export function FileUpload() {
 
         // Save metadata to DynamoDB with 3-tier storage fields
         // Status is PROCESSING until the process-image Lambda completes
-        console.log('Saving to database...');
         const dbResult = await client.models.Image.create({
           fileName: file.name,
           s3KeyOriginal: s3KeyOriginal,
@@ -125,21 +120,13 @@ export function FileUpload() {
           uploadedAt: new Date().toISOString(),
         });
 
-        console.log('Database result:', dbResult);
-
         if (dbResult.errors) {
-          console.error('Database errors:', dbResult.errors);
           throw new Error(dbResult.errors.map((e) => e.message).join(', '));
         }
 
         if (dbResult.data?.id) {
           uploadedImageIds.push(dbResult.data.id);
         }
-
-        // Note: The process-image Lambda should be triggered automatically
-        // via S3 event trigger or can be invoked manually
-        // For now, we'll rely on S3 trigger or manual invocation
-        console.log('Image uploaded. Compression will be handled by process-image Lambda.');
       }
 
       setFiles([]);
