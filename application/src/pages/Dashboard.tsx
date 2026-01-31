@@ -2,63 +2,25 @@ import { useState, useEffect } from 'react';
 import { signOut } from 'aws-amplify/auth';
 import { Link } from 'react-router-dom';
 import { client } from '../lib/apiClient';
+import { useAnnotationCounts } from '../hooks/useAnnotationCounts';
 import { MobileNavSpacer } from '../components/layout';
 
-interface Stats {
-  images: number;
-  annotations: number;
-  datasets: number;
-  aiAnnotations: number;
-  humanAnnotations: number;
-  approvedAnnotations: number;
-  pendingAnnotations: number;
-}
-
 export function Dashboard() {
-  const [stats, setStats] = useState<Stats>({
-    images: 0,
-    annotations: 0,
-    datasets: 0,
-    aiAnnotations: 0,
-    humanAnnotations: 0,
-    approvedAnnotations: 0,
-    pendingAnnotations: 0,
-  });
+  const { annotations, images } = useAnnotationCounts();
+  const [datasetCount, setDatasetCount] = useState(0);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchDatasets = async () => {
       try {
-        const [imagesResult, annotationsResult, datasetsResult] = await Promise.all([
-          client.models.Image.list(),
-          client.models.Annotation.list(),
-          client.models.DatasetVersion.list(),
-        ]);
-
-        const annotations = annotationsResult.data;
-        const aiAnnotations = annotations.filter((a) => a.generatedBy === 'AI').length;
-        const humanAnnotations = annotations.filter((a) => a.generatedBy === 'HUMAN').length;
-        const approvedAnnotations = annotations.filter(
-          (a) => a.validationStatus === 'APPROVED'
-        ).length;
-        const pendingAnnotations = annotations.filter(
-          (a) => a.validationStatus === 'PENDING' || !a.validationStatus
-        ).length;
-
-        setStats({
-          images: imagesResult.data.length,
-          annotations: annotations.length,
-          datasets: datasetsResult.data.length,
-          aiAnnotations,
-          humanAnnotations,
-          approvedAnnotations,
-          pendingAnnotations,
-        });
+        const datasetsResult = await client.models.DatasetVersion.list();
+        setDatasetCount(datasetsResult.data.length);
       } catch (error) {
-        console.error('Failed to fetch stats:', error);
+        console.error('Failed to fetch dataset count:', error);
       }
     };
-    fetchStats();
+    fetchDatasets();
   }, []);
+
 
   const handleSignOut = async () => {
     try {
@@ -387,9 +349,9 @@ export function Dashboard() {
                 </svg>
               </div>
             </div>
-            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{stats.images}</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{images.total}</div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              {stats.images === 0 ? 'No images uploaded yet' : 'Images in database'}
+              {images.total === 0 ? 'No images uploaded yet' : 'Images in database'}
             </p>
           </div>
 
@@ -446,9 +408,9 @@ export function Dashboard() {
                 </svg>
               </div>
             </div>
-            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{stats.annotations}</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{annotations.total}</div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              {stats.annotations === 0 ? 'Ready to annotate' : 'Annotations created'}
+              {annotations.total === 0 ? 'Ready to annotate' : 'Annotations created'}
             </p>
           </div>
 
@@ -504,14 +466,14 @@ export function Dashboard() {
                 </svg>
               </div>
             </div>
-            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{stats.datasets}</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#0f172a' }}>{datasetCount}</div>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              {stats.datasets === 0 ? 'No datasets exported yet' : 'Dataset versions'}
+              {datasetCount === 0 ? 'No datasets exported yet' : 'Dataset versions'}
             </p>
           </div>
         </div>
 
-        {/* AI Annotation Stats */}
+        {/* Annotation Status Stats */}
         <div
           style={{
             display: 'grid',
@@ -520,38 +482,6 @@ export function Dashboard() {
             marginBottom: '2.5rem',
           }}
         >
-          {/* AI Annotations */}
-          <div
-            style={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              color: 'white',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <span style={{ fontSize: '1.5rem' }}>🤖</span>
-              <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>AI Generated</span>
-            </div>
-            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{stats.aiAnnotations}</div>
-          </div>
-
-          {/* Human Annotations */}
-          <div
-            style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              color: 'white',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <span style={{ fontSize: '1.5rem' }}>✍️</span>
-              <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Human Created</span>
-            </div>
-            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{stats.humanAnnotations}</div>
-          </div>
-
           {/* Approved */}
           <div
             style={{
@@ -562,10 +492,9 @@ export function Dashboard() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <span style={{ fontSize: '1.5rem' }}>✓</span>
               <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Approved</span>
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{stats.approvedAnnotations}</div>
+            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{annotations.approved}</div>
           </div>
 
           {/* Pending */}
@@ -578,10 +507,24 @@ export function Dashboard() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <span style={{ fontSize: '1.5rem' }}>⏳</span>
               <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Pending Review</span>
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{stats.pendingAnnotations}</div>
+            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{annotations.pending}</div>
+          </div>
+
+          {/* Rejected */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              color: 'white',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Rejected</span>
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: '700' }}>{annotations.rejected}</div>
           </div>
         </div>
 

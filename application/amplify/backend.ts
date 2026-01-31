@@ -12,6 +12,7 @@ import {
   generateAnnotationHandler,
   exportDatasetHandler,
   triggerEvaluationHandler,
+  getAnnotationCountsHandler,
 } from './data/resource';
 import { processImage } from './functions/process-image/resource';
 import { exportDataset } from './functions/export-dataset/resource';
@@ -24,6 +25,7 @@ const backend = defineBackend({
   generateAnnotationHandler,
   exportDatasetHandler,
   triggerEvaluationHandler,
+  getAnnotationCountsHandler,
   processImage,
   exportDataset,
   runEvaluation,
@@ -255,5 +257,30 @@ runEvaluationLambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['ssm:GetParameter'],
     resources: ['arn:aws:ssm:*:*:parameter/business-ocr/*'],
+  })
+);
+
+// =============================================================================
+// getAnnotationCounts Lambda — Server-side annotation and image counts
+// =============================================================================
+backend.getAnnotationCountsHandler.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:ListTables'],
+    resources: ['*'],
+  })
+);
+backend.getAnnotationCountsHandler.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:Query'],
+    resources: [
+      'arn:aws:dynamodb:*:*:table/Annotation-*',
+      'arn:aws:dynamodb:*:*:table/Annotation-*/index/*',
+    ],
+  })
+);
+backend.getAnnotationCountsHandler.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:Scan'],
+    resources: ['arn:aws:dynamodb:*:*:table/Image-*'],
   })
 );

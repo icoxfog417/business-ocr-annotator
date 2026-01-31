@@ -4,7 +4,7 @@ import { client } from '../lib/apiClient';
 import { useEvaluationModels } from '../hooks/useEvaluationModels';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { useIsAdmin } from '../hooks/useIsAdmin';
-import { useApprovedAnnotationStats } from '../hooks/useApprovedAnnotationStats';
+import { useAnnotationCounts } from '../hooks/useAnnotationCounts';
 import { exportConfig } from '../config/exportConfig';
 import { MobileNavSpacer } from '../components/layout';
 import './DatasetManagement.css';
@@ -106,13 +106,12 @@ export function DatasetManagement() {
   const { enabledModels, getModelById } = useEvaluationModels();
   const { isMobile } = useBreakpoint();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
-  const {
-    annotationCount: approvedAnnotationCount,
-    pendingAnnotationCount,
-    totalExportableAnnotationCount,
-    totalExportableImageCount,
-    refetch: refetchStats,
-  } = useApprovedAnnotationStats();
+  const { annotations: annotationCounts, images: imageCounts, refetch: refetchStats } =
+    useAnnotationCounts();
+  const approvedAnnotationCount = annotationCounts.approved;
+  const pendingAnnotationCount = annotationCounts.pending;
+  const totalExportableAnnotationCount = annotationCounts.pending + annotationCounts.approved;
+  const totalExportableImageCount = imageCounts.exportable;
 
   // Export configuration (preset repo ID based on build environment)
   const { huggingFaceRepoId: presetRepoId, isRepoIdLocked } = exportConfig;
