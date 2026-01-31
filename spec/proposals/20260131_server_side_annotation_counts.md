@@ -106,19 +106,15 @@ export function useAnnotationCounts(): AnnotationCounts { ... }
 
 ### Page updates
 
-**Dashboard** — Replace `client.models.Annotation.list()` + `client.models.Image.list()` with `useAnnotationCounts()`. Remove client-side filtering for status counts. Image count and annotation counts come from the hook. DatasetVersion count remains as-is (small table).
+**Dashboard** — Replace `client.models.Annotation.list()` + `client.models.Image.list()` with `useAnnotationCounts()`. Remove client-side filtering for status counts. Image count and annotation counts come from the hook. DatasetVersion count remains as-is (small table). AI/Human annotation counts (`generatedBy`) will be removed from the Dashboard — we don't need to distinguish who created the annotation.
 
 **DatasetManagement** — Replace `useApprovedAnnotationStats` with `useAnnotationCounts()`. Derive `totalExportableAnnotationCount` from `pending + approved`. Use `images.exportable` for the unique image count.
 
-### Dashboard AI/Human annotation counts
+### Side effects
 
-The Dashboard also displays AI-generated vs Human-created annotation counts (filtered by `generatedBy`). There is no GSI on `generatedBy`. Options:
-
-- **Option A**: Add a GSI on `generatedBy` and use `Select: 'COUNT'` (most efficient, but adds a GSI)
-- **Option B**: Use Scan with `FilterExpression` and `Select: 'COUNT'` in the Lambda (no new GSI, but full table scan)
-- **Option C**: Drop AI/Human counts from Dashboard (simplest, but loses a feature)
-
-**Recommendation**: Option B for now. A Scan with `Select: 'COUNT'` and `FilterExpression` still only transfers count numbers, not records. The table scan is acceptable for the expected data scale. A GSI can be added later if performance becomes an issue.
+1. **Dashboard loses AI/Human annotation counts** — The current Dashboard shows AI-generated and Human-created counts. Since we don't need this distinction, these counters will be removed. If needed later, a GSI on `generatedBy` can be added.
+2. **Lambda cold start** — First call after idle period will have ~200-500ms cold start. Acceptable for a stats query that isn't latency-critical.
+3. **Eventual consistency** — DynamoDB GSI reads are eventually consistent. After creating/approving annotations, counts may lag by a fraction of a second. This is acceptable for display purposes.
 
 ## Impact
 
