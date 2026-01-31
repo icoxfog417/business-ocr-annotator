@@ -1,0 +1,11 @@
+# Development dependencies for testing
+# Install with: pip install -r requirements-dev.txt
+
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Reference implementations for comparison testing
+anls>=0.0.2  # DocVQA competition reference (https://pypi.org/project/anls/)
+
+# Include main requirements
+-r requirements.txt
