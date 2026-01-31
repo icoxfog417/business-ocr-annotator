@@ -142,6 +142,17 @@ vite.config.ts.timestamp-*
 .sandbox/*
 !.sandbox/.gitkeep
 !.sandbox/README.md
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+*.so
+.venv/
+venv/
+
 google-auth-oauth-info.json
 hugging-face-token.json
 wandb-api-key.json

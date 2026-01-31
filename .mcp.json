@@ -35,7 +35,10 @@
     },
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
+      "args": ["-y", "chrome-devtools-mcp@latest", "--headless"],
+      "env": {
+        "CHROME_FLAGS": "--headless --no-sandbox --disable-gpu"
+      }
     }
   }
 }

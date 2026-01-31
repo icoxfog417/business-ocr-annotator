@@ -2,10 +2,28 @@ import { type ClientSchema, a, defineData, defineFunction } from '@aws-amplify/b
 
 // Define the function inline to avoid circular dependency
 const generateAnnotationHandler = defineFunction({
+  name: 'generateAnnotationHandler',
   entry: '../functions/generate-annotation/handler.ts',
   timeoutSeconds: 60,
   memoryMB: 512,
 });
+
+// Sprint 4 Phase 2: Export dataset dispatcher (Node.js wrapper for Python Lambda)
+const exportDatasetHandler = defineFunction({
+  name: 'exportDatasetHandler',
+  entry: '../functions/export-dataset-handler/handler.ts',
+  timeoutSeconds: 30,
+  memoryMB: 256,
+});
+
+// Sprint 4 Phase 2: Trigger evaluation orchestrator (Node.js)
+const triggerEvaluationHandler = defineFunction({
+  name: 'triggerEvaluationHandler',
+  entry: '../functions/trigger-evaluation/handler.ts',
+  timeoutSeconds: 30,
+  memoryMB: 512,
+});
+
 
 const schema = a.schema({
   Image: a
@@ -107,6 +125,7 @@ const schema = a.schema({
       updatedBy: a.string(),
       updatedAt: a.datetime(),
     })
+    .secondaryIndexes((index) => [index('validationStatus')])
     .authorization((allow) => [allow.authenticated()]),
 
   DefaultQuestion: a
@@ -172,9 +191,10 @@ const schema = a.schema({
       // Primary metrics (DocVQA standard) - 0-1 scale
       avgAnls: a.float(), // Average ANLS (text accuracy)
       avgIou: a.float(), // Average IoU (bbox accuracy)
-      totalSamples: a.integer(),
+      totalSamples: a.integer(), // Successfully evaluated samples
+      failedSamples: a.integer(), // Samples that failed to evaluate
       wandbRunUrl: a.string(), // Link to W&B run
-      errorMessage: a.string(),
+      errorMessage: a.string(), // Error details (for FAILED status or partial failures)
       startedAt: a.datetime(),
       completedAt: a.datetime(),
       createdAt: a.datetime().required(),
@@ -197,11 +217,37 @@ const schema = a.schema({
     .returns(a.json())
     .authorization((allow) => [allow.authenticated()])
     .handler(a.handler.function(generateAnnotationHandler)),
+
+  // Sprint 4 Phase 2: Export dataset to Hugging Face (async dispatch)
+  exportDataset: a
+    .mutation()
+    .arguments({
+      datasetVersionId: a.string().required(),
+      datasetVersion: a.string().required(),
+      huggingFaceRepoId: a.string().required(),
+      resumeFrom: a.string(),
+    })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(exportDatasetHandler)),
+
+  // Sprint 4 Phase 2: Trigger parallel model evaluation
+  triggerEvaluation: a
+    .mutation()
+    .arguments({
+      datasetVersion: a.string().required(),
+      huggingFaceRepoId: a.string().required(),
+      modelIds: a.string().array(),
+    })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(triggerEvaluationHandler)),
+
 });
 
 export type Schema = ClientSchema<typeof schema>;
 
-export { generateAnnotationHandler };
+export { generateAnnotationHandler, exportDatasetHandler, triggerEvaluationHandler };
 export const data = defineData({
   schema,
   authorizationModes: {
