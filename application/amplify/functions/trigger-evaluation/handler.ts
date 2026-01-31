@@ -1,5 +1,5 @@
 import { DynamoDBClient, ListTablesCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 
 const dynamoClient = new DynamoDBClient({});
@@ -22,34 +22,82 @@ async function getEvaluationJobTableName(): Promise<string> {
   return evaluationJobTableName;
 }
 
+// GSI name cache (discovered at runtime)
+let evaluationJobGsiName: string | null = null;
+
+async function getEvaluationJobGsiName(tableName: string): Promise<string | null> {
+  if (evaluationJobGsiName) return evaluationJobGsiName;
+
+  const result = await dynamoClient.send(
+    new (await import('@aws-sdk/client-dynamodb')).DescribeTableCommand({
+      TableName: tableName,
+    })
+  );
+
+  const gsi = result.Table?.GlobalSecondaryIndexes?.find(
+    (idx) => idx.KeySchema?.some((key) => key.AttributeName === 'datasetVersion')
+  );
+  evaluationJobGsiName = gsi?.IndexName ?? null;
+  return evaluationJobGsiName;
+}
+
 /**
  * Check for existing QUEUED or RUNNING jobs for the given dataset version and model.
- * Returns the existing job if found, null otherwise.
+ * Uses GSI query on datasetVersion instead of full table scan.
  */
 async function findActiveJob(
   tableName: string,
   datasetVersion: string,
   modelId: string
 ): Promise<{ id: string; status: string } | null> {
-  const result = await docClient.send(
-    new ScanCommand({
-      TableName: tableName,
-      FilterExpression:
-        'datasetVersion = :dv AND modelId = :mid AND (#s = :queued OR #s = :running)',
-      ExpressionAttributeNames: { '#s': 'status' },
-      ExpressionAttributeValues: {
-        ':dv': datasetVersion,
-        ':mid': modelId,
-        ':queued': 'QUEUED',
-        ':running': 'RUNNING',
-      },
-      ProjectionExpression: 'id, #s',
-    })
-  );
+  const gsiName = await getEvaluationJobGsiName(tableName);
 
-  if (result.Items && result.Items.length > 0) {
-    return { id: result.Items[0].id as string, status: result.Items[0].status as string };
+  if (gsiName) {
+    // Use GSI query (efficient: reads only matching partition)
+    const result = await docClient.send(
+      new QueryCommand({
+        TableName: tableName,
+        IndexName: gsiName,
+        KeyConditionExpression: 'datasetVersion = :dv',
+        FilterExpression: 'modelId = :mid AND (#s = :queued OR #s = :running)',
+        ExpressionAttributeNames: { '#s': 'status' },
+        ExpressionAttributeValues: {
+          ':dv': datasetVersion,
+          ':mid': modelId,
+          ':queued': 'QUEUED',
+          ':running': 'RUNNING',
+        },
+        ProjectionExpression: 'id, #s',
+      })
+    );
+
+    if (result.Items && result.Items.length > 0) {
+      return { id: result.Items[0].id as string, status: result.Items[0].status as string };
+    }
+  } else {
+    // Fallback to scan if GSI not yet available
+    const { ScanCommand: ScanCmd } = await import('@aws-sdk/lib-dynamodb');
+    const result = await docClient.send(
+      new ScanCmd({
+        TableName: tableName,
+        FilterExpression:
+          'datasetVersion = :dv AND modelId = :mid AND (#s = :queued OR #s = :running)',
+        ExpressionAttributeNames: { '#s': 'status' },
+        ExpressionAttributeValues: {
+          ':dv': datasetVersion,
+          ':mid': modelId,
+          ':queued': 'QUEUED',
+          ':running': 'RUNNING',
+        },
+        ProjectionExpression: 'id, #s',
+      })
+    );
+
+    if (result.Items && result.Items.length > 0) {
+      return { id: result.Items[0].id as string, status: result.Items[0].status as string };
+    }
   }
+
   return null;
 }
 

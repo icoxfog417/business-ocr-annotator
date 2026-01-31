@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getUrl } from 'aws-amplify/storage';
 import { client } from '../lib/apiClient';
+import { listAllItems } from '../lib/paginatedList';
 import { getStatusStyle, getProcessingOpacity } from '../lib/statusStyles';
 import { MobileNavSpacer } from '../components/layout';
 
@@ -27,7 +28,15 @@ export function ImageGallery() {
 
   const fetchImages = async () => {
     try {
-      const { data } = await client.models.Image.list();
+      const data = await listAllItems<{
+        id: string;
+        fileName: string;
+        s3KeyOriginal: string;
+        s3KeyThumbnail?: string | null;
+        s3KeyCompressed?: string | null;
+        uploadedAt: string;
+        status?: string | null;
+      }>('Image');
       console.log('Fetched images from database:', data);
 
       const imagesWithUrls = await Promise.all(
@@ -75,14 +84,17 @@ export function ImageGallery() {
     if (!confirm('Are you sure you want to delete this image and all its annotations?')) return;
     
     try {
-      // Delete all annotations for this image first
-      const { data: annotations } = await client.models.Annotation.list({
+      // Delete all annotations for this image first (with pagination)
+      const annotations = await listAllItems<{ id: string }>('Annotation', {
         filter: { imageId: { eq: id } },
       });
-      
-      await Promise.all(annotations.map(ann => 
-        client.models.Annotation.delete({ id: ann.id })
-      ));
+
+      // Delete in batches of 25 to avoid API rate limiting
+      const BATCH_SIZE = 25;
+      for (let i = 0; i < annotations.length; i += BATCH_SIZE) {
+        const batch = annotations.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map((ann) => client.models.Annotation.delete({ id: ann.id })));
+      }
       
       // Then delete the image
       await client.models.Image.delete({ id });

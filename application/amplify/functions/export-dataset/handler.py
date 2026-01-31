@@ -132,9 +132,17 @@ def handler(event, context):
             processed_count = 0
             image_ids_seen: set = set()
 
+            # Cache for image records and downloaded images to avoid
+            # redundant DynamoDB gets and S3 downloads for the same image
+            image_record_cache: Dict[str, Optional[Dict]] = {}
+            image_data_cache: Dict[str, Optional[Image.Image]] = {}
+
             for annotation in annotations:
                 try:
-                    record = process_annotation(annotation, image_table, storage_bucket)
+                    record = process_annotation(
+                        annotation, image_table, storage_bucket,
+                        image_record_cache, image_data_cache,
+                    )
                     if record:
                         # Save image as JPEG
                         img_filename = f"{record['annotation_id']}.jpg"
@@ -310,28 +318,52 @@ def fetch_approved_annotations(table, resume_from: Optional[str] = None) -> List
     return all_annotations
 
 
-def process_annotation(annotation: Dict, image_table, bucket_name: str) -> Optional[Dict]:
-    """Process a single annotation into dataset format."""
+def process_annotation(
+    annotation: Dict,
+    image_table,
+    bucket_name: str,
+    image_record_cache: Optional[Dict[str, Optional[Dict]]] = None,
+    image_data_cache: Optional[Dict[str, Optional[Image.Image]]] = None,
+) -> Optional[Dict]:
+    """Process a single annotation into dataset format.
+
+    Uses optional caches to avoid redundant DynamoDB gets and S3 downloads
+    when multiple annotations reference the same image.
+    """
     image_id = annotation.get('imageId')
     if not image_id:
         return None
 
-    image_response = image_table.get_item(Key={'id': image_id})
-    image_record = image_response.get('Item')
+    # Check image record cache first
+    if image_record_cache is not None and image_id in image_record_cache:
+        image_record = image_record_cache[image_id]
+    else:
+        image_response = image_table.get_item(Key={'id': image_id})
+        image_record = image_response.get('Item')
+        if image_record_cache is not None:
+            image_record_cache[image_id] = image_record
 
     if not image_record:
         print(f"Image not found for annotation {annotation['id']}, imageId={image_id}")
         return None
 
-    # Download compressed image from S3
+    # Download compressed image from S3 (with cache)
     s3_key = image_record.get('s3KeyCompressed')
     if not s3_key:
         print(f"No compressed image for annotation {annotation['id']}")
         return None
 
-    image_obj = s3.get_object(Bucket=bucket_name, Key=s3_key)
-    image_bytes = image_obj['Body'].read()
-    image = Image.open(BytesIO(image_bytes))
+    if image_data_cache is not None and s3_key in image_data_cache:
+        image = image_data_cache[s3_key]
+    else:
+        image_obj = s3.get_object(Bucket=bucket_name, Key=s3_key)
+        image_bytes = image_obj['Body'].read()
+        image = Image.open(BytesIO(image_bytes))
+        if image_data_cache is not None:
+            image_data_cache[s3_key] = image
+
+    if not image:
+        return None
 
     # Get image dimensions
     # BBoxes are stored in ORIGINAL image coordinates (width/height from upload).
