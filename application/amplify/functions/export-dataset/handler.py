@@ -6,7 +6,7 @@ Exports approved annotations to Hugging Face Hub in ImageFolder format
 Implements checkpoint/resume capability for large datasets.
 
 Risk 1 fix: Uses GSI query instead of full table scan.
-Risk 2 fix: Uses table discovery pattern (ListTables) for DynamoDB table names.
+Risk 2 fix: Uses environment variables for DynamoDB table names.
 """
 import json
 import os
@@ -20,7 +20,6 @@ from io import BytesIO
 
 # AWS clients
 dynamodb = boto3.resource('dynamodb')
-dynamodb_client = boto3.client('dynamodb')
 s3 = boto3.client('s3')
 ssm = boto3.client('ssm')
 
@@ -32,17 +31,31 @@ _table_cache: Dict[str, object] = {}
 _hf_token: Optional[str] = None
 
 
+# Table name overrides passed via event payload from the data-stack dispatcher.
+# This avoids circular dependency between function and data CloudFormation stacks.
+_table_name_overrides: Dict[str, str] = {}
+
+
+def set_table_name_overrides(table_names: Dict[str, str]) -> None:
+    """Set table name overrides from event payload."""
+    mapping = {
+        'annotation': 'Annotation',
+        'image': 'Image',
+        'datasetVersion': 'DatasetVersion',
+        'datasetExportProgress': 'DatasetExportProgress',
+    }
+    for key, prefix in mapping.items():
+        if key in table_names and table_names[key]:
+            _table_name_overrides[prefix] = table_names[key]
+
+
 def get_table(prefix: str):
-    """Discover DynamoDB table name by prefix (same pattern as process-image)."""
+    """Get DynamoDB table by name from event payload overrides."""
     if prefix not in _table_cache:
-        response = dynamodb_client.list_tables()
-        table_name = next(
-            (name for name in response.get('TableNames', []) if name.startswith(f'{prefix}-')),
-            None,
-        )
+        table_name = _table_name_overrides.get(prefix)
         if not table_name:
-            raise ValueError(f"Table with prefix '{prefix}' not found")
-        print(f'Discovered table: {table_name}')
+            raise ValueError(f"Table name for '{prefix}' not provided in event payload")
+        print(f'Using table: {table_name}')
         _table_cache[prefix] = dynamodb.Table(table_name)
     return _table_cache[prefix]
 
@@ -83,6 +96,13 @@ def handler(event, context):
         export_id = event['exportId']
         storage_bucket = event['storageBucketName']
         resume_from = event.get('resumeFrom')
+
+        # Table names are passed from the data-stack dispatcher to avoid
+        # circular CloudFormation dependency between function and data stacks.
+        table_names = event.get('tableNames')
+        if not table_names:
+            raise ValueError('tableNames not provided in event payload')
+        set_table_name_overrides(table_names)
 
         print(f'Starting export: {export_id} for version {dataset_version}')
 

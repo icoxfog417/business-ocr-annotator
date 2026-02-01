@@ -23,7 +23,6 @@ from prompts import get_evaluation_prompt
 
 # AWS clients
 dynamodb = boto3.resource('dynamodb')
-dynamodb_client = boto3.client('dynamodb')
 bedrock_client = boto3.client('bedrock-runtime')
 ssm_client = boto3.client('ssm')
 
@@ -35,17 +34,18 @@ _table_cache: Dict[str, object] = {}
 _secrets_cache: Dict[str, str] = {}
 
 
+# Table name overrides passed via SQS message from the data-stack trigger.
+# This avoids circular dependency between function and data CloudFormation stacks.
+_table_name_overrides: Dict[str, str] = {}
+
+
 def get_table(prefix: str):
-    """Discover DynamoDB table name by prefix (same pattern as process-image)."""
+    """Get DynamoDB table by name from SQS message overrides."""
     if prefix not in _table_cache:
-        response = dynamodb_client.list_tables()
-        table_name = next(
-            (name for name in response.get('TableNames', []) if name.startswith(f'{prefix}-')),
-            None,
-        )
+        table_name = _table_name_overrides.get(prefix)
         if not table_name:
-            raise ValueError(f"Table with prefix '{prefix}' not found")
-        print(f'Discovered table: {table_name}')
+            raise ValueError(f"Table name for '{prefix}' not provided in SQS message")
+        print(f'Using table: {table_name}')
         _table_cache[prefix] = dynamodb.Table(table_name)
     return _table_cache[prefix]
 
@@ -102,6 +102,13 @@ def process_evaluation_job(message: Dict):
     model_id = message['modelId']
     model_name = message.get('modelName', model_id)
     bedrock_model_id = message['modelBedrockId']
+
+    # Table name is passed from the data-stack trigger to avoid circular
+    # CloudFormation dependency between function and data stacks.
+    eval_table_name = message.get('evaluationJobTableName')
+    if not eval_table_name:
+        raise ValueError('evaluationJobTableName not provided in SQS message')
+    _table_name_overrides['EvaluationJob'] = eval_table_name
 
     job_table = get_table('EvaluationJob')
     now = datetime.now(timezone.utc).isoformat()

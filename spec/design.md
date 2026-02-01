@@ -1255,6 +1255,12 @@ class Logger {
 
 ## 9. Deployment Architecture
 
+### 9.0 CloudFormation Stack Dependencies
+
+For detailed CloudFormation nested stack architecture, cross-stack dependency diagrams,
+and rules for passing table names to Lambda functions without circular dependencies,
+see **[spec/design_stack.md](design_stack.md)**.
+
 ### 9.1 Environments
 
 - **Development**: Local + AWS dev account

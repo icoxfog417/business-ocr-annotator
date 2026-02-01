@@ -1,36 +1,39 @@
 import type { Handler, S3Event } from 'aws-lambda';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import { DynamoDBClient, ListTablesCommand } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import sharp from 'sharp';
 
 const s3Client = new S3Client({});
-const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
+const docClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ssmClient = new SSMClient({});
 
 const COMPRESSED_MAX_SIZE = 4 * 1024 * 1024; // 4MB for AI processing
 const THUMBNAIL_MAX_SIZE = 100 * 1024; // 100KB for gallery
 const COMPRESSED_MAX_DIMENSION = 2048;
 const THUMBNAIL_MAX_DIMENSION = 300;
 
-// Cache for discovered table name
+// Cache for discovered table name (persists across warm Lambda invocations)
 let cachedTableName: string | null = null;
 
 /**
- * Discover Image table name via ListTables API.
+ * Discover Image table name via SSM Parameter Store.
+ * The parameter is created by CDK at deploy time, keyed by S3 bucket name,
+ * so each Amplify environment resolves to its own table — no cross-env collisions.
  */
-async function getImageTableName(): Promise<string> {
+async function getImageTableName(bucketName: string): Promise<string> {
   if (cachedTableName) return cachedTableName;
-  
-  const result = await dynamoClient.send(new ListTablesCommand({}));
-  const imageTable = result.TableNames?.find(name => name.startsWith('Image-'));
-  
-  if (!imageTable) {
-    throw new Error('Image table not found');
+
+  const paramName = `/business-ocr/tables/${bucketName}/image-table-name`;
+  const result = await ssmClient.send(new GetParameterCommand({ Name: paramName }));
+
+  if (!result.Parameter?.Value) {
+    throw new Error(`SSM parameter ${paramName} not found`);
   }
-  
-  cachedTableName = imageTable;
-  console.log(`Using Image table: ${cachedTableName}`);
+
+  cachedTableName = result.Parameter.Value;
+  console.log(`Using Image table from SSM: ${cachedTableName}`);
   return cachedTableName;
 }
 
@@ -303,8 +306,7 @@ export const handler: Handler<S3Event, ProcessImageResult[]> = async (event) => 
     }];
   }
 
-  // Discover table name via ListTables API
-  const tableName = await getImageTableName();
+  const tableName = await getImageTableName(bucketName);
 
   const results: ProcessImageResult[] = [];
 

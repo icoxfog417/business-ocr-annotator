@@ -1,4 +1,4 @@
-import { DynamoDBClient, DescribeTableCommand, ListTablesCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 
@@ -9,17 +9,10 @@ const sqsClient = new SQSClient({});
 // Risk 7 fix: Import from single source of truth instead of hardcoding
 import EVALUATION_MODELS from '../../../src/config/evaluation-models.json';
 
-// Table name cache
-let evaluationJobTableName: string | null = null;
-
-async function getEvaluationJobTableName(): Promise<string> {
-  if (evaluationJobTableName) return evaluationJobTableName;
-  const result = await dynamoClient.send(new ListTablesCommand({}));
-  const table = result.TableNames?.find((name) => name.startsWith('EvaluationJob-'));
-  if (!table) throw new Error('EvaluationJob table not found');
-  evaluationJobTableName = table;
-  console.log(`Using EvaluationJob table: ${evaluationJobTableName}`);
-  return evaluationJobTableName;
+function getEvaluationJobTableName(): string {
+  const tableName = process.env.EVALUATION_JOB_TABLE_NAME;
+  if (!tableName) throw new Error('EVALUATION_JOB_TABLE_NAME environment variable not set');
+  return tableName;
 }
 
 // GSI name cache (discovered at runtime)
@@ -162,7 +155,7 @@ export const handler = async (
       throw new Error('No enabled models found for evaluation');
     }
 
-    const tableName = await getEvaluationJobTableName();
+    const tableName = getEvaluationJobTableName();
     const jobIds: string[] = [];
     const skippedModels: { modelId: string; reason: string; existingJobId?: string }[] = [];
     const now = new Date().toISOString();
@@ -214,6 +207,7 @@ export const handler = async (
               modelId: model.id,
               modelName: model.name,
               modelBedrockId: model.bedrockModelId,
+              evaluationJobTableName: tableName,
             }),
           })
         );

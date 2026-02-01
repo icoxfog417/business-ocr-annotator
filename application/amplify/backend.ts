@@ -2,7 +2,8 @@ import { defineBackend } from '@aws-amplify/backend';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { EventType } from 'aws-cdk-lib/aws-s3';
 import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
-import { Duration, Stack } from 'aws-cdk-lib';
+import { Duration, Fn, Stack } from 'aws-cdk-lib';
+import { CfnParameter } from 'aws-cdk-lib/aws-ssm';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { auth } from './auth/resource';
@@ -65,6 +66,16 @@ backend.addOutput({
 });
 
 // =============================================================================
+// DynamoDB table references (used to pass exact table names to Lambdas)
+// =============================================================================
+const { tables } = backend.data.resources;
+const annotationTable = tables['Annotation'];
+const imageTable = tables['Image'];
+const evaluationJobTable = tables['EvaluationJob'];
+const datasetVersionTable = tables['DatasetVersion'];
+const datasetExportProgressTable = tables['DatasetExportProgress'];
+
+// =============================================================================
 // generateAnnotation Lambda (Sprint 2)
 // =============================================================================
 backend.generateAnnotationHandler.resources.lambda.addToRolePolicy(
@@ -79,6 +90,16 @@ backend.generateAnnotationHandler.resources.lambda.addToRolePolicy(
 // =============================================================================
 const storageBucket = backend.storage.resources.bucket;
 
+// SSM Parameter: Map S3 bucket name → Image table name (for processImage)
+// Both storageBucket and imageTable live in the data stack, so no cross-stack ref.
+// At runtime, processImage reads this parameter using its STORAGE_BUCKET_NAME env var.
+// Uses L1 CfnParameter because the L2 StringParameter can't compute ARNs for token-based names.
+new CfnParameter(Stack.of(imageTable), 'ImageTableNameParam', {
+  type: 'String',
+  name: Fn.join('/', ['/business-ocr/tables', storageBucket.bucketName, 'image-table-name']),
+  value: imageTable.tableName,
+});
+
 backend.processImage.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['s3:GetObject', 's3:PutObject'],
@@ -86,10 +107,13 @@ backend.processImage.resources.lambda.addToRolePolicy(
   })
 );
 
+// SSM read permission: processImage discovers the Image table name via SSM
+// parameter (keyed by bucket name) instead of ListTables, which avoids wrong-table
+// bugs when multiple Amplify environments share the same AWS account.
 backend.processImage.resources.lambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
+    actions: ['ssm:GetParameter'],
+    resources: ['arn:aws:ssm:*:*:parameter/business-ocr/*'],
   })
 );
 backend.processImage.resources.lambda.addToRolePolicy(
@@ -124,13 +148,10 @@ storageBucket.addEventNotification(
 // =============================================================================
 const exportDatasetLambda = backend.exportDataset.resources.lambda;
 
-// DynamoDB permissions: table discovery + read/write
-exportDatasetLambda.addToRolePolicy(
-  new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
-  })
-);
+// Note: exportDataset is in the function stack (custom CDK Function). Using CDK
+// table tokens here would create a circular dependency with the data stack. Table
+// names are passed at runtime via the event payload from exportDatasetHandler
+// (which IS in the data stack and can safely reference table tokens).
 exportDatasetLambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:Query', 'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem'],
@@ -177,6 +198,23 @@ exportDatasetHandlerCfnFunction.addPropertyOverride(
   'Environment.Variables.STORAGE_BUCKET_NAME',
   storageBucket.bucketName
 );
+// Table names for the Python export Lambda (passed via event payload)
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.ANNOTATION_TABLE_NAME',
+  annotationTable.tableName
+);
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.IMAGE_TABLE_NAME',
+  imageTable.tableName
+);
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.DATASET_VERSION_TABLE_NAME',
+  datasetVersionTable.tableName
+);
+exportDatasetHandlerCfnFunction.addPropertyOverride(
+  'Environment.Variables.DATASET_EXPORT_PROGRESS_TABLE_NAME',
+  datasetExportProgressTable.tableName
+);
 
 // Grant the wrapper permission to invoke the Python Lambda
 exportDatasetLambda.grantInvoke(exportDatasetHandlerLambda);
@@ -187,25 +225,23 @@ exportDatasetLambda.grantInvoke(exportDatasetHandlerLambda);
 // =============================================================================
 const triggerEvaluationLambda = backend.triggerEvaluationHandler.resources.lambda;
 
-// Environment variable: SQS queue URL
+// Environment variables
 const triggerEvalCfnFunction = backend.triggerEvaluationHandler.resources.cfnResources
   .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
 triggerEvalCfnFunction.addPropertyOverride(
   'Environment.Variables.EVALUATION_QUEUE_URL',
   evaluationQueue.queueUrl
 );
-
-// DynamoDB permissions: table discovery + write
-triggerEvaluationLambda.addToRolePolicy(
-  new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
-  })
+triggerEvalCfnFunction.addPropertyOverride(
+  'Environment.Variables.EVALUATION_JOB_TABLE_NAME',
+  evaluationJobTable.tableName
 );
+
+// DynamoDB permissions
 triggerEvaluationLambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ['dynamodb:PutItem', 'dynamodb:Scan', 'dynamodb:UpdateItem'],
-    resources: ['arn:aws:dynamodb:*:*:table/EvaluationJob-*'],
+    actions: ['dynamodb:PutItem', 'dynamodb:Scan', 'dynamodb:UpdateItem', 'dynamodb:DescribeTable', 'dynamodb:Query'],
+    resources: [evaluationJobTable.tableArn, `${evaluationJobTable.tableArn}/index/*`],
   })
 );
 
@@ -227,13 +263,8 @@ runEvaluationLambda.addEventSource(
   })
 );
 
-// DynamoDB permissions: table discovery + read/write
-runEvaluationLambda.addToRolePolicy(
-  new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
-  })
-);
+// Note: runEvaluation is in the function stack (custom CDK Function). Table name
+// is passed at runtime via the SQS message from triggerEvaluationHandler (data stack).
 runEvaluationLambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:GetItem', 'dynamodb:UpdateItem'],
@@ -263,24 +294,29 @@ runEvaluationLambda.addToRolePolicy(
 // =============================================================================
 // getAnnotationCounts Lambda — Server-side annotation and image counts
 // =============================================================================
-backend.getAnnotationCountsHandler.resources.lambda.addToRolePolicy(
-  new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
-  })
+const getAnnotationCountsCfnFunction = backend.getAnnotationCountsHandler.resources.cfnResources
+  .cfnFunction as import('aws-cdk-lib/aws-lambda').CfnFunction;
+getAnnotationCountsCfnFunction.addPropertyOverride(
+  'Environment.Variables.ANNOTATION_TABLE_NAME',
+  annotationTable.tableName
 );
+getAnnotationCountsCfnFunction.addPropertyOverride(
+  'Environment.Variables.IMAGE_TABLE_NAME',
+  imageTable.tableName
+);
+
 backend.getAnnotationCountsHandler.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:Query'],
     resources: [
-      'arn:aws:dynamodb:*:*:table/Annotation-*',
-      'arn:aws:dynamodb:*:*:table/Annotation-*/index/*',
+      annotationTable.tableArn,
+      `${annotationTable.tableArn}/index/*`,
     ],
   })
 );
 backend.getAnnotationCountsHandler.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['dynamodb:Scan'],
-    resources: ['arn:aws:dynamodb:*:*:table/Image-*'],
+    resources: [imageTable.tableArn],
   })
 );
