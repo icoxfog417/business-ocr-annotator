@@ -87,7 +87,7 @@ export function AnnotationFlow({
         boundingBox: parseBoundingBox(existing?.boundingBoxes),
         aiAssisted: existing?.aiAssisted || false,
         skipped: false,
-        isUnanswerable: existing?.isUnanswerable || false,
+        isUnanswerable: existing?.isUnanswerable ?? false,
       };
     })
   );
