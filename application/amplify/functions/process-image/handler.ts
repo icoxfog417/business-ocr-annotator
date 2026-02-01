@@ -61,8 +61,14 @@ async function compressToTargetSize(
   const metadata = await sharp(inputBuffer).metadata();
 
   // Calculate dimensions maintaining aspect ratio
+  // EXIF orientations 5-8 swap width/height; account for this so the
+  // resize targets match the visually-correct (post-rotation) dimensions.
   let width = metadata.width || 1000;
   let height = metadata.height || 1000;
+  const orientation = metadata.orientation || 1;
+  if (orientation >= 5) {
+    [width, height] = [height, width];
+  }
 
   if (width > maxDimension || height > maxDimension) {
     const ratio = Math.min(maxDimension / width, maxDimension / height);
@@ -77,6 +83,7 @@ async function compressToTargetSize(
   do {
     attempts++;
     compressed = await sharp(inputBuffer)
+      .rotate() // Apply EXIF orientation physically
       .resize(width, height, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality, mozjpeg: true, progressive: true })
       .toBuffer();
@@ -99,6 +106,7 @@ async function compressToTargetSize(
     width = Math.round(width * 0.7);
     height = Math.round(height * 0.7);
     compressed = await sharp(inputBuffer)
+      .rotate()
       .resize(width, height, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 70, mozjpeg: true, progressive: true })
       .toBuffer();
@@ -117,6 +125,7 @@ async function generateThumbnail(inputBuffer: Buffer): Promise<Buffer> {
 
   do {
     thumbnail = await sharp(inputBuffer)
+      .rotate() // Apply EXIF orientation physically
       .resize(size, size, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality, mozjpeg: true })
       .toBuffer();
