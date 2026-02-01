@@ -72,6 +72,10 @@ export function ImageGallery() {
         })
       );
       console.log('Images with URLs:', imagesWithUrls);
+      // Sort by uploadedAt descending (newest first)
+      imagesWithUrls.sort(
+        (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      );
       setImages(imagesWithUrls);
     } catch (error) {
       console.error('Failed to fetch images:', error);
