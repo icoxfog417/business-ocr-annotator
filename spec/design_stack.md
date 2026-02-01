@@ -28,6 +28,7 @@ graph TB
                 ExportProgressTable["DatasetExportProgress"]
                 DefaultQuestionTable["DefaultQuestion"]
             end
+            SSMParam["SSM Parameter<br/>/business-ocr/tables/{bucket}/image-table-name"]
             AppSync["AppSync GraphQL API"]
             GenAnnotation["generateAnnotationHandler<br/>(Node.js)"]
             ExportHandler["exportDatasetHandler<br/>(Node.js dispatcher)"]
@@ -78,7 +79,7 @@ graph LR
     %% Table names flow (runtime, NOT CDK tokens)
     ExportHandler -. "table names<br/>(event payload)" .-> ExportDataset
     TriggerEval -. "table name<br/>(SQS message)" .-> RunEval
-    ProcessImage -. "ListTables<br/>(runtime discovery)" .-> Tables
+    ProcessImage -. "SSM Parameter<br/>(bucket→table lookup)" .-> Tables
 
     %% Within DATA stack (safe, same stack)
     Tables -- "CDK tokens<br/>(addPropertyOverride)" --> GetCounts
@@ -107,8 +108,8 @@ flowchart TD
         RunEval["runEvaluation (Python)<br/>← message.evaluationJobTableName"]
     end
 
-    subgraph LISTTABLES["⚠️ ListTables — Known limitation"]
-        ProcessImage["processImage<br/>ListTables + prefix match"]
+    subgraph SSM["✅ SSM Parameter Store — Environment-safe"]
+        ProcessImage["processImage<br/>SSM param (bucket→table)"]
     end
 
     CDK -- "addPropertyOverride" --> GetCounts
@@ -116,11 +117,11 @@ flowchart TD
     CDK -- "addPropertyOverride" --> ExportHandler
     ExportHandler -- "Lambda invoke payload" --> ExportDataset
     TriggerEval -- "SQS message body" --> RunEval
-    ProcessImage -. "runtime API call" .-> DDB["DynamoDB ListTables API"]
+    ProcessImage -. "SSM GetParameter" .-> SSMParam["SSM Parameter Store<br/>/business-ocr/tables/{bucket}/image-table-name"]
 
     style SAFE fill:#c8e6c9
     style PAYLOAD fill:#fff9c4
-    style LISTTABLES fill:#ffcdd2
+    style SSM fill:#c8e6c9
 ```
 
 ## Rules to Avoid Circular Dependencies
@@ -140,11 +141,11 @@ flowchart TD
     Q1 -- "Yes" --> A1["✅ Use addPropertyOverride<br/>with table CDK tokens<br/>(same stack, safe)"]
     Q1 -- "No" --> Q2{"Does a data-stack Lambda<br/>invoke this Lambda?"}
     Q2 -- "Yes" --> A2["✅ Pass table names in<br/>event payload / SQS message<br/>from the data-stack caller"]
-    Q2 -- "No" --> A3["⚠️ Use ListTables at runtime<br/>or use SSM Parameter Store<br/>(no CDK cross-stack ref)"]
+    Q2 -- "No" --> A3["✅ Use SSM Parameter Store<br/>CDK writes param at deploy time<br/>Lambda reads at runtime<br/>(no CDK cross-stack ref)"]
 
     style A1 fill:#c8e6c9
     style A2 fill:#fff9c4
-    style A3 fill:#ffcdd2
+    style A3 fill:#c8e6c9
 ```
 
 ### Checklist When Adding New Lambdas
@@ -161,8 +162,9 @@ flowchart TD
 
 3. **Function-stack Lambdas** with no data-stack intermediary (e.g., S3-triggered):
    - Cannot use CDK table tokens at all
-   - Use `ListTables` at runtime or SSM Parameter Store as workaround
-   - Document the limitation
+   - Use SSM Parameter Store: CDK writes the parameter (in the data stack where both
+     the bucket token and table token are available), Lambda reads it at runtime
+   - See `processImage` for the reference implementation
 
 ### What Creates Cross-Stack References
 
@@ -173,7 +175,7 @@ flowchart TD
 | `lambda.addEnvironment('KEY', table.tableName)` | **Yes** — same mechanism |
 | `'arn:aws:dynamodb:*:*:table/Prefix-*'` string in IAM | **No** — plain string, no token |
 | Passing table name in Lambda invoke payload at runtime | **No** — runtime data flow, invisible to CDK |
-| `DynamoDB ListTables` API call at runtime | **No** — runtime discovery |
+| SSM Parameter (CDK writes in data stack, Lambda reads at runtime) | **No** — parameter created in same stack as table; Lambda only reads at runtime |
 
 ---
 

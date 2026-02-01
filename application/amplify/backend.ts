@@ -2,7 +2,8 @@ import { defineBackend } from '@aws-amplify/backend';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { EventType } from 'aws-cdk-lib/aws-s3';
 import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
-import { Duration, Stack } from 'aws-cdk-lib';
+import { Duration, Fn, Stack } from 'aws-cdk-lib';
+import { CfnParameter } from 'aws-cdk-lib/aws-ssm';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { auth } from './auth/resource';
@@ -89,6 +90,16 @@ backend.generateAnnotationHandler.resources.lambda.addToRolePolicy(
 // =============================================================================
 const storageBucket = backend.storage.resources.bucket;
 
+// SSM Parameter: Map S3 bucket name → Image table name (for processImage)
+// Both storageBucket and imageTable live in the data stack, so no cross-stack ref.
+// At runtime, processImage reads this parameter using its STORAGE_BUCKET_NAME env var.
+// Uses L1 CfnParameter because the L2 StringParameter can't compute ARNs for token-based names.
+new CfnParameter(Stack.of(imageTable), 'ImageTableNameParam', {
+  type: 'String',
+  name: Fn.join('/', ['/business-ocr/tables', storageBucket.bucketName, 'image-table-name']),
+  value: imageTable.tableName,
+});
+
 backend.processImage.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['s3:GetObject', 's3:PutObject'],
@@ -96,16 +107,13 @@ backend.processImage.resources.lambda.addToRolePolicy(
   })
 );
 
-// Note: processImage is in the function stack and is S3-triggered (no data-stack
-// intermediary). Using CDK table tokens here would create a circular dependency
-// between function and data stacks. Table name is discovered at runtime via
-// ListTables — acceptable because processImage only updates metadata (dimensions,
-// compression) on records already created by AppSync in the correct table.
-// TODO: Consider passing table name via S3 event metadata or SSM parameter.
+// SSM read permission: processImage discovers the Image table name via SSM
+// parameter (keyed by bucket name) instead of ListTables, which avoids wrong-table
+// bugs when multiple Amplify environments share the same AWS account.
 backend.processImage.resources.lambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ['dynamodb:ListTables'],
-    resources: ['*'],
+    actions: ['ssm:GetParameter'],
+    resources: ['arn:aws:ssm:*:*:parameter/business-ocr/*'],
   })
 );
 backend.processImage.resources.lambda.addToRolePolicy(
