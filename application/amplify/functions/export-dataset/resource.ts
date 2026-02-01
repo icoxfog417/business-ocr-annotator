@@ -33,7 +33,7 @@ export const exportDataset = defineFunction(
             tryBundle(outputDir: string) {
               try {
                 execSync(
-                  `python3 -m pip install -r ${path.join(functionDir, 'requirements.txt')} -t ${outputDir} --platform manylinux2014_x86_64 --only-binary=:all: --quiet`,
+                  `python3 -m pip install -r ${path.join(functionDir, 'requirements.txt')} -t ${outputDir} --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: --quiet`,
                   { stdio: 'inherit' }
                 );
                 execSync(
