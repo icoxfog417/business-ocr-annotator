@@ -88,10 +88,18 @@ export function ImageGallery() {
     if (!confirm('Are you sure you want to delete this image and all its annotations?')) return;
     
     try {
-      // Delete all annotations for this image first (with pagination)
-      const annotations = await listAllItems<{ id: string }>('Annotation', {
-        filter: { imageId: { eq: id } },
-      });
+      // Delete all annotations for this image first (via GSI query)
+      const firstPage = await client.models.Annotation.listAnnotationByImageId({ imageId: id });
+      const annotations = [...firstPage.data];
+      let nextToken = firstPage.nextToken;
+      while (nextToken) {
+        const page = await client.models.Annotation.listAnnotationByImageId(
+          { imageId: id },
+          { nextToken }
+        );
+        annotations.push(...page.data);
+        nextToken = page.nextToken;
+      }
 
       // Delete in batches of 25 to avoid API rate limiting
       const BATCH_SIZE = 25;

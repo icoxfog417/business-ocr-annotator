@@ -229,14 +229,10 @@ export const handler = async (
       };
     }
 
-    // Clean up the response text (remove any JSON artifacts if present)
+    // Clean up: strip leading/trailing quotes and whitespace per line
     let cleanText = responseText.trim();
-    
-    // Remove common JSON wrapper patterns if model still returns them
-    cleanText = cleanText.replace(/^["']|["']$/g, ''); // Remove quotes
-    cleanText = cleanText.replace(/^.*"answer":\s*["']([^"']+)["'].*$/s, '$1'); // Extract from JSON if present
-    // Trim spaces on each line, preserve newlines
-    cleanText = cleanText.split('\n').map(line => line.trim()).join('\n').trim();
+    cleanText = cleanText.replace(/^["']|["']$/g, '');
+    cleanText = cleanText.split('\n').map(line => line.trim()).filter(line => line).join('\n');
 
     // For single question mode, construct the JSON response here
     if (question) {
