@@ -14,6 +14,7 @@ interface Annotation {
   answer: string;
   boundingBoxes: BoundingBox[];
   aiAssisted?: boolean;
+  isUnanswerable?: boolean;
 }
 
 interface ImageData {
@@ -88,12 +89,20 @@ export function AnnotationWorkspace() {
         }
       }
 
-      // Fetch existing annotations
-      const { data: annotationsData } = await client.models.Annotation.list({
-        filter: { imageId: { eq: imageId } },
-      });
+      // Fetch existing annotations via GSI (Query, not Scan)
+      const firstPage = await client.models.Annotation.listAnnotationByImageId({ imageId });
+      const allAnnotations = [...firstPage.data];
+      let nextToken = firstPage.nextToken;
+      while (nextToken) {
+        const page = await client.models.Annotation.listAnnotationByImageId(
+          { imageId },
+          { nextToken }
+        );
+        allAnnotations.push(...page.data);
+        nextToken = page.nextToken;
+      }
 
-      const sortedAnnotations = [...annotationsData].sort(
+      const sortedAnnotations = [...allAnnotations].sort(
         (a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')
       );
 
@@ -107,6 +116,7 @@ export function AnnotationWorkspace() {
               ? JSON.parse(a.boundingBoxes)
               : (a.boundingBoxes as BoundingBox[]),
           aiAssisted: a.aiAssisted ?? undefined,
+          isUnanswerable: a.isUnanswerable ?? false,
         }))
       );
     } catch (error) {

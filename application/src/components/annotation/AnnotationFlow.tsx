@@ -33,6 +33,7 @@ interface AnnotationFlowProps {
     answer: string;
     boundingBoxes: string | number[][];
     aiAssisted?: boolean;
+    isUnanswerable?: boolean;
   }>;
   language: string;
   onComplete: (answers: AnnotationAnswer[]) => Promise<void>;
@@ -86,7 +87,7 @@ export function AnnotationFlow({
         boundingBox: parseBoundingBox(existing?.boundingBoxes),
         aiAssisted: existing?.aiAssisted || false,
         skipped: false,
-        isUnanswerable: false,
+        isUnanswerable: existing?.isUnanswerable || false,
       };
     })
   );

@@ -138,7 +138,7 @@ const schema = a.schema({
       updatedBy: a.string(),
       updatedAt: a.datetime(),
     })
-    .secondaryIndexes((index) => [index('validationStatus')])
+    .secondaryIndexes((index) => [index('validationStatus'), index('imageId')])
     .authorization((allow) => [allow.authenticated()]),
 
   DefaultQuestion: a

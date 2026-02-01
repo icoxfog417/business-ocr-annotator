@@ -201,7 +201,7 @@ def process_evaluation_job(message: Dict):
                 results_data.append({
                     'annotation_id': sample.get('annotation_id', f'a{i}'),
                     'question': sample['question'],
-                    'ground_truth': sample['answers'][0] if sample['answers'] else '',
+                    'ground_truth': '\n'.join(sample['answers']) if sample['answers'] else '',
                     'prediction': prediction.get('answer', ''),
                     'anls': round(anls, 4),
                     'iou': round(iou, 4),
