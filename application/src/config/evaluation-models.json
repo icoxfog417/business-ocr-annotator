@@ -9,6 +9,13 @@
       "enabled": true
     },
     {
+      "id": "amazon-nova-pro2-preview",
+      "name": "Amazon Nova Pro 2 (Preview)",
+      "provider": "bedrock",
+      "bedrockModelId": "us.amazon.nova-2-pro-preview-20251202-v1:0",
+      "enabled": true
+    },
+    {
       "id": "claude-sonnet-4-5",
       "name": "Claude Sonnet 4.5",
       "provider": "bedrock",
