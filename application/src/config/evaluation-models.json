@@ -13,7 +13,7 @@
       "name": "Amazon Nova Pro 2 (Preview)",
       "provider": "bedrock",
       "bedrockModelId": "us.amazon.nova-2-pro-preview-20251202-v1:0",
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "claude-sonnet-4-5",
