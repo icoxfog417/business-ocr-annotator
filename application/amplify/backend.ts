@@ -272,6 +272,10 @@ runEvaluationLambda.addToRolePolicy(
   })
 );
 
+// SQS send permission: runEvaluation re-enqueues itself when approaching
+// Lambda timeout (checkpoint/resume for large datasets).
+evaluationQueue.grantSendMessages(runEvaluationLambda);
+
 // Bedrock permissions for model invocation (foundation models + cross-region inference profiles)
 runEvaluationLambda.addToRolePolicy(
   new PolicyStatement({
