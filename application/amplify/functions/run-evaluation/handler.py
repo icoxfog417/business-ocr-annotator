@@ -232,7 +232,7 @@ def process_evaluation_job(message: Dict):
                     samples_failed=samples_failed,
                     running_anls=running_anls,
                     running_iou=running_iou,
-                    part=checkpoint.get('part', 1) + (1 if is_resume else 1),
+                    part=checkpoint.get('part', 1) + 1,
                 )
                 reenqueue_job(message, queue_url)
                 checkpointed = True
