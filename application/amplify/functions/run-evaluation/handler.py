@@ -46,6 +46,10 @@ CHECKPOINT_BUFFER_MS = 120_000
 # 100 images ≈ 52 MB which fits comfortably in Lambda /tmp.
 IMAGE_BATCH_SIZE = 100
 
+# Number of evaluated samples to accumulate before logging a W&B results table
+# batch and releasing wandb.Image references.  Keeps /tmp media files bounded.
+WANDB_TABLE_BATCH_SIZE = 50
+
 # Module-level caches
 _table_cache: Dict[str, object] = {}
 _secrets_cache: Dict[str, str] = {}
@@ -149,6 +153,12 @@ def _cleanup_tmp():
     if os.path.exists(hf_dir):
         shutil.rmtree(hf_dir, ignore_errors=True)
         print('Cleaned up previous HF dataset downloads')
+
+    # Clean up HF Hub cache to prevent cross-invocation residue on warm containers
+    hf_home = '/tmp/hf_home'
+    if os.path.exists(hf_home):
+        shutil.rmtree(hf_home, ignore_errors=True)
+        print('Cleaned up HF home cache')
 
 
 def process_evaluation_job(message: Dict):
@@ -343,7 +353,7 @@ def process_evaluation_job(message: Dict):
                     'prediction': prediction.get('answer', ''),
                     'anls': round(anls, 4),
                     'iou': round(iou, 4),
-                    'annotated_image': wandb.Image(annotated) if wandb_run else None,
+                    'annotated_image': wandb.Image(annotated, file_type='jpg') if wandb_run else None,
                     'predicted_bbox': format_bbox_str(pred_bbox),
                     'ground_truth_bbox': format_bbox_str(gt_bbox),
                 })
@@ -353,6 +363,11 @@ def process_evaluation_job(message: Dict):
                         f'Progress: {samples_evaluated}/{total_samples} '
                         f'| ANLS: {running_anls:.4f} | IoU: {running_iou:.4f}'
                     )
+
+                # Batch-log results table to bound /tmp disk usage from wandb media files
+                if wandb_run and len(results_data) >= WANDB_TABLE_BATCH_SIZE:
+                    _log_results_table(results_data)
+                    results_data = []
 
             except Exception as e:
                 samples_failed += 1
