@@ -133,6 +133,21 @@ git commit -m "Add Qwen integration proposal (see spec/proposals/20260104_implem
 - Update task status in `spec/tasks.md`
 - Run all tests before committing
 
+#### Running Python Lambda Function Tests
+
+Python Lambda functions (e.g. `run-evaluation`, `export-dataset`) keep their own `requirements.txt` (production) and `requirements-dev.txt` (test) in each function directory. Use `uv run` to run tests without manual venv management:
+
+```bash
+cd application/amplify/functions/run-evaluation
+uv run --with-requirements requirements-dev.txt pytest -v
+```
+
+Key points:
+- Tests **must be run from the function directory** (bare imports like `from metrics import ...` require it)
+- Each function is self-contained with its own dependencies
+- Test files (`test_*.py`) are excluded from Lambda deployment bundles by the `resource.ts` bundling config
+- `uv run --with-requirements` creates a cached ephemeral environment automatically
+
 ### Commit Messages
 
 - Reference proposal documents when applicable
@@ -376,6 +391,13 @@ npm run lint
   2. ESLint checks and fixes TypeScript files
   3. Commit is blocked if errors remain
 
+**Python Lambda Tests:**
+```bash
+# Run from each function directory
+cd application/amplify/functions/run-evaluation
+uv run --with-requirements requirements-dev.txt pytest -v
+```
+
 **In CI/CD:**
 ```bash
 npm run lint  # Fail build on any warnings
@@ -487,5 +509,5 @@ If you encounter ambiguity or need clarification:
 
 ---
 
-**Last Updated**: 2026-01-31
+**Last Updated**: 2026-03-03
 **Maintained By**: Project Team
