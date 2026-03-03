@@ -12,8 +12,10 @@ Metrics:
   - ANLS (Average Normalized Levenshtein Similarity): text accuracy (DocVQA standard)
   - IoU (Intersection over Union): bounding box spatial accuracy
 """
+import glob
 import json
 import os
+import shutil
 import boto3
 import wandb
 from datetime import datetime, timezone
@@ -127,6 +129,28 @@ def is_approaching_timeout() -> bool:
     return remaining_ms < CHECKPOINT_BUFFER_MS
 
 
+def _cleanup_tmp():
+    """Remove leftover files from previous warm-container invocations.
+
+    On checkpoint-resume, Lambda may reuse the same container.  Prior W&B run
+    directories and HF downloads can consume hundreds of MB and cause
+    "No space left on device" errors.  This is safe because wandb.finish()
+    syncs all data before the previous invocation returns.
+    """
+    # Clean up previous W&B run directories
+    old_runs = glob.glob('/tmp/wandb/wandb/run-*')
+    if old_runs:
+        for run_dir in old_runs:
+            shutil.rmtree(run_dir, ignore_errors=True)
+        print(f'Cleaned up {len(old_runs)} previous W&B run dir(s)')
+
+    # Clean up leftover HF dataset downloads
+    hf_dir = '/tmp/hf_dataset'
+    if os.path.exists(hf_dir):
+        shutil.rmtree(hf_dir, ignore_errors=True)
+        print('Cleaned up previous HF dataset downloads')
+
+
 def process_evaluation_job(message: Dict):
     """Process a single evaluation job for one model.
 
@@ -137,6 +161,8 @@ def process_evaluation_job(message: Dict):
     saves its progress, re-enqueues the job to SQS, and returns normally so
     the current SQS message is deleted (not counted as a retry failure).
     """
+    _cleanup_tmp()
+
     evaluation_job_id = message['evaluationJobId']
     job_id = message['jobId']
     dataset_version = message['datasetVersion']

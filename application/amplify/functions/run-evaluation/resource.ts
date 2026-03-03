@@ -14,7 +14,7 @@ export const runEvaluation = defineFunction(
       runtime: Runtime.PYTHON_3_12,
       timeout: Duration.seconds(900), // 15 minutes
       memorySize: 2048,
-      ephemeralStorageSize: Size.gibibytes(1),
+      ephemeralStorageSize: Size.gibibytes(2),
       environment: {
         HOME: '/tmp', // Required for libraries that write to home directory
         HF_HOME: '/tmp/hf_home',
