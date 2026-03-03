@@ -24,6 +24,7 @@ from PIL import Image
 from io import BytesIO
 from metrics import calculate_anls, calculate_iou
 from prompts import get_evaluation_prompt
+from visualization import draw_bbox, format_bbox_str
 
 # AWS clients
 dynamodb = boto3.resource('dynamodb')
@@ -251,11 +252,17 @@ def process_evaluation_job(message: Dict):
                 # Calculate ANLS (text accuracy)
                 anls = calculate_anls(prediction.get('answer', ''), sample['answers'])
 
+                # Extract bboxes for IoU and visualization
+                pred_bbox = prediction.get('bbox', [0.0, 0.0, 1.0, 1.0])
+                gt_bbox = list(sample['answer_bbox'])
+
                 # Calculate IoU (bounding box accuracy)
-                iou = calculate_iou(
-                    prediction.get('bbox', [0.0, 0.0, 1.0, 1.0]),
-                    list(sample['answer_bbox']),
-                )
+                iou = calculate_iou(pred_bbox, gt_bbox)
+
+                # Create annotated image with both bboxes drawn
+                annotated = image.copy().convert('RGB')
+                annotated = draw_bbox(annotated, gt_bbox, (0, 200, 0), 'GT')
+                annotated = draw_bbox(annotated, pred_bbox, (220, 0, 0), 'Pred')
 
                 samples_evaluated += 1
                 # Incremental running average
@@ -280,6 +287,9 @@ def process_evaluation_job(message: Dict):
                     'prediction': prediction.get('answer', ''),
                     'anls': round(anls, 4),
                     'iou': round(iou, 4),
+                    'annotated_image': wandb.Image(annotated) if wandb_run else None,
+                    'predicted_bbox': format_bbox_str(pred_bbox),
+                    'ground_truth_bbox': format_bbox_str(gt_bbox),
                 })
 
                 if samples_evaluated % 10 == 0:
@@ -315,7 +325,10 @@ def process_evaluation_job(message: Dict):
         # Log final results table to W&B
         wandb_run_url = ''
         if wandb_run and results_data:
-            columns = ['annotation_id', 'question', 'ground_truth', 'prediction', 'anls', 'iou']
+            columns = [
+                'annotation_id', 'question', 'ground_truth', 'prediction',
+                'anls', 'iou', 'annotated_image', 'predicted_bbox', 'ground_truth_bbox',
+            ]
             table = wandb.Table(columns=columns)
             for row in results_data:
                 table.add_data(*[row[c] for c in columns])
