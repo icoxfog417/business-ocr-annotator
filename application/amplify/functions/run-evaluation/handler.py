@@ -18,8 +18,8 @@ import boto3
 import wandb
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Dict, List, Optional
-from huggingface_hub import snapshot_download
+from typing import Dict, List
+from huggingface_hub import hf_hub_download
 from PIL import Image
 from io import BytesIO
 from metrics import calculate_anls, calculate_iou
@@ -38,6 +38,11 @@ WANDB_PROJECT = os.environ.get('WANDB_PROJECT', 'biz-doc-vqa')
 # Time (ms) reserved before Lambda timeout for saving checkpoint and re-enqueueing.
 # 120 seconds gives enough headroom for DynamoDB write + SQS send + W&B finish.
 CHECKPOINT_BUFFER_MS = 120_000
+
+# Number of images to download at a time from HuggingFace Hub.
+# Balances disk usage vs download overhead. With avg 535KB/image,
+# 100 images ≈ 52 MB which fits comfortably in Lambda /tmp.
+IMAGE_BATCH_SIZE = 100
 
 # Module-level caches
 _table_cache: Dict[str, object] = {}
@@ -197,16 +202,18 @@ def process_evaluation_job(message: Dict):
                 tags=['evaluation', model_id, dataset_version],
             )
 
-        # Download dataset from HF Hub (ImageFolder format)
-        print(f'Downloading dataset from {hf_repo_id}...')
+        # Download only metadata from HF Hub (not all images)
+        print(f'Downloading metadata from {hf_repo_id}...')
         hf_token = get_secret('HF_TOKEN_SSM_PARAM')
-        dataset_dir = snapshot_download(
+        token_arg = hf_token if hf_token else None
+        metadata_path = hf_hub_download(
             hf_repo_id,
+            filename='data/metadata.jsonl',
             repo_type='dataset',
             local_dir='/tmp/hf_dataset',
-            token=hf_token if hf_token else None,
+            token=token_arg,
         )
-        dataset = load_imagefolder_dataset(dataset_dir)
+        dataset = load_metadata(metadata_path)
         total_samples = len(dataset)
         print(f'Loaded {total_samples} samples (starting from index {start_index})')
 
@@ -218,6 +225,9 @@ def process_evaluation_job(message: Dict):
         failed_sample_errors: List[str] = []
         results_data: List[Dict] = []
         checkpointed = False
+
+        # Track downloaded image files for batch cleanup
+        downloaded_files: List[str] = []
 
         for i in range(start_index, total_samples):
             # Check if we're approaching Lambda timeout
@@ -240,8 +250,26 @@ def process_evaluation_job(message: Dict):
                 break
 
             sample = dataset[i]
+
+            # Download image on-demand if not yet present
+            image_path = os.path.join('/tmp/hf_dataset', 'data', sample['file_name'])
+            if not os.path.exists(image_path):
+                hf_hub_download(
+                    hf_repo_id,
+                    filename=f'data/{sample["file_name"]}',
+                    repo_type='dataset',
+                    local_dir='/tmp/hf_dataset',
+                    token=token_arg,
+                )
+            downloaded_files.append(image_path)
+
+            # Clean up previous batch of images to free disk space
+            if len(downloaded_files) > IMAGE_BATCH_SIZE:
+                _cleanup_image_files(downloaded_files[:-1])
+                downloaded_files = [downloaded_files[-1]]
+
             try:
-                image = Image.open(sample['_image_path'])
+                image = Image.open(image_path)
                 prediction = invoke_model(
                     bedrock_model_id,
                     image,
@@ -306,6 +334,9 @@ def process_evaluation_job(message: Dict):
                 if len(failed_sample_errors) < 10:
                     failed_sample_errors.append(error_msg)
                 continue
+
+        # Clean up remaining downloaded images
+        _cleanup_image_files(downloaded_files)
 
         # If we checkpointed, return early (job continues in next invocation)
         if checkpointed:
@@ -474,28 +505,33 @@ def reenqueue_job(message: Dict, queue_url: str):
     print(f'Re-enqueued evaluation job {message["evaluationJobId"]} to continue')
 
 
-def load_imagefolder_dataset(repo_dir: str) -> List[Dict]:
-    """Load ImageFolder dataset from downloaded HF repo directory.
+def load_metadata(metadata_path: str) -> List[Dict]:
+    """Load dataset metadata from metadata.jsonl.
 
-    Parses data/metadata.jsonl and returns list of samples with image file paths.
+    Returns list of sample dicts (without image data; images are downloaded on demand).
     """
-    metadata_path = os.path.join(repo_dir, 'data', 'metadata.jsonl')
     if not os.path.exists(metadata_path):
         raise FileNotFoundError(f'metadata.jsonl not found at {metadata_path}')
 
-    data_dir = os.path.join(repo_dir, 'data')
     samples: List[Dict] = []
-
     with open(metadata_path, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
-            row = json.loads(line)
-            row['_image_path'] = os.path.join(data_dir, row['file_name'])
-            samples.append(row)
+            samples.append(json.loads(line))
 
     return samples
+
+
+def _cleanup_image_files(file_paths: List[str]):
+    """Delete downloaded image files to free disk space."""
+    for path in file_paths:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            pass
 
 
 def invoke_model(bedrock_model_id: str, image, question: str, language: str) -> Dict:
