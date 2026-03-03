@@ -30,6 +30,20 @@
       "enabled": true
     },
     {
+      "id": "claude-opus-4-6",
+      "name": "Claude Opus 4.6",
+      "provider": "bedrock",
+      "bedrockModelId": "global.anthropic.claude-opus-4-6-v1",
+      "enabled": true
+    },
+    {
+      "id": "claude-sonnet-4-6",
+      "name": "Claude Sonnet 4.6",
+      "provider": "bedrock",
+      "bedrockModelId": "global.anthropic.claude-sonnet-4-6",
+      "enabled": true
+    },
+    {
       "id": "qwen3-vl-235b",
       "name": "Qwen3 VL 235B",
       "provider": "bedrock",
