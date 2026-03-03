@@ -115,6 +115,7 @@ const SINGLE_QUESTION_PROMPTS: Record<string, string> = {
 - 「品目」「商品」「購入したもの」を聞かれたら → 商品の名前のみ出力（価格・数量・「合計」は除外）
 - 「番号」「登録番号」を聞かれたら → Tで始まる番号のみ出力
 - 複数ある場合 → 1行に1つ
+- 画像に該当情報が見つからない場合 → 空文字""を返してください
 
 説明文は不要。答えのみ。`,
   en: `Look at the image and answer the question. Return only the answer, concisely.
@@ -127,6 +128,7 @@ Answer rules:
 - If asking for "items", "products", "purchases" → output product names only (exclude prices, quantities, "total")
 - If asking for "number", "registration number" → output the number only (starting with T if applicable)
 - If multiple items → one per line
+- If the requested information is NOT found in the document → return empty string ""
 
 No explanations needed. Answer only.`,
   zh: `查看图像并回答问题。只返回答案，简洁明了。
@@ -139,6 +141,7 @@ No explanations needed. Answer only.`,
 - 询问「品目」「商品」「购买的东西」→ 只输出商品名称（排除价格、数量、「合计」）
 - 询问「号码」「登记号」→ 只输出号码（如适用以T开头）
 - 多个项目 → 每行一个
+- 如果在文档中找不到所需信息 → 返回空字符串""
 
 不需要解释。只要答案。`,
   ko: `이미지를 보고 질문에 답하세요. 답만 간결하게 반환하세요.
@@ -151,6 +154,7 @@ No explanations needed. Answer only.`,
 - 「품목」「상품」「구매한 것」을 물으면 → 상품 이름만 출력 (가격, 수량, 「합계」 제외)
 - 「번호」「등록번호」를 물으면 → 번호만 출력 (해당되면 T로 시작)
 - 여러 항목 → 한 줄에 하나씩
+- 요청한 정보를 문서에서 찾을 수 없는 경우 → 빈 문자열""을 반환하세요
 
 설명 불필요. 답만.`,
 };

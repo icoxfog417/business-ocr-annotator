@@ -24,9 +24,11 @@ EVALUATION_PROMPTS: Dict[str, str] = {
 - 「品目」「商品」「購入したもの」を聞かれたら → 商品の名前のみ出力（価格・数量・「合計」は除外）
 - 「番号」「登録番号」を聞かれたら → Tで始まる番号のみ出力
 - 複数ある場合 → 1行に1つ（改行で区切る）
+- 画像に該当情報が見つからない場合 → 空文字""を返してください
 
 JSON形式で返答してください:
 {{"answer": "回答テキスト", "bbox": [x0, y0, x1, y1]}}
+情報がない場合: {{"answer": "", "bbox": [0, 0, 1, 1]}}
 
 bboxは正規化座標（0-1範囲）で、回答が見つかる領域を指定してください。
 説明文は不要。JSONのみ返してください。""",
@@ -41,9 +43,11 @@ Answer rules:
 - If asking for "items", "products", "purchases" → output product names only (exclude prices, quantities, "total")
 - If asking for "number", "registration number" → output the number only (starting with T if applicable)
 - If multiple items → one per line (separate with newlines)
+- If the requested information is NOT found in the document → return empty string ""
 
 Return as JSON format:
 {{"answer": "your answer text", "bbox": [x0, y0, x1, y1]}}
+If not found: {{"answer": "", "bbox": [0, 0, 1, 1]}}
 
 bbox should be normalized coordinates (0-1 range) indicating where the answer is found.
 No explanations needed. Return ONLY valid JSON.""",
@@ -58,9 +62,11 @@ No explanations needed. Return ONLY valid JSON.""",
 - 询问「品目」「商品」「购买的东西」→ 只输出商品名称（排除价格、数量、「合计」）
 - 询问「号码」「登记号」→ 只输出号码（如适用以T开头）
 - 多个项目 → 每行一个（用换行符分隔）
+- 如果在文档中找不到所需信息 → 返回空字符串""
 
 以JSON格式返回:
 {{"answer": "回答文本", "bbox": [x0, y0, x1, y1]}}
+如果未找到: {{"answer": "", "bbox": [0, 0, 1, 1]}}
 
 bbox应为正规化坐标（0-1范围），指示答案所在的区域。
 不需要解释。只返回有效的JSON。""",
@@ -75,9 +81,11 @@ bbox应为正规化坐标（0-1范围），指示答案所在的区域。
 - 「품목」「상품」「구매한 것」을 물으면 → 상품 이름만 출력 (가격, 수량, 「합계」 제외)
 - 「번호」「등록번호」를 물으면 → 번호만 출력 (해당되면 T로 시작)
 - 여러 항목 → 한 줄에 하나씩 (줄바꿈으로 구분)
+- 요청한 정보를 문서에서 찾을 수 없는 경우 → 빈 문자열""을 반환하세요
 
 JSON 형식으로 반환:
 {{"answer": "답변 텍스트", "bbox": [x0, y0, x1, y1]}}
+정보를 찾을 수 없는 경우: {{"answer": "", "bbox": [0, 0, 1, 1]}}
 
 bbox는 정규화된 좌표(0-1 범위)로, 답변이 발견된 영역을 지정하세요.
 설명 불필요. 유효한 JSON만 반환하세요.""",
