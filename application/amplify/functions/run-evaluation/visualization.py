@@ -63,6 +63,26 @@ def _is_valid_bbox(bbox: List[float]) -> bool:
     return x0 < x1 and y0 < y1
 
 
+def normalize_bbox(bbox: List[float], image_size: tuple) -> List[float]:
+    """Normalize bounding box coordinates to 0-1 range.
+
+    Models may return pixel coordinates despite the prompt asking for
+    normalized values.  If any coordinate exceeds 1.0, assume pixel
+    coordinates and scale by image dimensions.
+    """
+    if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+        return [0.0, 0.0, 1.0, 1.0]
+    try:
+        vals = [float(v) for v in bbox]
+    except (TypeError, ValueError):
+        return [0.0, 0.0, 1.0, 1.0]
+    if any(v > 1.0 for v in vals):
+        w, h = image_size
+        if w > 0 and h > 0:
+            return [vals[0] / w, vals[1] / h, vals[2] / w, vals[3] / h]
+    return vals
+
+
 def format_bbox_str(bbox: List[float]) -> str:
     """Format a bbox list as a human-readable string for table columns.
 
