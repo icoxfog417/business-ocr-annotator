@@ -178,11 +178,13 @@ export const handler = async (
       const jobId = crypto.randomUUID();
 
       // Create EvaluationJob record in DynamoDB
+      // Include __typename for Amplify Gen2 AppSync compatibility
       await docClient.send(
         new PutCommand({
           TableName: tableName,
           Item: {
             id: jobId,
+            __typename: 'EvaluationJob',
             jobId: jobId,
             datasetVersion: datasetVersion,
             modelId: model.id,
