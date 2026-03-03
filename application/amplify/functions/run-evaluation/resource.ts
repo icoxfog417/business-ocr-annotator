@@ -23,6 +23,8 @@ export const runEvaluation = defineFunction(
         WANDB_CONFIG_DIR: '/tmp/.config/wandb',
         WANDB_PROJECT: process.env.AWS_BRANCH === 'main' ? 'biz-doc-vqa' : 'biz-doc-vqa-dev',
         WANDB_API_KEY_SSM_PARAM: '/business-ocr/wandb-api-key',
+        GEMINI_API_KEY_SSM_PARAM: '/business-ocr/gemini-api-key',
+        OPENAI_API_KEY_SSM_PARAM: '/business-ocr/openai-api-key',
       },
       code: Code.fromAsset(functionDir, {
         bundling: {

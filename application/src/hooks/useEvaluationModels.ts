@@ -8,7 +8,9 @@ export interface EvaluationModel {
   id: string;
   name: string;
   provider: string;
-  bedrockModelId: string;
+  bedrockModelId?: string;
+  providerModelId?: string;
+  apiKeySSMParam?: string;
   enabled: boolean;
 }
 
