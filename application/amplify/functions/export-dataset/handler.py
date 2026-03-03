@@ -119,9 +119,11 @@ def handler(event, context):
 
         if not resume_from:
             # Create export progress record
+            # Include __typename for Amplify Gen2 AppSync compatibility
             progress_table.put_item(
                 Item={
                     'id': export_id,
+                    '__typename': 'DatasetExportProgress',
                     'exportId': export_id,
                     'version': dataset_version,
                     'processedCount': 0,

@@ -13,6 +13,10 @@ const MAX_PAGES = 1000;
  *
  * Amplify Gen2 `list()` returns at most one page of results by default.
  * This helper follows `nextToken` to retrieve every record.
+ *
+ * Note: The Amplify client's `list()` returns `{ data: [], errors }` on
+ * GraphQL errors instead of throwing.  We surface those errors so callers
+ * can decide how to handle them rather than silently returning empty data.
  */
 export async function listAllItems<T>(
   modelName: ModelName,
@@ -29,6 +33,11 @@ export async function listAllItems<T>(
       ...(options?.filter ? { filter: options.filter } : {}),
       ...(nextToken ? { nextToken } : {}),
     });
+
+    // Surface GraphQL errors that the Amplify client silently swallows
+    if (result.errors && result.errors.length > 0) {
+      console.error(`GraphQL errors listing ${modelName}:`, result.errors);
+    }
 
     if (Array.isArray(result.data)) {
       allItems.push(...(result.data as T[]));

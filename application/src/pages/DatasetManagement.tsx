@@ -156,33 +156,47 @@ export function DatasetManagement() {
   // -------------------------------------------------------------------------
   const fetchData = useCallback(async () => {
     try {
-      const [versionsData, progressData, jobsData] = await Promise.all([
+      // Use allSettled so a failure in one model does not block the others
+      const [versionsResult, progressResult, jobsResult] = await Promise.allSettled([
         listAllItems<DatasetVersion>('DatasetVersion'),
         listAllItems<DatasetExportProgress>('DatasetExportProgress'),
         listAllItems<EvaluationJob>('EvaluationJob'),
       ]);
 
-      const versions = versionsData.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setDatasetVersions(versions);
-      setExportProgresses(progressData);
-      setEvaluationJobs(
-        jobsData.sort(
+      if (versionsResult.status === 'fulfilled') {
+        const versions = versionsResult.value.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
-      );
+        );
+        setDatasetVersions(versions);
 
-      // Auto-fill next version & repoId from latest
-      if (versions.length > 0) {
-        const latest = versions[0];
-        setNewVersion((prev) => prev || incrementVersion(latest.version));
-        // Only auto-fill repo ID if not preset via config
-        if (!isRepoIdLocked) {
-          setRepoId((prev) => prev || latest.huggingFaceRepoId);
+        // Auto-fill next version & repoId from latest
+        if (versions.length > 0) {
+          const latest = versions[0];
+          setNewVersion((prev) => prev || incrementVersion(latest.version));
+          if (!isRepoIdLocked) {
+            setRepoId((prev) => prev || latest.huggingFaceRepoId);
+          }
+        } else {
+          setNewVersion((prev) => prev || 'v1.0.0');
         }
       } else {
-        setNewVersion((prev) => prev || 'v1.0.0');
+        console.error('Failed to fetch DatasetVersions:', versionsResult.reason);
+      }
+
+      if (progressResult.status === 'fulfilled') {
+        setExportProgresses(progressResult.value);
+      } else {
+        console.error('Failed to fetch DatasetExportProgress:', progressResult.reason);
+      }
+
+      if (jobsResult.status === 'fulfilled') {
+        setEvaluationJobs(
+          jobsResult.value.sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+        );
+      } else {
+        console.error('Failed to fetch EvaluationJobs:', jobsResult.reason);
       }
     } catch (err) {
       console.error('Failed to fetch dataset data:', err);
