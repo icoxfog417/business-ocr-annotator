@@ -26,7 +26,7 @@ from PIL import Image
 from io import BytesIO
 from metrics import calculate_anls, calculate_iou
 from prompts import get_evaluation_prompt
-from visualization import draw_bbox, format_bbox_str
+from visualization import draw_bbox, format_bbox_str, normalize_bbox
 
 # AWS clients
 dynamodb = boto3.resource('dynamodb')
@@ -308,6 +308,8 @@ def process_evaluation_job(message: Dict):
 
                 # Extract bboxes for IoU and visualization
                 pred_bbox = prediction.get('bbox', [0.0, 0.0, 1.0, 1.0])
+                # Normalize pixel coords to 0-1 range if model ignored the prompt instruction
+                pred_bbox = normalize_bbox(pred_bbox, image.size)
                 gt_bbox = list(sample['answer_bbox'])
 
                 # Calculate IoU (bounding box accuracy)
@@ -364,6 +366,10 @@ def process_evaluation_job(message: Dict):
         # Clean up remaining downloaded images
         _cleanup_image_files(downloaded_files)
 
+        # Log results table for this run (including checkpointed partial runs)
+        if wandb_run and results_data:
+            _log_results_table(results_data)
+
         # If we checkpointed, return early (job continues in next invocation)
         if checkpointed:
             print(
@@ -379,18 +385,9 @@ def process_evaluation_job(message: Dict):
                 f'First errors: {failed_sample_errors[:3]}'
             )
 
-        # Log final results table to W&B
+        # Log final summary to W&B (results table already logged above)
         wandb_run_url = ''
         if wandb_run and results_data:
-            columns = [
-                'annotation_id', 'question', 'ground_truth', 'prediction',
-                'anls', 'iou', 'annotated_image', 'predicted_bbox', 'ground_truth_bbox',
-            ]
-            table = wandb.Table(columns=columns)
-            for row in results_data:
-                table.add_data(*[row[c] for c in columns])
-            wandb.log({'evaluation_results': table})
-
             wandb.summary['final_anls'] = running_anls
             wandb.summary['final_iou'] = running_iou
             wandb.summary['total_samples'] = samples_evaluated
@@ -461,6 +458,18 @@ def process_evaluation_job(message: Dict):
     finally:
         if wandb_run:
             wandb.finish()
+
+
+def _log_results_table(results_data: List[Dict]):
+    """Log evaluation results as a W&B Table."""
+    columns = [
+        'annotation_id', 'question', 'ground_truth', 'prediction',
+        'anls', 'iou', 'annotated_image', 'predicted_bbox', 'ground_truth_bbox',
+    ]
+    table = wandb.Table(columns=columns)
+    for row in results_data:
+        table.add_data(*[row[c] for c in columns])
+    wandb.log({'evaluation_results': table})
 
 
 def load_checkpoint(job_table, evaluation_job_id: str) -> Dict:

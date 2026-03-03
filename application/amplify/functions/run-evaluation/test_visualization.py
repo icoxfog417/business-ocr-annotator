@@ -8,7 +8,7 @@ Run with: pytest test_visualization.py -v
 """
 from PIL import Image
 
-from visualization import draw_bbox, format_bbox_str
+from visualization import draw_bbox, format_bbox_str, normalize_bbox
 
 
 # =============================================================================
@@ -109,3 +109,44 @@ class TestFormatBboxStr:
 
     def test_non_numeric(self):
         assert format_bbox_str(['a', 'b', 'c', 'd']) == 'N/A'
+
+
+# =============================================================================
+# normalize_bbox
+# =============================================================================
+
+
+class TestNormalizeBbox:
+    """normalize_bbox converts pixel coords to 0-1 range when values exceed 1."""
+
+    def test_already_normalized(self):
+        """Values in 0-1 range are returned unchanged."""
+        assert normalize_bbox([0.1, 0.2, 0.5, 0.8], (1000, 800)) == [0.1, 0.2, 0.5, 0.8]
+
+    def test_pixel_coords_scaled(self):
+        """Pixel coordinates are divided by image dimensions."""
+        result = normalize_bbox([100, 200, 500, 800], (1000, 800))
+        assert result == [0.1, 0.25, 0.5, 1.0]
+
+    def test_mixed_coords_treated_as_pixel(self):
+        """If any value > 1.0, all are scaled."""
+        result = normalize_bbox([0.5, 0.5, 100, 100], (200, 200))
+        assert result == [0.0025, 0.0025, 0.5, 0.5]
+
+    def test_invalid_length_returns_fallback(self):
+        assert normalize_bbox([0.1, 0.2], (100, 100)) == [0.0, 0.0, 1.0, 1.0]
+
+    def test_empty_returns_fallback(self):
+        assert normalize_bbox([], (100, 100)) == [0.0, 0.0, 1.0, 1.0]
+
+    def test_non_numeric_returns_fallback(self):
+        assert normalize_bbox(['a', 'b', 'c', 'd'], (100, 100)) == [0.0, 0.0, 1.0, 1.0]
+
+    def test_zero_dimension_image(self):
+        """Zero-size image should not cause division by zero."""
+        result = normalize_bbox([100, 200, 300, 400], (0, 0))
+        assert result == [100.0, 200.0, 300.0, 400.0]
+
+    def test_exact_one_not_scaled(self):
+        """Coords of exactly 1.0 should NOT trigger scaling."""
+        assert normalize_bbox([0.0, 0.0, 1.0, 1.0], (500, 500)) == [0.0, 0.0, 1.0, 1.0]
