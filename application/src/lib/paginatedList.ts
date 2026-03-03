@@ -40,7 +40,8 @@ export async function listAllItems<T>(
     }
 
     if (Array.isArray(result.data)) {
-      allItems.push(...(result.data as T[]));
+      // Filter out null entries caused by GraphQL errors on required fields
+      allItems.push(...result.data.filter((item: T | null): item is T => item != null));
     }
     nextToken = result.nextToken;
     pages += 1;
