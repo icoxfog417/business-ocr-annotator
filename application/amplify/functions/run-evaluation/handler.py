@@ -26,11 +26,11 @@ from PIL import Image
 from io import BytesIO
 from metrics import calculate_anls, calculate_iou
 from prompts import get_evaluation_prompt
+from providers import invoke_provider
 from visualization import draw_bbox, format_bbox_str, normalize_bbox
 
 # AWS clients
 dynamodb = boto3.resource('dynamodb')
-bedrock_client = boto3.client('bedrock-runtime')
 sqs_client = boto3.client('sqs')
 ssm_client = boto3.client('ssm')
 
@@ -98,6 +98,9 @@ def handler(event, context):
         "modelId": "claude-sonnet-4-5",
         "modelName": "Claude Sonnet 4.5",
         "modelBedrockId": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "provider": "bedrock",
+        "providerModelId": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "apiKeySSMParam": "",
         "evaluationJobTableName": "EvaluationJob-xxx",
         "evaluationQueueUrl": "https://sqs.us-east-1.amazonaws.com/..."
     }
@@ -169,8 +172,15 @@ def process_evaluation_job(message: Dict):
     hf_repo_id = message['huggingFaceRepoId']
     model_id = message['modelId']
     model_name = message.get('modelName', model_id)
-    bedrock_model_id = message['modelBedrockId']
     queue_url = message.get('evaluationQueueUrl', '')
+
+    # Provider info (backward compatible: default to bedrock)
+    provider = message.get('provider', 'bedrock')
+    provider_model_id = (
+        message.get('providerModelId')
+        or message.get('modelBedrockId', '')
+    )
+    api_key_ssm_param = message.get('apiKeySSMParam', '')
 
     # Table name is passed from the data-stack trigger to avoid circular
     # CloudFormation dependency between function and data stacks.
@@ -218,7 +228,8 @@ def process_evaluation_job(message: Dict):
                 config={
                     'model_id': model_id,
                     'model_name': model_name,
-                    'bedrock_model_id': bedrock_model_id,
+                    'provider': provider,
+                    'provider_model_id': provider_model_id,
                     'dataset_version': dataset_version,
                     'hf_repo_id': hf_repo_id,
                     'job_id': job_id,
@@ -297,10 +308,12 @@ def process_evaluation_job(message: Dict):
             try:
                 image = Image.open(image_path)
                 prediction = invoke_model(
-                    bedrock_model_id,
+                    provider,
+                    provider_model_id,
                     image,
                     sample['question'],
                     sample.get('language', 'en'),
+                    api_key_ssm_param,
                 )
 
                 # Calculate ANLS (text accuracy)
@@ -569,8 +582,15 @@ def _cleanup_image_files(file_paths: List[str]):
             pass
 
 
-def invoke_model(bedrock_model_id: str, image, question: str, language: str) -> Dict:
-    """Invoke Bedrock model with image and question, return parsed answer + bbox.
+def invoke_model(
+    provider: str,
+    provider_model_id: str,
+    image,
+    question: str,
+    language: str,
+    api_key_ssm_param: str = '',
+) -> Dict:
+    """Invoke model via the appropriate provider, return parsed answer + bbox.
 
     Uses language-specific prompts synchronized with annotation prompts
     for consistent answer formatting (see prompts.py).
@@ -585,30 +605,14 @@ def invoke_model(bedrock_model_id: str, image, question: str, language: str) -> 
     # Use language-specific prompt for consistent formatting with annotation
     prompt = get_evaluation_prompt(question, language)
 
-    response = bedrock_client.converse(
-        modelId=bedrock_model_id,
-        messages=[
-            {
-                'role': 'user',
-                'content': [
-                    {'text': prompt},
-                    {
-                        'image': {
-                            'format': 'jpeg',
-                            'source': {'bytes': img_bytes},
-                        },
-                    },
-                ],
-            },
-        ],
-        inferenceConfig={
-            'temperature': 0.1,
-            'maxTokens': 500,
-        },
-    )
+    # Resolve API key for non-Bedrock providers
+    api_key = ''
+    if api_key_ssm_param:
+        api_key = get_secret(api_key_ssm_param)
 
-    content = response.get('output', {}).get('message', {}).get('content', [])
-    response_text = content[0].get('text', '') if content else ''
+    response_text = invoke_provider(
+        provider, provider_model_id, img_bytes, prompt, api_key
+    )
 
     return parse_model_response(response_text)
 

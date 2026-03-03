@@ -7,5 +7,8 @@ pytest-cov>=4.0.0
 # Reference implementations for comparison testing
 anls>=0.0.2  # DocVQA competition reference (https://pypi.org/project/anls/)
 
+# AWS SDK (available in Lambda runtime, needed for local testing)
+boto3>=1.28.0
+
 # Include main requirements
 -r requirements.txt

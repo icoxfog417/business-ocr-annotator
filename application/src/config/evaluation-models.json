@@ -6,6 +6,7 @@
       "name": "Amazon Nova Pro",
       "provider": "bedrock",
       "bedrockModelId": "amazon.nova-pro-v1:0",
+      "providerModelId": "amazon.nova-pro-v1:0",
       "enabled": true
     },
     {
@@ -13,6 +14,7 @@
       "name": "Amazon Nova Pro 2 (Preview)",
       "provider": "bedrock",
       "bedrockModelId": "us.amazon.nova-2-pro-preview-20251202-v1:0",
+      "providerModelId": "us.amazon.nova-2-pro-preview-20251202-v1:0",
       "enabled": true
     },
     {
@@ -20,6 +22,7 @@
       "name": "Claude Sonnet 4.5",
       "provider": "bedrock",
       "bedrockModelId": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+      "providerModelId": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
       "enabled": true
     },
     {
@@ -27,6 +30,7 @@
       "name": "Claude Haiku 4.5",
       "provider": "bedrock",
       "bedrockModelId": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "providerModelId": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
       "enabled": true
     },
     {
@@ -34,6 +38,7 @@
       "name": "Qwen3 VL 235B",
       "provider": "bedrock",
       "bedrockModelId": "qwen.qwen3-vl-235b-a22b",
+      "providerModelId": "qwen.qwen3-vl-235b-a22b",
       "enabled": true
     },
     {
@@ -41,6 +46,7 @@
       "name": "Google Gemma 3 27B",
       "provider": "bedrock",
       "bedrockModelId": "google.gemma-3-27b-it",
+      "providerModelId": "google.gemma-3-27b-it",
       "enabled": true
     },
     {
@@ -48,6 +54,39 @@
       "name": "NVIDIA Nemotron Nano 12B",
       "provider": "bedrock",
       "bedrockModelId": "nvidia.nemotron-nano-12b-v2",
+      "providerModelId": "nvidia.nemotron-nano-12b-v2",
+      "enabled": true
+    },
+    {
+      "id": "gemini-3-flash",
+      "name": "Gemini 3 Flash",
+      "provider": "gemini",
+      "providerModelId": "gemini-3-flash-preview",
+      "apiKeySSMParam": "GEMINI_API_KEY_SSM_PARAM",
+      "enabled": true
+    },
+    {
+      "id": "gemini-2-5-pro",
+      "name": "Gemini 2.5 Pro",
+      "provider": "gemini",
+      "providerModelId": "gemini-2.5-pro",
+      "apiKeySSMParam": "GEMINI_API_KEY_SSM_PARAM",
+      "enabled": true
+    },
+    {
+      "id": "gpt-5",
+      "name": "GPT-5",
+      "provider": "openai",
+      "providerModelId": "gpt-5",
+      "apiKeySSMParam": "OPENAI_API_KEY_SSM_PARAM",
+      "enabled": true
+    },
+    {
+      "id": "gpt-4-1",
+      "name": "GPT-4.1",
+      "provider": "openai",
+      "providerModelId": "gpt-4.1",
+      "apiKeySSMParam": "OPENAI_API_KEY_SSM_PARAM",
       "enabled": true
     }
   ],
