@@ -16,6 +16,13 @@
       "enabled": true
     },
     {
+      "id": "amazon-nova-lite-2",
+      "name": "Amazon Nova Lite 2",
+      "provider": "bedrock",
+      "bedrockModelId": "global.amazon.nova-2-lite-v1:0",
+      "enabled": true
+    },
+    {
       "id": "claude-sonnet-4-5",
       "name": "Claude Sonnet 4.5",
       "provider": "bedrock",
